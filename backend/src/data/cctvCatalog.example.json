@@ -1,0 +1,19 @@
+[
+  {
+    "id": "example-do-not-use",
+    "name": "Jl. Jenderal Sudirman (contoh format, URL palsu)",
+    "city": "Jakarta",
+    "cityId": "jakarta",
+    "provider": "Nama Website Sumber",
+    "lat": -6.2145,
+    "lon": 106.8215,
+    "headingDeg": 180,
+    "pitchDeg": -20,
+    "fovDeg": 60,
+    "rangeM": 250,
+    "mountHeightM": 8,
+    "feedType": "image",
+    "url": "https://example.com/ganti-dengan-url-frame-asli.jpg",
+    "license": "Sumber: Nama Website Sumber"
+  }
+]

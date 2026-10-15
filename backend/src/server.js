@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import routeRouter from './routes/route.js';
 import aqiRouter from './routes/aqi.js';
+import cctvRouter from './routes/cctv.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -17,8 +18,9 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/route', routeRouter);
 app.use('/api/aqi', aqiRouter);
+app.use('/api/cctv', cctvRouter);
 
-// TODO: GET /api/cctv/*, POST /api/navigate
+// TODO: POST /api/navigate
 
 app.listen(PORT, () => {
   console.log(`jakSafe backend running on http://localhost:${PORT}`);
