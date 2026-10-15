@@ -1,8 +1,8 @@
 // Multi-Criteria Route Scoring Engine for jakSafe
 // Combines 3 independent factors into a unified risk/safety score (0 - 100):
-// 1. Travel Time (OSRM duration)
+// 1. Travel Time (OSRM baseline duration calibrated with TomTom real-time delay)
 // 2. Air Pollution (PM2.5 / AQI from Open-Meteo)
-// 3. Road & Visual Condition (Flood/traffic detection from CCTV + Gemini Vision)
+// 3. Road & Visual Condition (Flood detection from CCTV + Gemini Vision, augmented by TomTom traffic)
 //
 // Reference: JAKSENTINEL_PROJECT_GUIDE.md Section 8
 
@@ -22,7 +22,7 @@ export const SCORE_LABELS = {
  * Normalizes travel duration to a 0 - 100 score.
  * < 5 mins = 0 (best)
  * > 60 mins = 100 (worst)
- * @param {number} durationS Duration in seconds
+ * @param {number} durationS Duration in seconds (real-time calibrated)
  * @returns {number} Score between 0 and 100
  */
 export function normalizeTimeScore(durationS) {
@@ -58,47 +58,53 @@ export function normalizeAqiScore({ pm2_5, us_aqi }) {
 }
 
 /**
- * Normalizes visual road condition (from Gemini Vision analysis) to 0 - 100.
+ * Normalizes road condition to 0 - 100 using both CCTV Visual Analysis and TomTom Traffic data.
  * Factors:
- * - Flood presence & severity (major weight)
- * - Traffic congestion (minor weight)
- * - Confidence guardrail: confidence < 0.4 downgrades to caution (at least 45)
- * @param {object} [analysis] Output from analyzeImage tool
+ * - Flood presence & severity from Gemini Vision (major weight)
+ * - Road closure or extreme congestion from TomTom (when CCTV is unavailable or augmenting)
+ * - Traffic congestion contribution
+ * - Confidence guardrail: vision confidence < 0.4 downgrades to caution (at least 45)
+ * @param {object} [analysis] Output from analyzeImage tool (CCTV + Gemini Vision)
+ * @param {object} [trafficData] Output from TomTom flow segment { delayPercent, roadClosure }
  * @returns {number} Score between 0 and 100
  */
-export function normalizeConditionScore(analysis) {
-  if (!analysis || typeof analysis !== 'object') {
-    // No camera nearby or analysis unavailable -> neutral condition
-    return 20;
+export function normalizeConditionScore(analysis, trafficData = null) {
+  // If road is reported closed by TomTom -> maximum hazard
+  if (trafficData?.roadClosure) {
+    return 100;
   }
 
-  const {
-    genangan_air = false,
-    tingkat_genangan = 'tidak_ada',
-    kondisi_jalan = 'lancar',
-    confidence = 1.0,
-  } = analysis;
-
-  // Base score from flooding
+  // Base score from flooding (Gemini Vision)
   let floodScore = 0;
-  if (genangan_air) {
-    const level = String(tingkat_genangan).toLowerCase();
+  if (analysis?.genangan_air) {
+    const level = String(analysis.tingkat_genangan || '').toLowerCase();
     if (level === 'rendah' || level === 'ringan') floodScore = 35;
     else if (level === 'sedang') floodScore = 65;
     else if (level === 'berat' || level === 'tinggi') floodScore = 95;
     else floodScore = 50;
   }
 
-  // Traffic congestion contribution
+  // Traffic congestion score: prioritize TomTom sensor delay if available, else vision analysis
   let trafficScore = 0;
-  const traffic = String(kondisi_jalan).toLowerCase();
-  if (traffic === 'padat' || traffic === 'merayap') trafficScore = 15;
-  else if (traffic === 'macet' || traffic === 'macet_total') trafficScore = 30;
+  if (trafficData && Number.isFinite(trafficData.delayPercent)) {
+    if (trafficData.delayPercent >= 80) trafficScore = 30;       // Severe congestion
+    else if (trafficData.delayPercent >= 30) trafficScore = 15;  // Moderate congestion
+    else trafficScore = 0;                                       // Free flow
+  } else if (analysis?.kondisi_jalan) {
+    const traffic = String(analysis.kondisi_jalan).toLowerCase();
+    if (traffic === 'padat' || traffic === 'merayap') trafficScore = 15;
+    else if (traffic === 'macet' || traffic === 'macet_total') trafficScore = 30;
+  }
 
   let totalCondition = floodScore + trafficScore;
 
-  // Ethical guardrail: low confidence degrades to caution
-  if (Number.isFinite(confidence) && confidence < 0.4) {
+  // If no CCTV analysis and no traffic data -> neutral default
+  if (!analysis && !trafficData) {
+    totalCondition = 20;
+  }
+
+  // Ethical guardrail: low confidence visual analysis degrades to caution
+  if (analysis && Number.isFinite(analysis.confidence) && analysis.confidence < 0.4) {
     totalCondition = Math.max(totalCondition, 45);
   }
 
@@ -118,24 +124,27 @@ export function getScoreCategory(totalScore) {
 
 /**
  * Calculates the multi-criteria score for a route.
+ * Calibrates OSRM duration with TomTom real-time traffic delay.
  * @param {object} params
- * @param {number} params.durationS Route duration in seconds (from Tool 1)
- * @param {object} params.aqiData Air quality data { pm2_5, us_aqi } (from Tool 2)
- * @param {object} [params.visualAnalysis] CCTV analysis result (from Tool 4)
+ * @param {number} params.durationS Route duration in seconds (from OSRM Tool 1)
+ * @param {object} [params.trafficData] Real-time traffic data from TomTom { delayPercent, currentSpeedKmH, roadClosure }
+ * @param {object} params.aqiData Air quality data { pm2_5, us_aqi } (from Open-Meteo Tool 2)
+ * @param {object} [params.visualAnalysis] CCTV analysis result (from Gemini Vision Tool 4)
  * @param {object} [params.weights] Optional custom weights { time, aqi, condition }
  * @returns {{
  *   totalScore: number,
  *   label: string,
  *   color: string,
  *   breakdown: {
- *     time: { score: number, weight: number, durationMinutes: number },
+ *     time: { score: number, weight: number, baseDurationMin: number, effectiveDurationMin: number, delayPercent: number, trafficSource: string },
  *     aqi: { score: number, weight: number, pm2_5?: number, us_aqi?: number },
- *     condition: { score: number, weight: number, floodDetected: boolean, traffic: string }
+ *     condition: { score: number, weight: number, floodDetected: boolean, roadClosure: boolean, traffic: string }
  *   }
  * }}
  */
 export function calculateRouteScore({
   durationS,
+  trafficData = null,
   aqiData = {},
   visualAnalysis = null,
   weights = DEFAULT_WEIGHTS,
@@ -149,9 +158,20 @@ export function calculateRouteScore({
     condition: (rawW.condition || 0) / sumW,
   };
 
-  const timeScore = normalizeTimeScore(durationS);
+  // Calibrate baseline duration with real-time TomTom delay
+  let effectiveDurationS = durationS;
+  let delayPercent = 0;
+  if (trafficData && Number.isFinite(trafficData.delayPercent) && trafficData.delayPercent > 0) {
+    delayPercent = trafficData.delayPercent;
+    effectiveDurationS = Math.round(durationS * (1 + delayPercent / 100));
+  }
+  if (trafficData?.roadClosure) {
+    effectiveDurationS = Math.max(effectiveDurationS, 3600); // Heavy penalty for closed road
+  }
+
+  const timeScore = normalizeTimeScore(effectiveDurationS);
   const aqiScore = normalizeAqiScore(aqiData);
-  const conditionScore = normalizeConditionScore(visualAnalysis);
+  const conditionScore = normalizeConditionScore(visualAnalysis, trafficData);
 
   const totalScore = Math.round(
     (timeScore * w.time) + (aqiScore * w.aqi) + (conditionScore * w.condition)
@@ -167,7 +187,10 @@ export function calculateRouteScore({
       time: {
         score: timeScore,
         weight: Number(w.time.toFixed(2)),
-        durationMinutes: Math.round(durationS / 60),
+        baseDurationMin: Math.round(durationS / 60),
+        effectiveDurationMin: Math.round(effectiveDurationS / 60),
+        delayPercent,
+        trafficSource: trafficData ? 'TomTom Live' : 'OSRM Baseline',
       },
       aqi: {
         score: aqiScore,
@@ -179,7 +202,10 @@ export function calculateRouteScore({
         score: conditionScore,
         weight: Number(w.condition.toFixed(2)),
         floodDetected: Boolean(visualAnalysis?.genangan_air),
-        traffic: visualAnalysis?.kondisi_jalan || 'normal',
+        roadClosure: Boolean(trafficData?.roadClosure),
+        traffic: trafficData
+          ? (trafficData.delayPercent >= 80 ? 'macet_berat' : trafficData.delayPercent >= 30 ? 'padat' : 'lancar')
+          : (visualAnalysis?.kondisi_jalan || 'normal'),
       },
     },
   };
