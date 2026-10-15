@@ -25,9 +25,11 @@ export class RouteError extends Error {
 }
 
 /** Parse "lon,lat;lon,lat" into [[lon, lat], ...] with validation. */
-export function parseCoords(raw) {
+export function parseCoords(raw, min = 2) {
   const pairs = String(raw || '').split(';').map((s) => s.trim()).filter(Boolean);
-  if (pairs.length < 2 || pairs.length > 12) throw new RouteError('need 2-12 coordinates');
+  if (pairs.length < min || pairs.length > 12) {
+    throw new RouteError(`need ${min}-12 coordinates`);
+  }
   return pairs.map((p) => {
     const parts = p.split(',');
     const lon = Number(parts[0]);

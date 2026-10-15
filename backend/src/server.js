@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import routeRouter from './routes/route.js';
+import aqiRouter from './routes/aqi.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,6 +16,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/route', routeRouter);
+app.use('/api/aqi', aqiRouter);
 
 // TODO: GET /api/cctv/*, POST /api/navigate
 
