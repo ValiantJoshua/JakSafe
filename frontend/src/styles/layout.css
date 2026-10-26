@@ -1,0 +1,254 @@
+/*
+   JakSafe, Layout
+*/
+
+.app { display: flex; flex-direction: column; height: 100vh; background: var(--jk-white); }
+
+/* TOPBAR */
+.topbar {
+  position: relative;
+  z-index: var(--z-topbar);
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s6);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.topbar::after {           /* garis tipis gradien brand di bawah topbar */
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg,
+    var(--jk-blue-1) 0%, var(--jk-blue-2) 32%,
+    var(--jk-green) 66%, var(--jk-lime) 100%);
+  opacity: .9;
+}
+
+.brandlink { text-decoration: none; display: inline-flex; }
+
+/* LOGO */
+.logo { display: inline-flex; align-items: center; gap: var(--s3); }
+
+/* Wadah logo. Berisi gambar dari tautan, dengan versi SVG
+   sebagai cadangan bila gambar gagal dimuat. */
+.logomark {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  border-radius: 27%;
+  overflow: hidden;
+  background: #FFFFFF;
+  box-shadow: var(--sh-brand);
+  transition: transform var(--dur-2) var(--ease);
+}
+.logomark__img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.logomark__fb  { display: none; position: absolute; inset: 0; }
+.logomark__fb svg { width: 100%; height: 100%; }
+.logomark.is-fallback .logomark__img { display: none; }
+.logomark.is-fallback .logomark__fb  { display: block; }
+
+.brandlink:hover .logomark { transform: translateY(-2px) rotate(-3deg); }
+
+.logo__text { display: flex; flex-direction: column; line-height: 1; }
+
+.logo__word {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+/* warna tulisan mengikuti logo resmi, Jak navy dan Safe hijau */
+.w-jak  { color: var(--jk-navy); }
+.w-safe { color: var(--jk-green); }
+[data-theme="gelap"] .w-jak  { color: #DCE3FF; }
+[data-theme="gelap"] .w-safe { color: var(--jk-lime); }
+
+.logo__tag {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  letter-spacing: .03em;
+  margin-top: 3px;
+}
+
+/* daun pada logo bergoyang pelan */
+.logoleaf { transform-origin: 52px 12px; animation: leafsway 4.5s var(--ease-io) infinite; }
+@keyframes leafsway { 50% { transform: rotate(-9deg) translateY(-1px); } }
+
+/* marka jalan pada logo berjalan */
+.roadline { animation: roadrun 3.2s linear infinite; }
+@keyframes roadrun { to { stroke-dashoffset: -32; } }
+
+.topbar__spacer { flex: 1; }
+.topbar__tools { display: flex; align-items: center; gap: var(--s2); }
+
+/* PEMILIH TEMA */
+.themeswitch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.themeswitch__btn {
+  padding: 7px var(--s3);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-3);
+  white-space: nowrap;
+  transition: all var(--dur-1) var(--ease);
+}
+.themeswitch__btn:hover { color: var(--text-1); }
+.themeswitch__btn[aria-pressed="true"] {
+  background: var(--grad-blue);
+  color: #fff;
+  box-shadow: var(--sh-1);
+}
+
+/* CHIP AKUN */
+.userchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  height: var(--control-h-sm);
+  padding: 0 var(--s3) 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  transition: all var(--dur-1) var(--ease);
+}
+.userchip:hover { border-color: var(--jk-blue-1); }
+.userchip__ava {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--grad-blue);
+  color: #fff;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.userchip__name { font-size: var(--fs-sm); font-weight: 700; color: var(--text-1); }
+
+/* WORKSPACE */
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 424px 1fr;
+  min-height: 0;
+  background: var(--jk-bg);
+}
+[data-textsize="large"] .workspace { grid-template-columns: 476px 1fr; }
+
+.sidepanel {
+  position: relative;
+  z-index: var(--z-panel);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+.sidepanel__body {
+  flex: 1; min-height: 0;
+  padding: var(--s5);
+  display: flex; flex-direction: column;
+  gap: var(--s4);
+}
+
+.mapstage {
+  position: relative;
+  z-index: var(--z-map);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--jk-bg);
+}
+.mapstage__float { position: absolute; z-index: var(--z-mapctrl); }
+.mapstage__float--tr { top: var(--s5); right: var(--s5); }
+.mapstage__float--br { bottom: var(--s5); right: var(--s5); }
+
+/* DOCK PRATINJAU */
+.dockwrap {
+  position: fixed;
+  z-index: var(--z-dock);
+  left: 50%; bottom: var(--s5);
+  transform: translateX(-50%);
+  transition: transform var(--dur-3) var(--ease), opacity var(--dur-2) var(--ease);
+}
+.dockwrap[data-open="false"] {
+  transform: translateX(-50%) translateY(140%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.demodock {
+  display: flex; align-items: center; gap: var(--s1);
+  padding: var(--s2) var(--s2) var(--s2) var(--s3);
+  background: rgba(22,34,74,.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-4);
+  max-width: calc(100vw - 32px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.demodock::-webkit-scrollbar { display: none; }
+
+.demodock__label {
+  display: inline-flex; align-items: center; gap: var(--s1);
+  font-size: var(--fs-xs); font-weight: 800;
+  color: var(--jk-lime);
+  letter-spacing: .07em; text-transform: uppercase;
+  padding-right: var(--s2); white-space: nowrap;
+}
+.demodock__btn {
+  padding: var(--s2) var(--s4);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm); font-weight: 700;
+  color: rgba(255,255,255,.7);
+  white-space: nowrap;
+  transition: all var(--dur-1) var(--ease);
+}
+.demodock__btn:hover { background: rgba(255,255,255,.14); color: #fff; }
+.demodock__btn[aria-pressed="true"] {
+  background: var(--grad-lime);
+  color: #16224A;
+}
+.demodock__close {
+  width: 32px; height: 32px; flex: 0 0 32px;
+  margin-left: var(--s1);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,.1);
+  color: rgba(255,255,255,.75);
+  transition: all var(--dur-1) var(--ease);
+}
+.demodock__close:hover { background: var(--st-hindari); color: #fff; }
+
+/* tombol kecil untuk memunculkan dock kembali */
+.docktab {
+  position: fixed;
+  z-index: var(--z-dock);
+  left: var(--s5); bottom: var(--s5);
+  display: inline-flex; align-items: center; gap: var(--s2);
+  height: 42px; padding: 0 var(--s4);
+  border-radius: var(--r-pill);
+  background: rgba(22,34,74,.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--jk-lime);
+  font-size: var(--fs-sm); font-weight: 800;
+  letter-spacing: .02em;
+  box-shadow: var(--sh-3);
+  opacity: 0; transform: translateY(16px) scale(.9);
+  pointer-events: none;
+  transition: all var(--dur-3) var(--ease);
+}
+.docktab.is-on {
+  opacity: 1; transform: none; pointer-events: auto;
+}
+.docktab:hover { background: var(--jk-blue-1); color: #fff; }

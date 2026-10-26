@@ -1,0 +1,357 @@
+/*
+   JakSafe, Bagian Tambahan
+
+   Berkas ini memuat gaya untuk bagian bagian yang lahir bersamaan dengan
+   penyambungan ke backend, yaitu penanda sambungan di bilah atas, daftar
+   saran lokasi, lencana sumber hasil, kartu kamera beserta keadaan
+   gagalnya, dan panel jejak proses.
+
+   Dipisah dari components.css supaya jelas mana gaya tampilan dasar yang
+   sudah stabil dan mana yang menyertai penyambungan data. Diimpor paling
+   akhir sebelum responsive.css.
+*/
+
+/* Penanda sambungan backend pada bilah atas.
+   Warnanya ditentukan atribut data-status, bukan kelas, supaya
+   backendController cukup menulis satu atribut tanpa mengatur kelas. */
+.konstat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  height: var(--control-h-sm);
+  padding: 0 var(--s3);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-2);
+  white-space: nowrap;
+  cursor: help;
+}
+.konstat__titik {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex: 0 0 9px;
+  background: var(--text-3);
+}
+.konstat[data-status="hidup"] .konstat__titik {
+  background: var(--st-aman);
+  animation: denyutTitik 2.4s var(--ease-io) infinite;
+}
+.konstat[data-status="sebagian"] .konstat__titik { background: var(--st-hati); }
+.konstat[data-status="mati"] .konstat__titik { background: var(--st-hindari); }
+.konstat[data-status="mati"] { border-color: var(--st-hindari); color: var(--st-hindari); }
+
+@keyframes denyutTitik {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(144,184,62,.55); }
+  50%      { box-shadow: 0 0 0 5px rgba(144,184,62,0); }
+}
+
+/* Daftar saran lokasi di bawah kotak isian. */
+.field { position: relative; }
+
+.saran {
+  position: absolute;
+  z-index: 40;
+  left: 0; right: 0; top: calc(100% + 6px);
+  max-height: 258px;
+  overflow-y: auto;
+  padding: var(--s2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--sh-3);
+}
+.saran__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--s3);
+  border-radius: var(--r-sm);
+  text-align: left;
+  transition: background var(--dur-1) var(--ease);
+}
+.saran__item:hover,
+.saran__item:focus-visible { background: var(--jk-blue-pale); }
+.saran__nama { font-size: var(--fs-sm); font-weight: 700; color: var(--text-1); }
+.saran__area { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
+.saran__kosong { padding: var(--s3); font-size: var(--fs-sm); color: var(--text-3); }
+
+/* Lencana sumber hasil pada kartu skor.
+   Dua keadaan, agen untuk hasil dari backend dan pratinjau untuk hasil
+   yang dirangkai frontend. Perbedaan warnanya dibuat tegas supaya tidak
+   mungkin terlewat saat demo. */
+.sumberbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+  padding: 5px var(--s3);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+.sumberbadge__titik { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 7px; }
+.sumberbadge[data-sumber="agen"] {
+  background: rgba(42,64,208,.12);
+  color: var(--jk-blue-1);
+}
+.sumberbadge[data-sumber="agen"] .sumberbadge__titik { background: var(--jk-blue-1); }
+.sumberbadge[data-sumber="pratinjau"] {
+  background: rgba(224,161,38,.16);
+  color: #8A6212;
+}
+.sumberbadge[data-sumber="pratinjau"] .sumberbadge__titik { background: var(--st-hati); }
+[data-theme="gelap"] .sumberbadge[data-sumber="pratinjau"] { color: #F0C878; }
+[data-theme="gelap"] .sumberbadge[data-sumber="agen"] { color: #AFBDFF; }
+
+/* Kalimat arti skor di bawah label. */
+.scorecard__arti {
+  margin-top: var(--s2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+}
+
+/* Isian bar rincian penilaian.
+   Warnanya mengikuti atribut data-status yang diisi resultController dari
+   pita nilai tiap kriteria, bukan dari warna tetap. Jadi satu kriteria
+   yang buruk langsung terlihat merah walaupun skor akhirnya masih hijau,
+   dan pengguna bisa melihat faktor mana yang sebenarnya menyeret nilai. */
+.bar__fill { background: var(--st-aman-grad); }
+.bar__fill[data-status="aman"] { background: var(--st-aman-grad); }
+.bar__fill[data-status="hati"] { background: var(--st-hati-grad); }
+.bar__fill[data-status="hindari"] { background: var(--st-hindari-grad); }
+
+/* Pada tema kontras gradien diganti warna rata supaya batas tepinya
+   tetap tegas dan tidak ada bagian yang memudar. */
+[data-theme="kontras"] .bar__fill[data-status="aman"] { background: var(--st-aman); }
+[data-theme="kontras"] .bar__fill[data-status="hati"] { background: var(--st-hati); }
+[data-theme="kontras"] .bar__fill[data-status="hindari"] { background: var(--st-hindari); }
+
+/* Catatan sumber angka waktu pada kartu rincian. */
+.note--sumber {
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px dashed var(--border);
+  display: block;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-base);
+  color: var(--text-3);
+}
+
+/* Kartu kamera. */
+.cctv { margin: 0; }
+.cctv__img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  background: var(--surface-3);
+}
+.cctv__gagal {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-md);
+  background: var(--surface-3);
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-align: center;
+  padding: var(--s4);
+}
+/* Saat atribut gagal dipasang oleh onerror, gambar disembunyikan dan
+   keterangan yang tampil. Dikerjakan lewat CSS supaya tidak perlu
+   menyusun ulang isi kartu dari JavaScript. */
+.cctv[data-gagal="1"] .cctv__img { display: none; }
+.cctv[data-gagal="1"] .cctv__gagal { display: flex; }
+
+.cctv__cap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--s3);
+}
+.cctv__name { font-size: var(--fs-sm); font-weight: 800; color: var(--text-1); }
+.cctv__meta { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
+.cctv__lisensi { font-size: var(--fs-xs); color: var(--text-3); font-style: italic; }
+
+/* Keadaan tidak ada kamera. */
+.nocam { text-align: center; padding: var(--s5) var(--s3); }
+.nocam__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 54px; height: 54px;
+  margin-bottom: var(--s3);
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+.nocam__title { font-size: var(--fs-base); font-weight: 800; color: var(--text-1); }
+.nocam__text {
+  margin-top: var(--s2);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  color: var(--text-2);
+}
+
+/* Ringkasan pembacaan gambar oleh model penglihatan. */
+.analisis {
+  margin-top: var(--s4);
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.analisis__judul {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: var(--fs-sm); font-weight: 800; color: var(--text-1);
+}
+.analisis__list {
+  margin: var(--s2) 0 0;
+  padding-left: var(--s5);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  color: var(--text-2);
+}
+
+/* Panel jejak proses. */
+.logjudul {
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: var(--s4) 0 var(--s2);
+}
+.logjudul:first-child { margin-top: 0; }
+
+.loglist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+
+.logitem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s3);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.logitem__no {
+  flex: 0 0 22px;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--jk-blue-pale);
+  color: var(--jk-blue-1);
+  font-size: 11px; font-weight: 800;
+}
+.logitem__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.logitem__judul {
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--text-1);
+  /* Jalur API bisa panjang, dipotong supaya tidak merusak tata letak. */
+  overflow-wrap: anywhere;
+}
+.logitem__teks { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
+.logitem__lama { font-size: var(--fs-xs); color: var(--text-3); font-weight: 700; white-space: nowrap; }
+.logitem[data-gagal="1"] { border-color: var(--st-hindari); }
+.logitem[data-gagal="1"] .logitem__no { background: var(--st-hindari-bg); color: var(--st-hindari); }
+
+/* Petunjuk teknis pada layar galat. */
+.errorbox__hint {
+  margin: var(--s4) 0;
+  padding: var(--s4);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--text-2);
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+/* Baris sakelar pada formulir masuk. */
+.switchrow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  margin-top: var(--s4);
+  padding: var(--s3);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.switchrow input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--jk-blue-1); }
+.switchrow__teks { font-size: var(--fs-xs); color: var(--text-2); line-height: var(--lh-base); }
+.switchrow__teks strong { display: block; font-size: var(--fs-sm); color: var(--text-1); }
+
+/* Kartu pintasan rute.
+   Kartunya berupa elemen button, dan anak sebuah button bersifat inline
+   secara bawaan sehingga aturan tinggi pada bagian gambar tidak berlaku
+   dan gambar memenuhi seluruh kartu. Dua baris di bawah memaksa kedua
+   bagiannya menjadi blok supaya tinggi gambar terkunci dan teks di
+   bawahnya kembali terlihat. */
+.routecards { align-items: stretch; }
+.routecard { display: flex; flex-direction: column; }
+.routecard__thumb { flex: 0 0 86px; }
+.routecard__body { flex: 1; display: block; }
+.routecard__name { display: block; }
+
+.routecard__to {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-weight: 700;
+}
+
+/* Baris rute tersimpan.
+   Nama dan keterangan skornya dijadikan blok supaya tidak menyambung
+   dalam satu baris, dan panah antar tempat dijaga agar tidak ikut pindah
+   baris sendirian. */
+.saveditem__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.saveditem__name svg { flex: 0 0 auto; }
+.saveditem__meta { display: block; margin-top: 2px; }
+
+/* Pemberitahuan singkat dipindah ke bawah layar.
+   Sebelumnya muncul di tengah atas dan menutupi penanda sambungan
+   backend beserta pemilih tema, padahal dua hal itu justru yang sering
+   perlu dilihat tepat setelah sebuah pemberitahuan muncul. */
+.toast {
+  top: auto;
+  bottom: var(--s8);
+  transform: translateX(-50%) translateY(18px);
+  max-width: min(520px, calc(100vw - 32px));
+  text-align: center;
+}
+.toast.is-on { transform: translateX(-50%) translateY(0); }
+
+/* Penyesuaian tema kontras. Seluruh rona tipis dimatikan dan batas
+   dipertegas, sejalan dengan aturan yang sudah ada di tokens.css. */
+[data-theme="kontras"] .saran,
+[data-theme="kontras"] .logitem,
+[data-theme="kontras"] .analisis,
+[data-theme="kontras"] .switchrow,
+[data-theme="kontras"] .errorbox__hint { border-width: 2px; }
+[data-theme="kontras"] .sumberbadge { border: 2px solid currentColor; }

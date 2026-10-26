@@ -1,0 +1,15 @@
+{
+  "name": "jaksafe-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JakSafe frontend. Antarmuka navigasi yang membaca data dari jaksafe-backend.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
