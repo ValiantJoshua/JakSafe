@@ -1,0 +1,85 @@
+/*
+   JakSafe, Penyesuaian Layar
+   Dikerjakan paling akhir, setelah tampilan lebar stabil.
+*/
+
+/* Laptop kecil */
+@media (max-width: 1180px) {
+  .workspace { grid-template-columns: 372px 1fr; }
+  [data-textsize="large"] .workspace { grid-template-columns: 420px 1fr; }
+  .legend { width: 206px; }
+}
+
+/* Tablet */
+@media (max-width: 920px) {
+  .workspace { grid-template-columns: 330px 1fr; }
+  [data-textsize="large"] .workspace { grid-template-columns: 370px 1fr; }
+  .sidepanel__body { padding: var(--s4); }
+  .mapstage__float--br { bottom: 92px; }
+}
+
+/* Ponsel
+   Panel berubah menjadi lembar bawah yang bisa digeser,
+   peta tetap memenuhi bagian atas layar. */
+@media (max-width: 720px) {
+  body { overflow: auto; }
+
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    position: relative;
+  }
+
+  .mapstage { min-height: 48vh; }
+
+  .sidepanel {
+    border-right: none;
+    border-top: 1px solid var(--border);
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    margin-top: calc(var(--s6) * -1);
+    box-shadow: 0 -8px 32px rgba(27,30,35,.12);
+    max-height: 72vh;
+  }
+
+  /* pegangan geser di atas lembar */
+  .sidepanel::before {
+    content: '';
+    display: block;
+    width: 46px; height: 5px;
+    margin: var(--s3) auto var(--s1);
+    border-radius: var(--r-pill);
+    background: var(--border-strong);
+  }
+
+  .topbar { padding: var(--s3) var(--s4); }
+  .brand__tag { display: none; }
+
+  .statrow { grid-template-columns: 1fr 1fr; }
+
+  .mapholder__card { width: 90%; padding: var(--s6) var(--s5); }
+  .mapholder__x { width: 58px; height: 58px; }
+
+  .mapstage__float--br,
+  .mapstage__float--tr { display: none; }
+
+  .demodock {
+    left: var(--s3);
+    right: var(--s3);
+    transform: none;
+    bottom: var(--s3);
+    justify-content: flex-start;
+  }
+}
+
+/* Ponsel kecil */
+@media (max-width: 420px) {
+  .search__title { font-size: var(--fs-lg); }
+  .gauge { width: 162px; height: 162px; }
+  .statrow { grid-template-columns: 1fr; }
+}
+
+/* Cetak */
+@media print {
+  .topbar__tools, .demodock, .mapstage__float { display: none; }
+  .sidepanel { border: none; }
+}
