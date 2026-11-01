@@ -1,89 +1,147 @@
 /*
-   Panggung kanan.
+   Panggung kanan — Peta Interaktif 3D CesiumJS & 2D Normal Map (Indonesia / Jakarta).
 
-   Berisi tiga lapis yang bergantian tampil. Banner sambutan saat belum
-   ada pencarian, tempat peta saat sedang memproses dan melihat hasil,
-   serta kendali dan legenda yang mengambang di atasnya.
-
-   Peta tiga dimensi belum dipasang pada tahap ini. Yang ada sekarang
-   gambar pengganti berupa sketsa jaringan jalan, lengkap dengan keterangan
-   jujur bahwa peta aslinya menyusul. Modul kosong untuk peta sudah
-   disiapkan di folder src/map supaya tahap berikutnya tinggal mengisi,
-   bukan merombak susunan berkas.
+   Menyediakan:
+   - Kanvas utama CesiumJS (#mapCanvas) yang aktif sejak awal aplikasi dibuka.
+   - Bilah atas mengambang:
+     1) Pemilih Mode Peta: "3D Cesium" <-> "2D Peta Normal" <-> "2D Satelit"
+     2) Pintasan Wilayah Indonesia: Jakarta Pusat, Jabodetabek, Nusantara (Indonesia)
+   - Bilah bawah mengambang (Gaya God's Eye View):
+     Sakelar ON / OFF untuk layer Traffic (TomTom Flow + Partikel Kendaraan),
+     CCTV (38 Kamera Jakarta + Viewshed Cone), dan Kualitas Udara (AQI / PM2.5).
+   - Kartu HUD Pratinjau Kamera CCTV langsung di atas peta ketika penanda kamera diklik,
+     lengkap dengan tombol Analisis AI Vision (Gemini).
 */
 
 import { ikon } from '../icons.js';
-import { heroBanner } from '../brand.js';
 
 /**
  * @returns {string} potongan HTML panggung kanan
  */
 export function templateStage() {
   return `
-<main class="mapstage" aria-label="Area peta">
+<main class="mapstage" aria-label="Area peta interaktif Indonesia">
 
-  <!-- Banner sambutan. Gambarnya sudah memuat logo dan tagline, jadi
-       tidak ada teks tambahan yang ditimpa di atasnya. Yang menimpa
-       hanya tiga penanda fitur di tepi bawah. -->
-  <section class="hero" id="hero">
-    <div class="hero__banner" id="heroArt">${heroBanner()}</div>
+  <!-- Wadah utama Peta 3D CesiumJS & 2D Normal Map -->
+  <div class="mapholder" id="mapHolder">
+    <div class="mapcanvas" id="mapCanvas"></div>
+  </div>
 
-    <div class="hero__feats">
-      <span class="feat"><span class="feat__ic feat__ic--b">${ikon('i-route', 17)}</span>Rute cerdas</span>
-      <span class="feat"><span class="feat__ic feat__ic--g">${ikon('i-wind', 17)}</span>Pantau udara</span>
-      <span class="feat"><span class="feat__ic feat__ic--n">${ikon('i-camera', 17)}</span>Bukti CCTV</span>
+  <!-- Bilah Kiri Atas: Switch Mode 3D / 2D Normal Map & Preset Wilayah Indonesia -->
+  <div class="mapstage__float mapstage__float--tl" id="mapModeWrap">
+    <div class="maphud-bar">
+      <div class="mapmode-group" role="group" aria-label="Mode tampilan peta">
+        <button type="button" class="mapmode-btn" data-map-mode="3d" aria-pressed="true" title="Peta 3D Photorealistic / Globe">
+          ${ikon('i-layers', 15)}
+          <span>3D Cesium</span>
+        </button>
+        <button type="button" class="mapmode-btn" data-map-mode="2d-road" aria-pressed="false" title="Peta 2D Jalan Normal (Google Maps)">
+          ${ikon('i-route', 15)}
+          <span>2D Peta Normal</span>
+        </button>
+        <button type="button" class="mapmode-btn" data-map-mode="2d-sat" aria-pressed="false" title="Peta 2D Satelit Hibrida">
+          ${ikon('i-eye', 15)}
+          <span>2D Satelit</span>
+        </button>
+      </div>
+
+      <div class="mappreset-group" role="group" aria-label="Fokus wilayah Indonesia">
+        <button type="button" class="mappreset-btn" data-map-preset="jakarta" title="Fokus ke Jakarta Pusat (Sudirman–Monas)">Jakarta</button>
+        <button type="button" class="mappreset-btn" data-map-preset="jabodetabek" title="Fokus ke Jabodetabek">Jabodetabek</button>
+        <button type="button" class="mappreset-btn" data-map-preset="indonesia" title="Fokus ke seluruh kepulauan Indonesia">Indonesia</button>
+      </div>
     </div>
 
-    <span class="hero__note">
-      ${ikon('i-layers', 14)}
-      Peta 3D dipasang pada tahap berikutnya
-    </span>
-  </section>
-
-  <!-- Tempat peta. Sketsa jalannya memakai ruas lurus dan diagonal,
-       bukan lengkungan, supaya terbaca sebagai jaringan jalan dan tidak
-       membuat mata lelah. -->
-  <div class="mapholder" id="mapHolder" hidden>
-    <div class="mapholder__grid"></div>
-    <svg class="mapholder__sketch" viewBox="0 0 900 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <g stroke="var(--border-strong)" stroke-width="3" fill="none" opacity=".6">
-        <path d="M0 200 H900M0 420 H900M240 0 V640M640 0 V640"/>
-      </g>
-      <path class="sketch-path" stroke="var(--jk-blue-2)"
-            d="M80 560 L240 560 L240 420 L420 420 L420 300 L640 300 L640 200 L840 120"/>
-      <path class="sketch-path sketch-path--alt" stroke="var(--jk-green)"
-            d="M60 300 L240 300 L300 200 L640 200 L720 120 L870 70"/>
-      <g class="sketch-node"><circle cx="80" cy="560" r="13" fill="var(--jk-blue-1)"/><circle cx="80" cy="560" r="5" fill="#fff"/></g>
-      <g class="sketch-node"><circle cx="420" cy="300" r="11" fill="var(--jk-green)"/><circle cx="420" cy="300" r="4" fill="#fff"/></g>
-      <g class="sketch-node"><circle cx="840" cy="120" r="13" fill="var(--st-hindari)"/><circle cx="840" cy="120" r="5" fill="#fff"/></g>
-    </svg>
-
-    <div class="mapholder__card">
-      <div class="mapholder__x">${ikon('i-x', 34)}</div>
-      <h2 class="mapholder__title">Peta 3D belum aktif</h2>
-      <p class="mapholder__text">Area ini nantinya diisi globe 3D Jakarta beserta garis rute,
-        lapisan kualitas udara, dan penanda kamera CCTV.</p>
-      <span class="mapholder__hint">${ikon('i-layers', 14)} Dipasang pada tahap berikutnya</span>
+    <div class="mapstatus-pill" id="mapStatusPill">
+      <span class="mapstatus-dot"></span>
+      <span id="mapStatusText">3D Photorealistic · Fokus Indonesia</span>
     </div>
   </div>
 
-  <div class="mapstage__float mapstage__float--tr" id="mapCtrlWrap" hidden>
+  <!-- Bilah Kanan Atas: Kendali Zoom & Fokus Kamera -->
+  <div class="mapstage__float mapstage__float--tr" id="mapCtrlWrap">
     <div class="mapctrl">
-      <button class="iconbtn" disabled aria-label="Perbesar">${ikon('i-plus', 18)}</button>
-      <button class="iconbtn" disabled aria-label="Perkecil">${ikon('i-minus', 18)}</button>
-      <button class="iconbtn" disabled aria-label="Posisi saya">${ikon('i-locate', 18)}</button>
+      <button type="button" class="iconbtn" id="btnMapZoomIn" aria-label="Perbesar peta" title="Perbesar">${ikon('i-plus', 18)}</button>
+      <button type="button" class="iconbtn" id="btnMapZoomOut" aria-label="Perkecil peta" title="Perkecil">${ikon('i-minus', 18)}</button>
+      <button type="button" class="iconbtn" id="btnMapLocate" aria-label="Fokus ke rute atau Jakarta" title="Fokus ke Rute / Jakarta">${ikon('i-locate', 18)}</button>
     </div>
   </div>
 
-  <div class="mapstage__float mapstage__float--br" id="legendWrap" hidden>
+  <!-- Bilah Kiri Bawah: Sakelar Layer ON / OFF (Traffic, CCTV, Kualitas Udara) ala God's Eye View -->
+  <div class="mapstage__float mapstage__float--bl" id="mapLayersWrap">
+    <div class="maplayer-dock" role="group" aria-label="Lapisan data peta (ON/OFF)">
+      <span class="maplayer-dock__label">LAYER PETA</span>
+
+      <button type="button" class="maplayer-chip" id="btnLayerTraffic" aria-pressed="true" title="Nyalakan/matikan layer arus lalu lintas & partikel kendaraan">
+        <span class="maplayer-chip__dot maplayer-chip__dot--traffic"></span>
+        ${ikon('i-car', 16)}
+        <span class="maplayer-chip__name">Traffic</span>
+        <span class="maplayer-chip__badge" id="badgeLayerTraffic">ON</span>
+      </button>
+
+      <button type="button" class="maplayer-chip" id="btnLayerCctv" aria-pressed="true" title="Nyalakan/matikan layer titik kamera CCTV & kerucut pandang">
+        <span class="maplayer-chip__dot maplayer-chip__dot--cctv"></span>
+        ${ikon('i-camera', 16)}
+        <span class="maplayer-chip__name">CCTV</span>
+        <span class="maplayer-chip__badge" id="badgeLayerCctv">ON</span>
+      </button>
+
+      <button type="button" class="maplayer-chip" id="btnLayerAqi" aria-pressed="false" title="Nyalakan/matikan layer zona kualitas udara PM2.5">
+        <span class="maplayer-chip__dot maplayer-chip__dot--aqi"></span>
+        ${ikon('i-wind', 16)}
+        <span class="maplayer-chip__name">Udara (AQI)</span>
+        <span class="maplayer-chip__badge" id="badgeLayerAqi">OFF</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Kartu Mengambang Pratinjau Kamera CCTV saat titik kamera di peta diklik -->
+  <aside class="mapcctv-popup" id="mapCctvPopup" aria-label="Pratinjau kamera CCTV" hidden>
+    <div class="mapcctv__head">
+      <div class="mapcctv__titlewrap">
+        <span class="mapcctv__live"><span class="mapcctv__livedot"></span>LIVE CCTV</span>
+        <h3 class="mapcctv__title" id="mapCctvTitle">Kamera Jakarta</h3>
+        <p class="mapcctv__meta" id="mapCctvMeta">Memuat info kamera...</p>
+      </div>
+      <button type="button" class="mapcctv__close" id="btnMapCctvClose" aria-label="Tutup pratinjau kamera">
+        ${ikon('i-x', 16)}
+      </button>
+    </div>
+
+    <div class="mapcctv__frame">
+      <img class="mapcctv__img" id="mapCctvImg" alt="Cuplikan langsung kamera CCTV"
+           onerror="this.closest('.mapcctv__frame').setAttribute('data-gagal','1')">
+      <div class="mapcctv__fallback">
+        ${ikon('i-camera-off', 22)}
+        <span>Bingkai kamera sedang tidak merespons</span>
+      </div>
+    </div>
+
+    <div class="mapcctv__actions">
+      <button type="button" class="mapcctv__btn" id="btnMapCctvFly" title="Arahkan kamera 3D ke sudut pandang CCTV ini">
+        ${ikon('i-locate', 14)} Sudut Pandang 3D
+      </button>
+      <button type="button" class="mapcctv__btn" id="btnMapCctvRefresh" title="Muat ulang gambar terbaru">
+        Muat Ulang
+      </button>
+      <button type="button" class="mapcctv__btn mapcctv__btn--primary" id="btnMapCctvAnalyze" title="Analisis kondisi jalan & banjir dengan Gemini Vision">
+        ${ikon('i-spark', 14)} Analisis AI Vision (Gemini)
+      </button>
+    </div>
+
+    <div class="mapcctv__aibox" id="mapCctvAiResult" hidden></div>
+  </aside>
+
+  <!-- Kanan Bawah: Legenda Skor Rute & Lalu Lintas -->
+  <div class="mapstage__float mapstage__float--br" id="legendWrap">
     <div class="legend">
-      <p class="legend__title">Arti Warna Rute</p>
-      <div class="legend__item"><span class="legend__swatch" style="background:var(--st-aman)"></span>
-        Aman <span class="legend__range">0 sampai 29</span></div>
-      <div class="legend__item"><span class="legend__swatch" style="background:var(--st-hati)"></span>
-        Hati-hati <span class="legend__range">30 sampai 59</span></div>
-      <div class="legend__item"><span class="legend__swatch" style="background:var(--st-hindari)"></span>
-        Hindari <span class="legend__range">60 sampai 100</span></div>
+      <p class="legend__title">Arti Warna Rute & Lalu Lintas</p>
+      <div class="legend__item"><span class="legend__swatch" style="background:#22C55E"></span>
+        Aman / Lancar <span class="legend__range">0–29</span></div>
+      <div class="legend__item"><span class="legend__swatch" style="background:#F59E0B"></span>
+        Hati-hati / Padat <span class="legend__range">30–59</span></div>
+      <div class="legend__item"><span class="legend__swatch" style="background:#EF4444"></span>
+        Hindari / Macet <span class="legend__range">60–100</span></div>
     </div>
   </div>
 

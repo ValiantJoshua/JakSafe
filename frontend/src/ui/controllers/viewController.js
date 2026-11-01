@@ -2,17 +2,10 @@
    Pengendali pergantian layar.
 
    Panel kiri punya empat layar yang saling menggantikan, yaitu pencarian,
-   proses, hasil, dan galat. Panggung kanan ikut berganti antara banner
-   sambutan dan tempat peta.
-
-   Semua pergantian itu dijalankan dari satu tempat ini, bukan tersebar di
-   tiap pengendali. Dengan begitu tidak mungkin terjadi dua layar tampil
-   bersamaan, dan menambah layar baru nanti cukup menyentuh satu berkas.
-
-   Pergantian dipicu lewat langganan ke appState, bukan dipanggil langsung
-   oleh pengendali lain. Jadi pengendali pencarian cukup menulis keadaan
-   baru, dan tampilan menyesuaikan sendiri. Pola ini yang mencegah tampilan
-   dan keadaan berbeda isi.
+   proses, hasil, dan galat. Panggung kanan menampilkan peta interaktif
+   3D CesiumJS / 2D Normal Map beserta kendali layer (Traffic, CCTV, AQI)
+   sepanjang waktu sehingga pengguna dapat menjelajahi peta Indonesia/Jakarta
+   baik sebelum maupun sesudah mencari rute.
 */
 
 import { $, show } from '../../utils/dom.js';
@@ -27,7 +20,7 @@ const LAYAR = {
 };
 
 /**
- * Menampilkan satu layar dan menyembunyikan sisanya.
+ * Menampilkan satu layar pada panel kiri dan menyembunyikan sisanya.
  * @param {'siap'|'memproses'|'hasil'|'galat'} nama
  */
 function gantiLayar(nama) {
@@ -35,17 +28,12 @@ function gantiLayar(nama) {
     show($(pemilih), kunci === nama);
   }
 
-  // Banner sambutan hanya pada layar pencarian. Begitu pencarian dimulai,
-  // panggung berganti ke tempat peta supaya perhatian pindah ke hasil.
-  const diAwal = nama === 'siap';
-  show($('#hero'), diAwal);
-  show($('#mapHolder'), !diAwal);
-  show($('#mapCtrlWrap'), !diAwal);
-  show($('#legendWrap'), nama === 'hasil');
+  // Pastikan panggung peta beserta kendali HUD selalu tampil
+  show($('#mapHolder'), true);
+  show($('#mapCtrlWrap'), true);
+  show($('#legendWrap'), true);
 
-  // Panel digulirkan ke atas setiap berganti layar. Tanpa ini, pengguna
-  // yang tadi menggulir sampai bawah kartu hasil akan mendapati layar
-  // baru sudah dalam keadaan tergulir dan mengira isinya terpotong.
+  // Panel digulirkan ke atas setiap berganti layar.
   const panel = $('#panelBody');
   if (panel) panel.scrollTop = 0;
 }

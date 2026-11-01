@@ -16,7 +16,7 @@
 import { $, setText, show, countTo, afterPaint } from '../../utils/dom.js';
 import {
   formatJarak, formatDurasi, formatAngka, formatLama, formatJam,
-  labelKondisiJalan, labelGenangan, KOSONG,
+  labelKondisiJalan, labelGenangan, formatObservasi, KOSONG,
 } from '../../utils/format.js';
 import { pitaDariSkor, kunciDariLabel, kalimatArti, susunAlasan } from '../../domain/scoreLabels.js';
 import { PM25_BANDS, SUMBER_HASIL, DEFAULT_WEIGHTS } from '../../config/constants.js';
@@ -167,7 +167,7 @@ function gambarUdara(air, score) {
     if (Number.isFinite(usAqi)) bagian.push(`Indeks AQI Amerika ${Math.round(usAqi)}`);
     const uv = Number(air?.uv_index);
     if (Number.isFinite(uv)) bagian.push(`indeks ultraviolet ${formatAngka(uv)}`);
-    const waktu = air?.titikTerburuk?.time;
+    const waktu = air?.titikTerburuk?.time || air?.time;
     if (waktu) bagian.push(`data pukul ${formatJam(waktu)}`);
     bagian.push('angka yang dipakai adalah titik terburuk di sepanjang rute, bukan rata rata');
     catatan.textContent = `${bagian.join(', ')}.`;
@@ -179,24 +179,31 @@ function gambarKamera(visual) {
   const badan = $('#cctvBody');
   if (!badan) return;
 
-  // Keadaan tanpa kamera. Ini keadaan yang paling sering terjadi sekarang
-  // karena katalog kamera di backend masih kosong. Ditampilkan dengan
-  // nada netral, bukan sebagai kegagalan.
-  if (!visual?.kamera) {
+  // Mendukung bentuk kamera baik dari jalur agen (cameraId/cameraName) maupun pratinjau (kamera)
+  const k = visual?.kamera || (visual?.cameraId ? {
+    id: visual.cameraId,
+    nama: visual.cameraName,
+    jarakM: visual.distanceM ?? null,
+    provider: visual.provider ?? null,
+    license: visual.license ?? null,
+  } : null);
+
+  const analisis = visual?.analisis || visual?.analysis || null;
+
+  // Keadaan tanpa kamera di sekitar rute
+  if (!k) {
     badan.innerHTML = `
       <div class="nocam">
         <span class="nocam__icon">${ikon('i-camera-off', 26)}</span>
         <p class="nocam__title">Tidak ada kamera di sekitar rute ini</p>
-        <p class="nocam__text">Katalog kamera di backend belum berisi titik yang dekat
-          dengan rute ini, jadi tidak ada bukti visual yang bisa ditampilkan.
-          Penilaian kondisi jalan memakai data lalu lintas dan nilai netral,
+        <p class="nocam__text">Belum ada kamera aktif yang mencakup segmen rute ini.
+          Penilaian kondisi jalan menggunakan sensor lalu lintas TomTom dan nilai netral,
           bukan tebakan.</p>
       </div>`;
     return;
   }
 
-  const k = visual.kamera;
-  const jarak = Number.isFinite(k.jarakM) ? `${k.jarakM} m dari rute` : 'jarak tidak diketahui';
+  const jarak = Number.isFinite(k.jarakM) ? `${k.jarakM} m dari rute` : 'di sekitar rute';
 
   badan.innerHTML = `
     <figure class="cctv">
@@ -212,14 +219,11 @@ function gambarKamera(visual) {
         ${k.license ? `<span class="cctv__lisensi">${k.license}</span>` : ''}
       </figcaption>
     </figure>
-    ${gambarAnalisis(visual.analisis)}`;
+    ${gambarAnalisis(analisis)}`;
 }
 
 /** Bagian hasil analisis citra, kalau ada. */
 function gambarAnalisis(analisis) {
-  // Analisis citra memakai Gemini dan kuncinya hanya ada di backend, jadi
-  // pada jalur pratinjau bagian ini memang selalu kosong. Keterangan di
-  // bawah menjelaskan itu apa adanya supaya tidak terkesan fiturnya rusak.
   if (!analisis) {
     return `
       <p class="note" style="margin-top:var(--s4)">
@@ -236,23 +240,19 @@ function gambarAnalisis(analisis) {
     const rendah = analisis.confidence < 0.4;
     baris.push(`Keyakinan analisis ${Math.round(analisis.confidence * 100)} persen${rendah ? ', dinilai lebih hati hati karena di bawah 40 persen' : ''}`);
   }
+  if (analisis.alasan) {
+    baris.push(`<em>Catatan visual:</em> "${analisis.alasan}"`);
+  }
 
   return `
     <div class="analisis">
-      <p class="analisis__judul">${ikon('i-spark', 16)} Pembacaan gambar</p>
+      <p class="analisis__judul">${ikon('i-spark', 16)} Pembacaan AI Vision</p>
       <ul class="analisis__list">${baris.map((b) => `<li>${b}</li>`).join('')}</ul>
     </div>`;
 }
 
 /**
  * Membuat jalur API lebih enak dibaca di panel jejak.
- *
- * URLSearchParams menyandikan koma menjadi %2C dan titik koma menjadi %3B,
- * sehingga parameter coords terlihat seperti deretan kode yang susah
- * dibaca. Penyandian itu tetap dibiarkan saat permintaan dikirim karena
- * memang bagian dari aturan URL, yang diubah hanya tampilannya.
- * decodeURIComponent dibungkus try catch karena akan melempar galat bila
- * menemui tanda persen yang tidak membentuk pasangan heksadesimal.
  *
  * @param {string} jalur
  * @returns {string}
@@ -277,9 +277,9 @@ function gambarJejak(hasil) {
       <span class="logitem__no">${i + 1}</span>
       <span class="logitem__body">
         <span class="logitem__judul">${r.action || r.thought || 'Langkah agen'}</span>
-        <span class="logitem__teks">${r.observation || ''}</span>
+        <span class="logitem__teks">${formatObservasi(r.observation)}</span>
       </span>
-      <span class="logitem__lama">${formatLama(r.durationMs)}</span>
+      <span class="logitem__lama">${formatLama(r.durationMs || 0)}</span>
     </li>`).join('');
 
   const panggilan = (hasil.jejak || []).map((j, i) => `
@@ -297,7 +297,7 @@ function gambarJejak(hasil) {
     <p class="logjudul">Panggilan ke backend</p>
     <ul class="loglist">${panggilan || '<li class="logitem"><span class="logitem__body">Tidak ada panggilan tercatat.</span></li>'}</ul>
     <p class="note">${ikon('i-info', 15)}
-      <span>Daftar di atas adalah permintaan HTTP yang benar benar terjadi beserta
+      <span>Daftar di atas adalah permintaan HTTP dan jejak reasoning agen yang benar-benar terjadi beserta
       lamanya, diukur dari peramban.</span></p>`;
 }
 
@@ -315,7 +315,7 @@ export function gambarHasil(hasil) {
   setText($('#sDuration'), formatDurasi(hasil.route?.durationS));
 
   gambarSkor(hasil.score);
-  setText($('#sReason'), susunAlasan(hasil.score));
+  setText($('#sReason'), hasil.reason || susunAlasan(hasil.score));
   gambarRincian(hasil.score);
   gambarUdara(hasil.air, hasil.score);
   gambarKamera(hasil.visual);
@@ -330,8 +330,6 @@ export function gambarHasil(hasil) {
  * Memasang perilaku tombol di layar hasil. Dipanggil sekali dari main.js.
  */
 export function pasangPengendaliHasil() {
-  // Panel jejak proses dibuka dan ditutup. Memakai aria-expanded supaya
-  // pembaca layar tahu keadaannya, bukan hanya terlihat dari panah.
   const tombolLog = $('#btnLog');
   tombolLog?.addEventListener('click', () => {
     const terbuka = tombolLog.getAttribute('aria-expanded') === 'true';
