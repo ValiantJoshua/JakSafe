@@ -196,6 +196,7 @@ export function renderRouteOnMap(hasil) {
       polyline: {
         positions: altPositions,
         width: 5,
+        clampToGround: true,
         material: new Cesium.PolylineDashMaterialProperty({
           color: Cesium.Color.fromCssColorString('#94A3B8').withAlpha(0.75),
           dashLength: 16,
@@ -213,6 +214,7 @@ export function renderRouteOnMap(hasil) {
       polyline: {
         positions: mainPositions,
         width: 13,
+        clampToGround: true,
         material: Cesium.Color.fromCssColorString('#0E1430').withAlpha(0.85),
       },
     });
@@ -223,6 +225,7 @@ export function renderRouteOnMap(hasil) {
       polyline: {
         positions: mainPositions,
         width: 8,
+        clampToGround: true,
         material: new Cesium.PolylineGlowMaterialProperty({
           glowPower: 0.22,
           color: warnaUtama,

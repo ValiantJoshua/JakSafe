@@ -302,6 +302,37 @@ function gambarJejak(hasil) {
 }
 
 /**
+ * Mengubah markdown sederhana dari balasan agen AI menjadi elemen HTML bersih & aman.
+ * @param {string} md
+ * @returns {string}
+ */
+function renderMarkdownAman(md) {
+  if (!md) return '';
+  let html = String(md)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Headings: ### Judul atau ## Judul
+  html = html.replace(/^###?\s+(.+)$/gm, '<h4 class="reason__subheading">$1</h4>');
+  // Bold: **teks**
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Italic: *teks*
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  // Garis pemisah: ---
+  html = html.replace(/^---$/gm, '<hr class="reason__divider">');
+  // List items: * atau -
+  html = html.replace(/^\s*[\*\-]\s+(.+)$/gm, '<li class="reason__item">$1</li>');
+  html = html.replace(/(<li class="reason__item">.*?<\/li>\s*)+/gs, '<ul class="reason__list">$&</ul>');
+  // Paragraf ganda
+  html = html.replace(/\n\n+/g, '</p><p class="reason__paragraph">');
+  // Line break tunggal
+  html = html.replace(/\n/g, '<br>');
+
+  return `<p class="reason__paragraph">${html}</p>`;
+}
+
+/**
  * Menggambar seluruh layar hasil dari satu objek hasil navigasi.
  * @param {object} hasil
  */
@@ -315,7 +346,16 @@ export function gambarHasil(hasil) {
   setText($('#sDuration'), formatDurasi(hasil.route?.durationS));
 
   gambarSkor(hasil.score);
-  setText($('#sReason'), hasil.reason || susunAlasan(hasil.score));
+
+  const elReason = $('#sReason');
+  if (elReason) {
+    if (hasil.reason) {
+      elReason.innerHTML = renderMarkdownAman(hasil.reason);
+    } else {
+      setText(elReason, susunAlasan(hasil.score));
+    }
+  }
+
   gambarRincian(hasil.score);
   gambarUdara(hasil.air, hasil.score);
   gambarKamera(hasil.visual);

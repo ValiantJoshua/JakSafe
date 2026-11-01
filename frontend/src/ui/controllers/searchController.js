@@ -1,22 +1,13 @@
 /*
    Pengendali layar pencarian.
 
-   Berkas ini yang menyambungkan tombol di layar dengan alur di
-   domain/navigationService.js. Isinya empat kelompok perilaku, yaitu
-   kotak isian beserta daftar sarannya, pemilihan moda perjalanan,
-   penekanan tombol cari lengkap dengan pembatalan, dan penanganan galat.
-
-   Soal pembatalan perlu dicatat. Setiap pencarian membuat AbortController
-   baru dan menyimpannya di variabel modul. Tombol Batalkan memanggil
-   abort pada pengendali itu, dan pencarian baru juga membatalkan yang
-   lama lebih dulu. Tanpa penjagaan ini, pengguna yang menekan tombol dua
-   kali berturut turut bisa melihat hasil pencarian pertama menimpa hasil
-   pencarian kedua, karena jawaban yang lebih lambat datang belakangan.
+   Menyambungkan input pengguna ke Geocoding dinamis (Google Maps & OSM)
+   dan alur navigasi di domain/navigationService.js.
 */
 
 import { $, $$, show, setPressed, setText } from '../../utils/dom.js';
 import { getState, setState } from '../../state/appState.js';
-import { findPlaceById, searchPlaces, DEFAULT_TRIP } from '../../config/jakartaPlaces.js';
+import { findPlaceById, searchPlacesLive, registerCustomPlace, DEFAULT_TRIP } from '../../config/jakartaPlaces.js';
 import { cariRute } from '../../domain/navigationService.js';
 import { SEBAB } from '../../api/httpClient.js';
 import { SUMBER_HASIL } from '../../config/constants.js';
@@ -43,11 +34,8 @@ function tutupSemuaSaran() {
 }
 
 /**
- * Memasang perilaku satu kotak isian beserta daftar sarannya.
- *
- * Daftar saran dibangun ulang tiap kali teks berubah. Jumlahnya kecil,
- * paling banyak enam baris, jadi membangun ulang jauh lebih sederhana
- * daripada menyunting baris yang sudah ada, dan tidak terasa lambat.
+ * Memasang perilaku kotak isian dengan pencarian geocoding dinamis (live).
+ * Mendukung pencarian alamat spesifik apa pun di Jakarta/Indonesia atau koordinat angka.
  *
  * @param {string} idInput
  * @param {string} idSaran
@@ -58,31 +46,38 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
   const daftar = $(idSaran);
   if (!kotak || !daftar) return;
 
-  const gambarSaran = () => {
-    const hasil = searchPlaces(kotak.value);
+  let timerDebounce = null;
+
+  const gambarSaran = async () => {
+    const val = kotak.value.trim();
+    daftar.innerHTML = '<p class="saran__kosong" style="color:var(--text-3, #94a3b8)">Mencari lokasi...</p>';
+    daftar.hidden = false;
+    kotak.setAttribute('aria-expanded', 'true');
+
+    const hasil = await searchPlacesLive(val);
     if (hasil.length === 0) {
-      daftar.innerHTML = '<p class="saran__kosong">Tidak ada lokasi yang cocok.</p>';
+      daftar.innerHTML = '<p class="saran__kosong">Lokasi tidak ditemukan. Coba ketik nama jalan, gedung, atau koordinat.</p>';
     } else {
       daftar.innerHTML = hasil.map((p) => `
         <button class="saran__item" role="option" data-tempat="${p.id}">
           <span class="saran__nama">${p.nama}</span>
-          <span class="saran__area">${p.area}</span>
+          <span class="saran__area">${p.area || ''}</span>
         </button>`).join('');
     }
     daftar.hidden = false;
     kotak.setAttribute('aria-expanded', 'true');
   };
 
-  kotak.addEventListener('focus', gambarSaran);
-  kotak.addEventListener('input', gambarSaran);
+  kotak.addEventListener('focus', () => { gambarSaran(); });
+  kotak.addEventListener('input', () => {
+    clearTimeout(timerDebounce);
+    timerDebounce = setTimeout(gambarSaran, 250);
+  });
 
-  // Pemilihan ditangkap di tingkat daftar, bukan dipasang satu per satu
-  // pada tiap baris, karena barisnya dibangun ulang terus menerus.
+  // Pemilihan ditangkap di tingkat daftar saran
   daftar.addEventListener('mousedown', (e) => {
     const item = e.target.closest('.saran__item');
     if (!item) return;
-    // mousedown dipakai, bukan click, supaya pilihan terdaftar sebelum
-    // kotak isian kehilangan fokus dan daftarnya tertutup.
     e.preventDefault();
     const tempat = findPlaceById(item.dataset.tempat);
     if (!tempat) return;
@@ -92,17 +87,42 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
     kotak.setAttribute('aria-expanded', 'false');
   });
 
+  // Bila pengguna menekan Enter pada teks kustom, otomatis pilih hasil pertama yang cocok
+  kotak.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      const val = kotak.value.trim();
+      if (val) {
+        const hits = await searchPlacesLive(val, 1);
+        if (hits.length > 0) {
+          registerCustomPlace(hits[0]);
+          kotak.value = hits[0].nama;
+          setState({ [kunciKeadaan]: hits[0].id });
+          daftar.hidden = true;
+          kotak.setAttribute('aria-expanded', 'false');
+        }
+      }
+    }
+  });
+
   kotak.addEventListener('blur', () => {
-    // Ditunda sebentar supaya klik pada daftar sempat diproses.
-    setTimeout(() => {
+    setTimeout(async () => {
       daftar.hidden = true;
       kotak.setAttribute('aria-expanded', 'false');
-      // Teks yang tidak cocok dengan daftar dikembalikan ke pilihan
-      // terakhir yang sah, supaya kotak tidak pernah berisi tempat yang
-      // tidak punya koordinat.
+      const val = kotak.value.trim();
       const sekarang = findPlaceById(getState()[kunciKeadaan]);
-      if (sekarang && kotak.value !== sekarang.nama) kotak.value = sekarang.nama;
-    }, 120);
+      if (!sekarang || sekarang.nama !== val) {
+        if (val) {
+          const hits = await searchPlacesLive(val, 1);
+          if (hits.length > 0) {
+            registerCustomPlace(hits[0]);
+            kotak.value = hits[0].nama;
+            setState({ [kunciKeadaan]: hits[0].id });
+            return;
+          }
+        }
+        if (sekarang) kotak.value = sekarang.nama;
+      }
+    }, 220);
   });
 }
 
@@ -172,9 +192,6 @@ async function jalankanPencarian() {
   resetTahap();
   setState({ tampilan: 'memproses', hasil: null, pesanGalat: null });
 
-  // Kalau endpoint agen ternyata aktif, tahap per tahap tidak akan pernah
-  // dilaporkan. Penanda ini yang membedakannya, dan dipakai untuk memilih
-  // tampilan progres yang jujur.
   let adaKabarTahap = false;
 
   try {
@@ -198,8 +215,6 @@ async function jalankanPencarian() {
     gambarHasil({ ...hasil, asal, tujuan });
     setState({ tampilan: 'hasil', hasil: { ...hasil, asal, tujuan } });
   } catch (galat) {
-    // Pembatalan oleh pengguna bukan kegagalan, jadi tidak memunculkan
-    // layar galat, cukup kembali ke layar pencarian.
     if (galat?.sebab === SEBAB.DIBATALKAN || pengendaliAktif?.signal.aborted) {
       setState({ tampilan: 'siap' });
       return;
@@ -212,8 +227,6 @@ async function jalankanPencarian() {
  * Memasang seluruh perilaku layar pencarian. Dipanggil sekali dari main.js.
  */
 export function pasangPengendaliPencarian() {
-  // Mengisi kotak dengan pasangan bawaan supaya pengguna bisa langsung
-  // menekan tombol cari tanpa mengetik apa pun saat pertama membuka.
   setState({ idAsal: DEFAULT_TRIP.origin, idTujuan: DEFAULT_TRIP.destination });
   isiKotak('#inpOrigin', DEFAULT_TRIP.origin);
   isiKotak('#inpDest', DEFAULT_TRIP.destination);
@@ -236,8 +249,6 @@ export function pasangPengendaliPencarian() {
     });
   }
 
-  // Kartu pintasan hanya mengisi kotak isian, tidak langsung mencari,
-  // supaya pengguna masih sempat mengubah moda perjalanan lebih dulu.
   $('#routeCards')?.addEventListener('click', (e) => {
     const kartu = e.target.closest('[data-pintasan-asal]');
     if (!kartu) return;
@@ -261,8 +272,6 @@ export function pasangPengendaliPencarian() {
     setState({ tampilan: 'siap' });
   });
 
-  // Menekan Enter di salah satu kotak isian langsung mencari. Ini
-  // kebiasaan yang diharapkan pengguna pada kotak pencarian mana pun.
   for (const id of ['#inpOrigin', '#inpDest']) {
     $(id)?.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;

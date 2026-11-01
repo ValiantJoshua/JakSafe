@@ -23,13 +23,18 @@ const MAX_STEPS = 6;
 const SYSTEM_INSTRUCTION = [
   'Anda adalah agen navigasi cerdas jakSafe untuk wilayah DKI Jakarta.',
   'Tugas Anda adalah menemukan dan mengevaluasi rute perjalanan teraman dan tersehat.',
-  'Evaluasi didasarkan pada 3 faktor: 1. Waktu tempuh & kemacetan (OSRM & TomTom), 2. Kualitas udara PM2.5 (Open-Meteo), 3. Kondisi fisik/visual jalan dan genangan banjir (CCTV Jakarta & Vision).',
+  'Evaluasi didasarkan pada 3 pilar: 1. Waktu tempuh & kemacetan (OSRM & TomTom), 2. Kualitas udara PM2.5 (Open-Meteo), 3. Kondisi fisik/visual jalan dan genangan banjir (CCTV Jakarta & Vision).',
   'Alur kerja Anda (ReAct):',
   '1. Cari rute menggunakan get_route.',
   '2. Periksa kemacetan real-time pada rute menggunakan get_traffic.',
   '3. Periksa kualitas udara PM2.5 di sepanjang rute menggunakan get_aqi.',
   '4. Cari snapshot CCTV terdekat di titik kritis menggunakan get_cctv_snapshot, lalu analisis gambar dengan analyze_image jika kamera tersedia.',
   '5. Berikan kesimpulan dan rekomendasi rute yang holistik.',
+  'ATURAN FORMAT JAWABAN AKHIR (SANGAT PENTING):',
+  '- Tuliskan kesimpulan akhir secara RINGKAS, PADAT, dan ELEGAN (cukup 2–3 kalimat langsung ke intinya).',
+  '- Fokuskan HANYA pada: (a) Status kelayakan rute & lalu lintas, dan (b) Tindakan mitigasi / saran praktis bagi pengguna (misal: mode sirkulasi AC, kewaspadaan genangan, atau pilihan waktu berangkat).',
+  '- JANGAN mengulang-ulang daftar angka mentah (seperti koordinat [lat, lon], jarak km, detik, persentase delay, angka PM2.5 eksak), karena seluruh metrik tersebut SUDAH ditampilkan secara visual di kartu statistik antarmuka pengguna.',
+  '- Gunakan bahasa Indonesia yang ramah, profesional, dan actionable.',
   'ATURAN ETIKA: Jangan pernah mengidentifikasi orang atau plat kendaraan.',
 ].join(' ');
 
@@ -131,6 +136,7 @@ export async function runNavigationAgent({
   let airSummary = null;
   let lastCctvSnapshot = null;
   let visualResult = null;
+  let agentFinalThought = '';
 
   // Calculate weights based on user preferences
   const weights = preferences.healthSensitive
@@ -181,6 +187,7 @@ export async function runNavigationAgent({
         if (!functionCalls || functionCalls.length === 0) {
           // Model completed its final thought / text answer
           const finalText = response.response.text ? response.response.text() : '';
+          agentFinalThought = finalText;
           reasoning.push({
             step: stepIndex++,
             thought: finalText || 'Analisis dan evaluasi rute selesai.',
@@ -221,11 +228,20 @@ export async function runNavigationAgent({
             toolResult = await getCctvSnapshot(call.args);
             if (toolResult.ok) {
               lastCctvSnapshot = toolResult;
+              const cam = toolResult.camera || {};
               visualResult = {
-                cameraId: toolResult.camera?.id,
-                cameraName: toolResult.camera?.name,
-                fetchedAt: toolResult.camera?.fetchedAt || new Date().toISOString(),
+                cameraId: cam.id,
+                cameraName: cam.name,
+                fetchedAt: cam.fetchedAt || new Date().toISOString(),
                 analysis: null,
+                kamera: {
+                  id: cam.id,
+                  nama: cam.name,
+                  jarakM: Number.isFinite(cam.distanceM) ? cam.distanceM : null,
+                  provider: cam.provider || null,
+                  license: cam.license || null,
+                },
+                analisis: null,
               };
             }
           } else if (call.name === 'analyze_image') {
@@ -244,6 +260,7 @@ export async function runNavigationAgent({
               toolResult = await analyzeImage({ image_base64: imageBase64, mime_type: mimeType, context });
               if (toolResult.ok && visualResult) {
                 visualResult.analysis = toolResult.analysis;
+                visualResult.analisis = toolResult.analysis;
               }
             } else {
               toolResult = { ok: false, error: 'no image base64 provided or available' };
@@ -336,6 +353,7 @@ export async function runNavigationAgent({
     });
     if (visionRes.ok) {
       visualResult.analysis = visionRes.analysis;
+      visualResult.analisis = visionRes.analysis;
     }
   } else if (!visualResult) {
     const cctvRes = await getCctvSnapshot({ lat: midpoint.lat, lon: midpoint.lon, radius_m: 1000 });
@@ -345,11 +363,20 @@ export async function runNavigationAgent({
         mime_type: cctvRes.image.mimeType,
         context: cctvRes.camera?.name,
       });
+      const cam = cctvRes.camera || {};
       visualResult = {
-        cameraId: cctvRes.camera?.id,
-        cameraName: cctvRes.camera?.name,
-        fetchedAt: cctvRes.camera?.fetchedAt || new Date().toISOString(),
+        cameraId: cam.id,
+        cameraName: cam.name,
+        fetchedAt: cam.fetchedAt || new Date().toISOString(),
         analysis: visionRes.ok ? visionRes.analysis : null,
+        kamera: {
+          id: cam.id,
+          nama: cam.name,
+          jarakM: Number.isFinite(cam.distanceM) ? cam.distanceM : null,
+          provider: cam.provider || null,
+          license: cam.license || null,
+        },
+        analisis: visionRes.ok ? visionRes.analysis : null,
       };
     }
   }
@@ -392,8 +419,14 @@ export async function runNavigationAgent({
       geometry: primaryRoute.geometry,
     },
     score: primaryScore,
-    air: airSummary,
+    air: airSummary
+      ? {
+          ...airSummary,
+          titikTerburuk: { time: airSummary.time },
+        }
+      : null,
     visual: visualResult,
+    reason: agentFinalThought || null,
     reasoning,
     alternatives,
   };

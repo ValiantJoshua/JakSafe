@@ -1,16 +1,6 @@
 /*
-   Perakit kerangka tampilan.
-
-   Berkas ini yang mengisi div#app pada app.html. Urutan pemasangannya
-   mengikuti urutan dokumen yang masuk akal, yaitu sprite ikon lebih dulu
-   karena seluruh bagian lain memakainya lewat tag use, baru bilah atas,
-   ruang kerja, dan terakhir lapisan mengambang seperti modal dan toast.
-
-   Satu rakitan menghasilkan satu dokumen utuh. Setelah fungsi ini selesai,
-   semua id yang dicari pengendali sudah pasti ada di DOM, sehingga
-   pengendali tidak perlu menunggu atau memeriksa keberadaannya berulang
-   kali. Inilah alasan main.js memanggil rakit lebih dulu, baru memasang
-   pengendali.
+   Perakit kerangka tampilan utama JakSafe.
+   Mendukung sidebar yang dapat dilipat/dibuka (collapsible sidebar) ala Google Maps.
 */
 
 import { spriteIkon } from './icons.js';
@@ -21,6 +11,7 @@ import { templateResultView } from './templates/resultView.js';
 import { templateErrorView } from './templates/errorView.js';
 import { templateStage } from './templates/stageView.js';
 import { templateLoginModal, templateUserMenu } from './templates/loginModal.js';
+import { ikon } from './icons.js';
 
 /**
  * Membangun seluruh kerangka tampilan ke dalam elemen induk.
@@ -34,14 +25,21 @@ ${spriteIkon()}
 <div class="app">
   ${templateTopbar()}
 
-  <div class="workspace">
-    <aside class="sidepanel">
+  <div class="workspace" id="workspace" data-sidebar="open">
+    <aside class="sidepanel" id="sidePanel" aria-label="Panel navigasi rute">
       <div class="sidepanel__body scroll-y" id="panelBody">
         ${templateSearchView()}
         ${templateProgressView()}
         ${templateResultView()}
         ${templateErrorView()}
       </div>
+
+      <!-- Tab Lipat/Buka Panel Samping ala Google Maps -->
+      <button type="button" class="sidepanel__tab" id="btnSidebarTab"
+              aria-label="Sembunyikan atau tampilkan panel rute"
+              title="Sembunyikan / Tampilkan Panel">
+        ${ikon('i-chev', 16, 'sidepanel__tabicon')}
+      </button>
     </aside>
 
     ${templateStage()}
@@ -51,7 +49,6 @@ ${spriteIkon()}
 ${templateLoginModal()}
 ${templateUserMenu()}
 
-<!-- Pemberitahuan singkat yang muncul lalu hilang sendiri. -->
 <div class="toast" id="toast" hidden><span id="toastText"></span></div>
 `;
 }
