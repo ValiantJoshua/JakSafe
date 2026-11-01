@@ -235,7 +235,7 @@ function renderEntitasKamera() {
         heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
         pixelOffset: new Cesium.Cartesian2(0, -22),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isSelected || isRouteCam ? 25000 : 6500),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isSelected || isRouteCam ? 25000 : 1200),
       },
     });
   }

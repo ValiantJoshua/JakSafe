@@ -364,43 +364,43 @@
   display: flex;
   flex-direction: column;
   gap: var(--s2);
-  max-width: calc(100% - 88px);
+  max-width: calc(100% - 84px);
 }
 
 .mapstage__float--bl {
-  bottom: var(--s5);
+  bottom: var(--s4);
   left: var(--s4);
-  max-width: calc(100% - 270px);
+  max-width: calc(100% - 250px);
 }
 
 .maphud-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s2);
+  gap: 8px;
 }
 
-/* Grup pemilih 3D Cesium / 2D Peta Normal / 2D Satelit */
+/* Grup pemilih 3D / 2D Peta / Satelit ala Google Maps */
 .mapmode-group,
 .mappreset-group {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   padding: 4px;
   border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border);
-  box-shadow: var(--sh-3);
+  box-shadow: 0 4px 16px rgba(14, 20, 48, 0.12);
 }
 
 .mapmode-btn,
 .mappreset-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 13px;
+  gap: 5px;
+  padding: 6px 12px;
   border-radius: var(--r-pill);
   font-size: var(--fs-xs);
   font-weight: 800;
@@ -426,109 +426,85 @@
   color: var(--jk-blue-1);
 }
 
-.mapstatus-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2);
-  align-self: flex-start;
-  padding: 4px 12px;
-  border-radius: var(--r-pill);
-  background: rgba(14, 20, 48, 0.82);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #E2E8F0;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.mapstatus-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #22C55E;
-  box-shadow: 0 0 8px #22C55E;
-}
-
-/* Dock Sakelar Layer ON / OFF (Traffic, CCTV, AQI) ala God's Eye View */
+/* Dock Sakelar Layer ON / OFF (Traffic, CCTV, Gedung 3D, Udara) — Clean Pill Style */
 .maplayer-dock {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s2);
-  padding: 6px 10px 6px 14px;
+  gap: 6px;
+  padding: 5px;
   border-radius: var(--r-pill);
-  background: rgba(14, 20, 48, 0.90);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: var(--sh-4);
-}
-
-.maplayer-dock__label {
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  color: #94A3B8;
-  margin-right: 2px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 20px rgba(14, 20, 48, 0.14);
 }
 
 .maplayer-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
+  gap: 6px;
+  padding: 6px 11px;
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.72);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  color: var(--text-2);
   font-size: var(--fs-xs);
   font-weight: 800;
   transition: all var(--dur-1) var(--ease);
 }
 
 .maplayer-chip:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #FFFFFF;
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text-1);
 }
 
 .maplayer-chip[aria-pressed="true"] {
-  background: rgba(42, 64, 208, 0.45);
-  border-color: #60A5FA;
+  background: var(--jk-navy);
+  border-color: transparent;
   color: #FFFFFF;
-  box-shadow: 0 0 16px rgba(59, 130, 246, 0.32);
+}
+
+[data-theme="gelap"] .maplayer-chip[aria-pressed="true"] {
+  background: var(--grad-blue);
 }
 
 .maplayer-chip__dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #64748B;
+  background: var(--text-3);
   transition: all var(--dur-1) var(--ease);
 }
 
 .maplayer-chip[aria-pressed="true"] .maplayer-chip__dot--traffic {
   background: #22C55E;
-  box-shadow: 0 0 8px #22C55E;
+  box-shadow: 0 0 6px #22C55E;
 }
 
 .maplayer-chip[aria-pressed="true"] .maplayer-chip__dot--cctv {
   background: #38BDF8;
-  box-shadow: 0 0 8px #38BDF8;
+  box-shadow: 0 0 6px #38BDF8;
+}
+
+.maplayer-chip[aria-pressed="true"] .maplayer-chip__dot--buildings {
+  background: #A78BFA;
+  box-shadow: 0 0 6px #A78BFA;
 }
 
 .maplayer-chip[aria-pressed="true"] .maplayer-chip__dot--aqi {
   background: #F59E0B;
-  box-shadow: 0 0 8px #F59E0B;
+  box-shadow: 0 0 6px #F59E0B;
 }
 
 .maplayer-chip__badge {
-  padding: 2px 7px;
+  padding: 1px 6px;
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.06);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.04em;
 }
 
 .maplayer-chip[aria-pressed="true"] .maplayer-chip__badge {
