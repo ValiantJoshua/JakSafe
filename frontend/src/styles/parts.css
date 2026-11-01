@@ -707,3 +707,12 @@
 [data-theme="kontras"] .switchrow,
 [data-theme="kontras"] .errorbox__hint { border-width: 2px; }
 [data-theme="kontras"] .sumberbadge { border: 2px solid currentColor; }
+
+/* Pemformatan Hasil Markdown Rekomendasi AI */
+.reason__paragraph { margin-bottom: var(--s2, 8px); }
+.reason__paragraph:last-child { margin-bottom: 0; }
+.reason__subheading { font-size: var(--fs-sm, 13px); font-weight: 700; color: #fff; margin: var(--s3, 12px) 0 var(--s2, 8px); }
+.reason__subheading:first-child { margin-top: 0; }
+.reason__divider { border: 0; border-top: 1px solid rgba(255,255,255,.15); margin: var(--s3, 12px) 0; }
+.reason__list { margin: var(--s2, 8px) 0 var(--s3, 12px); padding-left: var(--s4, 16px); display: flex; flex-direction: column; gap: 4px; }
+.reason__item { list-style: disc; }

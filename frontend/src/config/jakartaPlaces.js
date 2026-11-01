@@ -1,17 +1,10 @@
 /*
    Daftar lokasi Jakarta untuk kotak isian titik awal dan tujuan.
 
-   Kenapa daftar ini ada di frontend dan bukan di backend. Backend JakSafe
-   tidak menyediakan layanan geocoding, jadi ia hanya menerima koordinat
-   mentah pada /api/route dengan urutan bujur lalu lintang. Sampai pencarian
-   alamat yang sebenarnya dipasang, daftar tetap ini yang menerjemahkan nama
-   tempat menjadi koordinat sebelum permintaan dikirim.
-
    PENTING soal urutan angka. Seluruh berkas ini menyimpan koordinat dalam
    bentuk { lat, lon } karena itu yang lazim dibaca manusia. Perubahan ke
    urutan "lon,lat" yang diminta backend dikerjakan di satu tempat saja,
-   yaitu fungsi toCoordParam pada src/utils/geo.js. Jangan membalik urutan
-   di tempat lain supaya tidak ada rute yang melenceng ke tengah laut.
+   yaitu fungsi toCoordParam pada src/utils/geo.js.
 */
 
 /**
@@ -51,21 +44,31 @@ export const DEFAULT_TRIP = {
   destination: 'monas',
 };
 
+/** Peta memori untuk menyimpan lokasi dinamis hasil pencarian geocoding live */
+const customPlaces = new Map();
+
+/**
+ * Mendaftarkan lokasi dinamis hasil pencarian geocoding
+ * @param {Tempat} place
+ */
+export function registerCustomPlace(place) {
+  if (place && place.id) {
+    customPlaces.set(place.id, place);
+  }
+}
+
 /**
  * Mencari satu tempat berdasarkan id.
  * @param {string} id
  * @returns {Tempat|null}
  */
 export function findPlaceById(id) {
+  if (customPlaces.has(id)) return customPlaces.get(id);
   return JAKARTA_PLACES.find((p) => p.id === id) || null;
 }
 
 /**
- * Mencari tempat berdasarkan teks yang diketik pengguna.
- * Pencocokan dibuat longgar, tidak peduli huruf besar kecil, dan juga
- * mencocokkan nama wilayah supaya mengetik "Jakarta Utara" tetap memberi
- * hasil. Dipakai oleh daftar saran pada kotak isian.
- *
+ * Mencari tempat berdasarkan teks yang diketik pengguna (pencarian lokal).
  * @param {string} teks
  * @param {number} [maks=6] jumlah saran paling banyak yang dikembalikan
  * @returns {Tempat[]}
@@ -73,7 +76,56 @@ export function findPlaceById(id) {
 export function searchPlaces(teks, maks = 6) {
   const kunci = String(teks || '').trim().toLowerCase();
   if (!kunci) return JAKARTA_PLACES.slice(0, maks);
-  return JAKARTA_PLACES
-    .filter((p) => `${p.nama} ${p.area}`.toLowerCase().includes(kunci))
-    .slice(0, maks);
+
+  const customHits = Array.from(customPlaces.values()).filter((p) =>
+    `${p.nama} ${p.area}`.toLowerCase().includes(kunci)
+  );
+
+  const presetHits = JAKARTA_PLACES.filter((p) =>
+    `${p.nama} ${p.area}`.toLowerCase().includes(kunci)
+  );
+
+  return [...customHits, ...presetHits].slice(0, maks);
+}
+
+/**
+ * Mencari lokasi secara dinamis menggunakan Geocoding API (Google Geocoding / OSM Photon / Nominatim).
+ * Mendukung pencarian alamat spesifik apa pun di Jakarta & Indonesia (nama jalan, nomor rumah, gedung, koordinat).
+ *
+ * @param {string} teks
+ * @param {number} [maks=6]
+ * @returns {Promise<Tempat[]>}
+ */
+export async function searchPlacesLive(teks, maks = 6) {
+  const kunci = String(teks || '').trim();
+  if (!kunci) return JAKARTA_PLACES.slice(0, maks);
+
+  // 1. Cek kecocokan lokal di preset Jakarta
+  const localHits = searchPlaces(kunci, maks);
+  if (localHits.length >= 3 && localHits.some((h) => h.nama.toLowerCase().startsWith(kunci.toLowerCase()))) {
+    return localHits;
+  }
+
+  // 2. Panggil endpoint Geocoding di backend
+  try {
+    const res = await fetch(`/api/geocode?q=${encodeURIComponent(kunci)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.places) && data.places.length > 0) {
+        data.places.forEach((p) => registerCustomPlace(p));
+        // Gabungkan hasil geocoding dengan preset yang relevan
+        const hasil = [...data.places];
+        for (const loc of localHits) {
+          if (!hasil.some((h) => h.nama.toLowerCase() === loc.nama.toLowerCase())) {
+            hasil.push(loc);
+          }
+        }
+        return hasil.slice(0, maks);
+      }
+    }
+  } catch (err) {
+    console.warn('[searchPlacesLive] Gagal memanggil geocode backend, fallback ke lokal:', err.message);
+  }
+
+  return localHits;
 }

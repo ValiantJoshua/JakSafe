@@ -54,7 +54,7 @@ export function templateResultView() {
       <span class="reason__badge">${ikon('i-spark', 17)}</span>
       <span class="reason__title">Ringkasan Rekomendasi AI</span>
     </div>
-    <p class="reason__text" id="sReason"></p>
+    <div class="reason__text" id="sReason"></div>
   </div>
 
   <div class="card card--detail rise rise-4">
