@@ -1,0 +1,129 @@
+/*
+   JakSafe, Efek Kedalaman & Gerak
+   Semua efek di sini sengaja dibuat halus. Target pengguna
+   mencakup usia lanjut dan pengguna awam, jadi gerakan tidak
+   boleh mengganggu keterbacaan atau memperlambat interaksi.
+*/
+
+/* KEMIRINGAN 3D SAAT KURSOR DI ATAS
+   Dipakai pada kartu ringkasan. Sudut maksimal kecil (6 derajat)
+   supaya terasa berdimensi tanpa membuat teks sulit dibaca.
+   Nilai --rx dan --ry diisi oleh gui.js dari posisi kursor. */
+.tilt {
+  transform-style: preserve-3d;
+  transition: transform var(--dur-2) var(--ease),
+              box-shadow var(--dur-2) var(--ease);
+  will-change: transform;
+}
+.tilt:hover { box-shadow: var(--sh-4); }
+
+.tilt--on {
+  transform:
+    perspective(1000px)
+    rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg))
+    translateZ(6px);
+}
+
+/* lapisan isi yang diangkat sedikit ke depan */
+.tilt__layer { transform: translateZ(26px); }
+
+/* MUNCUL BERURUTAN
+   Panel hasil tampil satu per satu supaya mata pengguna
+   terbimbing dari skor ke rincian. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rise { animation: rise var(--dur-3) var(--ease) both; }
+.rise-1 { animation-delay: .00s; }
+.rise-2 { animation-delay: .07s; }
+.rise-3 { animation-delay: .14s; }
+.rise-4 { animation-delay: .21s; }
+.rise-5 { animation-delay: .28s; }
+.rise-6 { animation-delay: .35s; }
+
+/* MASUK DARI SAMPING */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.slide-in { animation: slide-in var(--dur-2) var(--ease) both; }
+
+/* KILAU BERJALAN
+   Dipakai pada tombol utama saat panel pencarian aktif,
+   untuk menarik perhatian ke aksi berikutnya. */
+.sheen { position: relative; overflow: hidden; }
+.sheen::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -140%;
+  width: 60%; height: 100%;
+  background: linear-gradient(100deg,
+    transparent 0%,
+    rgba(255,255,255,.34) 50%,
+    transparent 100%);
+  transform: skewX(-18deg);
+  animation: sheen-run 4.5s var(--ease) infinite;
+}
+@keyframes sheen-run {
+  0%, 62% { left: -140%; }
+  100%    { left: 160%; }
+}
+
+/* ANGKA MENGHITUNG */
+.counting { font-variant-numeric: tabular-nums; }
+
+/* RANGKA MUAT */
+@keyframes shimmer { to { background-position: 200% 0; } }
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--surface-3) 0%, var(--surface-2) 50%, var(--surface-3) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: var(--r-sm);
+}
+
+/* BENDA MENGAPUNG DI LATAR PETA */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(46px);
+  opacity: .5;
+  pointer-events: none;
+  animation: drift 17s var(--ease-io) infinite alternate;
+}
+.blob--1 {
+  width: 290px; height: 290px;
+  top: 8%; left: 10%;
+  background: var(--jk-lavender);
+}
+.blob--2 {
+  width: 240px; height: 240px;
+  bottom: 12%; right: 14%;
+  background: var(--jk-lime);
+  animation-delay: -6s;
+}
+.blob--3 {
+  width: 190px; height: 190px;
+  top: 52%; left: 46%;
+  background: var(--jk-lime-soft);
+  animation-delay: -11s;
+}
+@keyframes drift {
+  to { transform: translate(34px, -28px) scale(1.08); }
+}
+
+/* PENEKANAN TOMBOL */
+.press { transition: transform var(--dur-1) var(--ease); }
+.press:active { transform: scale(.97); }
+
+/* MATIKAN EFEK BILA DIMINTA
+   Pengguna yang menyalakan pengurangan gerak di sistemnya
+   tetap mendapat tampilan utuh tanpa animasi. */
+@media (prefers-reduced-motion: reduce) {
+  .rise, .slide-in { animation: none; opacity: 1; transform: none; }
+  .sheen::after, .blob, .sketch-path, .sketch-node,
+  .progress__ring, .progress__ring span { animation: none; }
+  .tilt--on { transform: none; }
+}

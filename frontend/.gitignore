@@ -1,0 +1,15 @@
+# Berkas ini melengkapi .gitignore pada root repositori.
+# Aturan di sini khusus untuk folder frontend.
+
+node_modules/
+dist/
+.vite/
+
+# Berkas lingkungan lokal. Yang ikut masuk git hanya .env.example.
+.env
+.env.local
+.env.*.local
+
+# Sisa perkakas dan sistem
+*.log
+.DS_Store

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JakSafe, Rute Lebih Aman untuk Jakarta</title>
+<meta name="description" content="Navigasi Jakarta yang menimbang kualitas udara dan kondisi jalan, bukan hanya waktu tempuh.">
+
+<!--
+  Berkas ini sengaja dibiarkan kosong dari sisi tampilan.
+
+  Tidak ada satu pun elemen antarmuka yang ditulis di sini. Topbar, panel
+  pencarian, kartu hasil, modal, dan panggung peta semuanya dibentuk oleh
+  modul JavaScript di dalam src/ui/ lalu dipasang ke dalam div#app di bawah.
+
+  Konsekuensinya memang disengaja. Membuka berkas ini langsung dari
+  penjelajah berkas tidak akan menampilkan apa pun, karena modul ES tidak
+  dimuat lewat protokol file:// dan pemanggilan /api tidak punya tujuan.
+  Tampilan hanya muncul kalau dev server Vite berjalan dan backend JakSafe
+  juga hidup, sesuai cara aplikasi ini memang dijalankan.
+-->
+
+<!--
+  Ikon tab ditulis langsung sebagai data URI berisi SVG. Dipilih begitu
+  supaya tidak ada permintaan berkas tambahan dan tidak ada 404 favicon
+  di log dev server, yang kalau dibiarkan mengotori penelusuran galat.
+-->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='17' fill='%232A40D0'/%3E%3Cpath d='M12 54 C24 44 34 40 44 32 C52 25 55 18 57 12' stroke='%23D9ED66' stroke-width='9' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body data-theme="terang" data-textsize="normal" data-auth="guest">
+
+<!-- Satu satunya simpul statis. Seluruh isinya dibangun dari JavaScript. -->
+<div id="app"></div>
+
+<!--
+  Pesan cadangan untuk peramban yang JavaScript-nya dimatikan. Dipasang di
+  dalam tag noscript supaya tidak pernah ikut terbaca saat aplikasi normal.
+-->
+<noscript>
+  <p style="font-family:system-ui;padding:24px;max-width:46ch;line-height:1.6">
+    JakSafe membutuhkan JavaScript untuk berjalan. Jalankan
+    <code>npm run dev</code> pada folder frontend dan pastikan
+    backend JakSafe aktif di porta 3001.
+  </p>
+</noscript>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
