@@ -223,6 +223,7 @@ function renderEntitasKamera() {
         heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scaleByDistance: new Cesium.NearFarScalar(800, 1.15, 35000, 0.55),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isSelected || isRouteCam ? 65000 : 45000),
       },
       label: {
         text: cam.nama,

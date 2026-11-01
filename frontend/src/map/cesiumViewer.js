@@ -447,17 +447,43 @@ export function flyToCoordinates({
   });
 }
 
-/** Perbesar atau perkecil tampilan kamera. */
+/**
+ * Perbesar atau perkecil tampilan kamera dengan animasi transisi halus (smooth animated zoom).
+ * @param {number} direction 1 untuk zoom in (perbesar), -1 untuk zoom out (perkecil)
+ */
 export function zoomMap(direction = 1) {
   if (!viewerInstance) return;
-  const height = viewerInstance.camera.positionCartographic?.height || 2000;
-  const step = Math.max(120, height * 0.35);
-  if (direction > 0) {
-    viewerInstance.camera.zoomIn(step);
-  } else {
-    viewerInstance.camera.zoomOut(step);
-  }
-  viewerInstance.scene.requestRender();
+  const camera = viewerInstance.camera;
+  const currentHeight = camera.positionCartographic?.height || 2000;
+
+  // Faktor perbesaran: maju ~40% untuk zoom in, mundur ~55% untuk zoom out
+  const factor = direction > 0 ? 0.60 : 1.55;
+  const targetHeight = Math.max(70, Math.min(3800000, currentHeight * factor));
+  const diff = currentHeight - targetHeight;
+
+  // Gerakkan kamera sepanjang arah pandang garis mata saat ini
+  const moveVector = Cesium.Cartesian3.multiplyByScalar(
+    camera.direction,
+    diff,
+    new Cesium.Cartesian3(),
+  );
+  const targetDestination = Cesium.Cartesian3.add(
+    camera.position,
+    moveVector,
+    new Cesium.Cartesian3(),
+  );
+
+  // Transisi animasi mulus & responsif
+  camera.flyTo({
+    destination: targetDestination,
+    orientation: {
+      heading: camera.heading,
+      pitch: camera.pitch,
+      roll: camera.roll,
+    },
+    duration: 0.35,
+    easingFunction: Cesium.EasingFunction.QUADRATIC_OUT,
+  });
 }
 
 /** Menjaga agar kamera tetap berada di dalam cakupan wilayah Indonesia. */

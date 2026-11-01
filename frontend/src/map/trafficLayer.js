@@ -189,23 +189,23 @@ export function getTrafficLayerStatus() {
 function warnaLaluLintas(level) {
   const l = Number.isFinite(level) ? level : 0.65;
   if (l < 0.36) {
-    // Macet berat -> Merah terang
+    // Macet berat -> Merah lembut transparan
     return {
-      line: Cesium.Color.fromCssColorString('#EF4444').withAlpha(0.88),
-      dot: Cesium.Color.fromCssColorString('#FCA5A5').withAlpha(0.96),
+      line: Cesium.Color.fromCssColorString('#EF4444').withAlpha(0.55),
+      dot: Cesium.Color.fromCssColorString('#FCA5A5').withAlpha(0.70),
     };
   }
   if (l < 0.68) {
-    // Padat merayap -> Kuning / Oranye
+    // Padat merayap -> Kuning / Oranye lembut transparan
     return {
-      line: Cesium.Color.fromCssColorString('#F59E0B').withAlpha(0.85),
-      dot: Cesium.Color.fromCssColorString('#FDE68A').withAlpha(0.95),
+      line: Cesium.Color.fromCssColorString('#F59E0B').withAlpha(0.52),
+      dot: Cesium.Color.fromCssColorString('#FDE68A').withAlpha(0.68),
     };
   }
-  // Lancar -> Hijau zamrud
+  // Lancar -> Hijau zamrud lembut transparan
   return {
-    line: Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.82),
-    dot: Cesium.Color.fromCssColorString('#86EFAC').withAlpha(0.94),
+    line: Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.48),
+    dot: Cesium.Color.fromCssColorString('#86EFAC').withAlpha(0.62),
   };
 }
 
@@ -353,7 +353,7 @@ function renderRoadsAndParticles(roads) {
     if (total < 45) continue;
 
     const style = warnaLaluLintas(road.trafficLevel);
-    const width = road.highway === 'motorway' ? 5.5 : road.highway === 'trunk' ? 4.5 : 3.5;
+    const width = road.highway === 'motorway' ? 4.5 : road.highway === 'trunk' ? 3.8 : 2.8;
 
     const positions = road.coords.map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(lon, lat, 10));
 
@@ -373,10 +373,10 @@ function renderRoadsAndParticles(roads) {
       const initialPos = interpolateAlongRoad(road.coords, lengths, total, startOffset);
       const pointPrimitive = particleCollection.add({
         position: initialPos,
-        pixelSize: road.highway === 'motorway' ? 6.5 : 5.2,
+        pixelSize: road.highway === 'motorway' ? 5.2 : 4.2,
         color: style.dot,
-        outlineColor: Cesium.Color.fromCssColorString('#0E1430').withAlpha(0.75),
-        outlineWidth: 1.2,
+        outlineColor: Cesium.Color.fromCssColorString('#0E1430').withAlpha(0.40),
+        outlineWidth: 1.0,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       });
 
