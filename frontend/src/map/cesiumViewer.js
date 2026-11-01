@@ -2,19 +2,26 @@
 /*
    Inisialisasi dan pengendali utama peta CesiumJS JakSafe (Fokus Indonesia & Jakarta).
 
-   Mendukung dua mode tampilan utama yang bisa di-switch kapan saja:
-   1. Mode 3D ("3d")
-      - Menggunakan Google Photorealistic 3D Tiles jika Google Maps API Key tersedia
-        dan mengizinkan Map Tiles API, atau fallback 3D Globe + OSM/Google Hybrid dengan
-        sudut pandang perspektif 3D (-38 derajat).
-   2. Mode 2D Normal Map ("2d-road" & "2d-sat")
-      - Mematikan 3D Tileset, menyalakan Globe 2D datar dari atas (top-down -90 derajat),
+   Arsitektur Tiling Berjenjang (3-Tier Tiling Optimization & Fallback):
+   1. Tier 1 — Cesium Ion 3D / Photorealistic 3D (Aktif bila VITE_CESIUM_ION_TOKEN tersedia):
+      - Memuat Cesium World Terrain (kontur 3D Indonesia + normal permukaan & masker air)
+        serta Cesium OSM 3D Buildings (seluruh gedung 3D Jakarta/Indonesia dengan
+        pewarnaan ketinggian arsitektural modern dan optimasi LOD dynamicScreenSpaceError).
+      - Mencoba Google Photorealistic 3D Tiles jika diizinkan oleh kunci Google/Ion.
+      - Mengoptimalkan ketajaman tile globe (maximumScreenSpaceError = 1.35,
+        tileCacheSize = 1000, preloadAncestors = true) agar peta tajam dan cepat.
+   2. Tier 2 — Fallback Standar CesiumJS (Jika TIDAK ada VITE_CESIUM_ION_TOKEN):
+      - Otomatis kembali ke CesiumJS standar menggunakan EllipsoidTerrainProvider
+        dan basemap hibrida/jalan tanpa memerlukan token Cesium Ion.
+   3. Mode 2D Normal Map ("2d-road" & "2d-sat"):
+      - Mematikan 3D Buildings & 3D Tileset, meratakan terrain ke 2D top-down (-90 derajat),
         dan menampilkan layer peta jalan normal Google Maps 2D (Roadmap) atau Satelit Hibrida.
 */
 
 import * as Cesium from 'cesium';
 
 const STORAGE_KEY_GMAPS = 'jaksafe_google_maps_key';
+const STORAGE_KEY_ION = 'jaksafe_cesium_ion_token';
 
 /** Batas wilayah Indonesia (Sabang sampai Merauke, Miangas sampai Rote). */
 export const INDONESIA_BOUNDS = {
@@ -30,10 +37,10 @@ export const CAMERA_PRESETS = {
     label: 'Jakarta Pusat (Sudirman–Monas)',
     lon: 106.8230,
     lat: -6.1920,
-    height3d: 1850,
+    height3d: 1450,
     height2d: 5500,
     headingDeg: 12,
-    pitch3dDeg: -38,
+    pitch3dDeg: -36,
   },
   jabodetabek: {
     label: 'Jabodetabek',
@@ -61,17 +68,21 @@ let viewerInstance = null;
 let google3dTileset = null;
 /** @type {Cesium.Cesium3DTileset|null} */
 let osmBuildingsTileset = null;
+/** @type {Cesium.TerrainProvider|null} */
+let worldTerrainProvider = null;
+/** @type {Cesium.TerrainProvider|null} */
+let flatTerrainProvider = null;
 /** @type {Cesium.ImageryLayer|null} */
 let baseImageryLayer = null;
 
 /** @type {'3d'|'2d-road'|'2d-sat'} */
 let currentMode = '3d';
-/** @type {'3d-photoreal'|'3d-globe'|'2d-road'|'2d-sat'} */
+/** @type {'3d-ion-buildings'|'3d-photoreal'|'3d-globe'|'2d-road'|'2d-sat'} */
 let activeRenderDetail = '3d-globe';
 /** @type {string} */
 let statusMessage = 'Memuat peta Indonesia...';
 
-/** @type {Set<(info:{mode:string, detail:string, message:string, hasGoogleKey:boolean})=>void>} */
+/** @type {Set<(info:{mode:string, detail:string, message:string, hasGoogleKey:boolean, hasIonToken:boolean})=>void>} */
 const modeListeners = new Set();
 
 /** Membaca Google Maps API Key dari localStorage atau environment Vite. */
@@ -83,6 +94,19 @@ export function getGoogleMapsApiKey() {
   return String(
     import.meta.env.VITE_GOOGLE_MAPS_API_KEY
     || import.meta.env.GOOGLE_MAPS_API_KEY
+    || '',
+  ).trim();
+}
+
+/** Membaca Cesium Ion Token dari localStorage atau environment Vite (.env). */
+export function getCesiumIonToken() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_ION);
+    if (saved && saved.trim()) return saved.trim();
+  } catch { /* ignore */ }
+  return String(
+    import.meta.env.VITE_CESIUM_ION_TOKEN
+    || import.meta.env.CESIUM_ION_TOKEN
     || '',
   ).trim();
 }
@@ -110,6 +134,7 @@ function notifyModeListeners() {
     detail: activeRenderDetail,
     message: statusMessage,
     hasGoogleKey: Boolean(getGoogleMapsApiKey()),
+    hasIonToken: Boolean(getCesiumIonToken()),
   };
   for (const fn of modeListeners) {
     try { fn(payload); } catch { /* ignore */ }
@@ -132,25 +157,66 @@ export function getMapViewMode() {
 export function getGoogleMapsKeyStatus() {
   return {
     hasKey: Boolean(getGoogleMapsApiKey()),
+    hasIonToken: Boolean(getCesiumIonToken()),
     detail: activeRenderDetail,
     message: statusMessage,
   };
 }
 
 /**
- * Membuat ImageryProvider 2D (Google Maps 2D Roadmap / Satellite Hybrid, dengan fallback OSM).
+ * Mengoptimalkan parameter streaming 3D Tileset (baik Cesium OSM Buildings maupun Photorealistic Tiles)
+ * agar tidak membebani GPU/jaringan saat kamera digerakkan cepat.
+ * @param {Cesium.Cesium3DTileset} tileset
+ * @param {{maxError?:number}} [opts]
+ */
+function optimize3DTileset(tileset, { maxError = 8 } = {}) {
+  if (!tileset) return;
+  tileset.maximumScreenSpaceError = maxError;
+  tileset.dynamicScreenSpaceError = true;
+  tileset.dynamicScreenSpaceErrorDensity = 0.00278;
+  tileset.dynamicScreenSpaceErrorFactor = 4.0;
+  tileset.dynamicScreenSpaceErrorHeightFalloff = 0.25;
+  tileset.cullRequestsWhileMoving = true;
+  tileset.cullRequestsWhileMovingMultiplier = 60.0;
+  tileset.preloadWhenHidden = false;
+  tileset.preferLeaves = true;
+}
+
+/**
+ * Membuat gaya warna arsitektural untuk gedung 3D Cesium OSM Buildings di Jakarta.
+ * Gedung tinggi (pencakar langit Sudirman-Thamrin-Kuningan) diberi nuansa biru kaca kristal,
+ * gedung menengah abu-perak terang, dan bangunan rendah putih gading hangat.
+ */
+function createJakartaBuildingsStyle() {
+  return new Cesium.Cesium3DTileStyle({
+    color: {
+      conditions: [
+        ['Number(${feature["cesium#estimatedHeight"]}) >= 120', 'color("#93C5FD", 0.92)'],
+        ['Number(${feature["cesium#estimatedHeight"]}) >= 55', 'color("#BFDBFE", 0.90)'],
+        ['Number(${feature["cesium#estimatedHeight"]}) >= 22', 'color("#E2E8F0", 0.88)'],
+        ['true', 'color("#F1F5F9", 0.85)'],
+      ],
+    },
+  });
+}
+
+/**
+ * Membuat ImageryProvider 2D dengan ketajaman tinggi (Retina/High-DPI Google Maps 2D
+ * atau Bing Aerial / OpenStreetMap fallback).
  * @param {'road'|'sat'|'hybrid'} style
  */
 function create2DImageryProvider(style = 'road') {
   const gKey = getGoogleMapsApiKey();
-  // Google Maps 2D Tile Server (mendukung bahasa Indonesia hl=id & region gl=ID)
+  // scale=2 meminta tile resolusi tinggi (512x512 retina) agar teks jalan & satelit jauh lebih tajam
   const lyrs = style === 'sat' ? 's' : style === 'hybrid' ? 'y' : 'm';
   const keyQuery = gKey ? `&key=${encodeURIComponent(gKey)}` : '';
   try {
     return new Cesium.UrlTemplateImageryProvider({
-      url: `https://mt1.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}&hl=id&gl=ID${keyQuery}`,
+      url: `https://mt1.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}&scale=2&hl=id&gl=ID${keyQuery}`,
       maximumLevel: 20,
-      credit: new Cesium.Credit('Google Maps 2D'),
+      tileWidth: 512,
+      tileHeight: 512,
+      credit: new Cesium.Credit('Google Maps'),
     });
   } catch {
     return new Cesium.OpenStreetMapImageryProvider({
@@ -159,22 +225,88 @@ function create2DImageryProvider(style = 'road') {
   }
 }
 
-/** Mengganti basemap 2D pada globe. */
-function applyGlobeImagery(style = 'road') {
+/**
+ * Mengganti basemap pada globe dan mengatur ketajaman kontras/saturasi.
+ * Jika Cesium Ion tersedia dan mode 'ion-aerial' diminta, memakai Cesium World Imagery (Bing Aerial),
+ * jika tidak memakai Google High-DPI Hybrid/Roadmap.
+ * @param {'road'|'sat'|'hybrid'|'ion-aerial'} style
+ */
+async function applyGlobeImagery(style = 'road') {
   if (!viewerInstance) return;
   const layers = viewerInstance.imageryLayers;
+
+  let provider = null;
+  if (style === 'ion-aerial' && getCesiumIonToken()) {
+    try {
+      provider = await Cesium.createWorldImageryAsync({
+        style: Cesium.IonWorldImageryStyle.AERIAL_WITH_LABELS,
+      });
+    } catch {
+      provider = null;
+    }
+  }
+  if (!provider) {
+    provider = create2DImageryProvider(style === 'ion-aerial' ? 'hybrid' : style);
+  }
+
   if (baseImageryLayer) {
     try { layers.remove(baseImageryLayer, true); } catch { /* ignore */ }
     baseImageryLayer = null;
   }
-  const provider = create2DImageryProvider(style);
+
   baseImageryLayer = layers.addImageryProvider(provider, 0);
+  // Optimasi kejernihan visual basemap
+  baseImageryLayer.brightness = style === 'road' ? 1.0 : 1.04;
+  baseImageryLayer.contrast = style === 'road' ? 1.02 : 1.08;
+  baseImageryLayer.saturation = style === 'road' ? 1.0 : 1.12;
+  baseImageryLayer.gamma = 0.98;
 }
 
 /**
- * Memuat Google Photorealistic 3D Tileset jika API key tersedia.
- * Jika gagal (mis. Map Tiles API belum diaktifkan di Google Cloud Console),
- * otomatis jatuh ke 3D Globe Hybrid + bangunan 3D agar peta tetap tampil mulus.
+ * Memastikan Cesium World Terrain & Cesium OSM 3D Buildings dimuat ketika
+ * VITE_CESIUM_ION_TOKEN tersedia. Jika tidak ada token atau gagal, mengembalikan false
+ * sehingga otomatis fallback ke mode CesiumJS standar.
+ */
+async function ensureCesiumIon3DAssets() {
+  if (!viewerInstance) return false;
+  const ionToken = getCesiumIonToken();
+  if (!ionToken) return false;
+
+  Cesium.Ion.defaultAccessToken = ionToken;
+
+  // 1. Muat Cesium World Terrain (kontur 3D Indonesia)
+  if (!worldTerrainProvider) {
+    try {
+      worldTerrainProvider = await Cesium.createWorldTerrainAsync({
+        requestVertexNormals: true,
+        requestWaterMask: true,
+      });
+    } catch (err) {
+      console.warn('[JakSafe Map] Cesium World Terrain gagal dimuat, menggunakan ellipsoid standar:', err?.message || err);
+      worldTerrainProvider = null;
+    }
+  }
+
+  // 2. Muat Cesium OSM 3D Buildings (Gedung 3D seluruh Jakarta & Indonesia)
+  if (!osmBuildingsTileset) {
+    try {
+      const buildings = await Cesium.createOsmBuildingsAsync();
+      if (!viewerInstance) return false;
+      optimize3DTileset(buildings, { maxError: 6 });
+      buildings.style = createJakartaBuildingsStyle();
+      osmBuildingsTileset = viewerInstance.scene.primitives.add(buildings);
+    } catch (err) {
+      console.warn('[JakSafe Map] Cesium OSM 3D Buildings gagal dimuat:', err?.message || err);
+      osmBuildingsTileset = null;
+    }
+  }
+
+  return Boolean(osmBuildingsTileset || worldTerrainProvider);
+}
+
+/**
+ * Mencoba memuat Google Photorealistic 3D Tileset hanya bila kunci Google Maps
+ * memiliki akses ke Map Tiles API.
  */
 async function ensureGoogle3DTileset() {
   if (!viewerInstance) return false;
@@ -189,25 +321,24 @@ async function ensureGoogle3DTileset() {
       onlyUsingWithGoogleGeocoder: true,
     });
     if (!viewerInstance) return false;
+    optimize3DTileset(tileset, { maxError: 8 });
     google3dTileset = viewerInstance.scene.primitives.add(tileset);
     return true;
-  } catch (err) {
-    console.warn('[JakSafe Map] Google Photorealistic 3D Tiles fallback ke 3D Globe:', err?.message || err);
+  } catch {
     google3dTileset = null;
     return false;
   }
 }
 
 /**
- * Mengatur kemiringan kamera saat berpindah antara 3D (miring -38 derajat) dan 2D (tegak lurus -90 derajat)
- * sambil menjaga titik tengah layar (target di permukaan tanah) tetap sama.
+ * Mengatur kemiringan kamera saat berpindah antara 3D (miring -36 derajat) dan 2D (tegak lurus -90 derajat)
+ * sambil menjaga titik tengah layar tetap sama.
  */
 function adjustCameraForMode(mode) {
   if (!viewerInstance) return;
   const camera = viewerInstance.camera;
   const canvas = viewerInstance.scene.canvas;
 
-  // Cari titik tengah layar di ellipsoid supaya kamera berputar di sekitar lokasi yang sedang dilihat
   const centerPixel = new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2);
   const pickEllipsoid = camera.pickEllipsoid(centerPixel, viewerInstance.scene.globe.ellipsoid);
   const carto = pickEllipsoid
@@ -216,11 +347,10 @@ function adjustCameraForMode(mode) {
 
   const lon = Cesium.Math.toDegrees(carto.longitude);
   const lat = Cesium.Math.toDegrees(carto.latitude);
-  const currentHeight = Math.max(400, Math.min(3800000, camera.positionCartographic.height));
+  const currentHeight = Math.max(350, Math.min(3800000, camera.positionCartographic.height));
 
   if (mode === '3d') {
-    // Jika melihat dari dekat (< 45 km), miringkan kamera ke perspektif 3D
-    const pitchDeg = currentHeight < 45000 ? -38 : -65;
+    const pitchDeg = currentHeight < 45000 ? -36 : -65;
     const latOffset = currentHeight < 45000 ? (currentHeight / 111320) * 0.85 : 0;
     camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lon, lat - latOffset, currentHeight),
@@ -232,7 +362,6 @@ function adjustCameraForMode(mode) {
       duration: 0.9,
     });
   } else {
-    // Mode 2D Normal Map: menghadap lurus ke bawah (top-down -89.9 derajat) dan utara di atas
     camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(lon, lat, Math.max(800, currentHeight)),
       orientation: {
@@ -246,10 +375,14 @@ function adjustCameraForMode(mode) {
 }
 
 /**
- * Mengganti mode tampilan peta antara:
- * - `'3d'`      : Peta 3D Cesium (Google Photorealistic 3D Tiles / 3D Globe)
- * - `'2d-road'` : Peta 2D Normal (Google Maps 2D Jalan Raya)
- * - `'2d-sat'`  : Peta 2D Satelit Hibrida (Google Maps 2D Hybrid)
+ * Mengganti mode tampilan peta dengan dukungan penuh Cesium Ion + Fallback Standar:
+ * - `'3d'`      :
+ *     1) Jika `VITE_CESIUM_ION_TOKEN` ada -> Mengaktifkan Cesium World Terrain + 3D OSM Buildings Jakarta
+ *        di atas basemap High-DPI Hybrid/Aerial.
+ *     2) Jika Google 3D Photorealistic juga aktif -> Menampilkan Photorealistic 3D Tiles.
+ *     3) Fallback (Tanpa Token Ion) -> Menggunakan 3D Globe Standar CesiumJS saat ini.
+ * - `'2d-road'` : Peta 2D Normal (Google Maps 2D Jalan Raya High-DPI)
+ * - `'2d-sat'`  : Peta 2D Satelit Hibrida (Google Maps 2D Hybrid High-DPI)
  *
  * @param {'3d'|'2d-road'|'2d-sat'} mode
  * @param {{fly?:boolean}} [opts]
@@ -259,40 +392,62 @@ export async function setMapViewMode(mode, { fly = true } = {}) {
   currentMode = mode;
   const controller = viewerInstance.scene.screenSpaceCameraController;
 
+  if (!flatTerrainProvider) {
+    flatTerrainProvider = new Cesium.EllipsoidTerrainProvider();
+  }
+
   if (mode === '3d') {
     controller.enableTilt = true;
     controller.enableLook = true;
 
-    const has3DTiles = await ensureGoogle3DTileset();
-    if (has3DTiles && google3dTileset) {
-      google3dTileset.show = true;
-      // Tetap nyalakan globe dengan basemap hybrid sebagai cadangan bila 3D tile sedang streaming
-      applyGlobeImagery('hybrid');
-      viewerInstance.scene.globe.show = true;
-      activeRenderDetail = '3d-photoreal';
-      statusMessage = '3D Photorealistic (Google Maps 3D)';
-    } else {
+    // Prioritas 1: Gunakan Cesium Ion (World Terrain + 3D OSM Buildings) bila token tersedia
+    const hasIon3D = await ensureCesiumIon3DAssets();
+    if (hasIon3D) {
       if (google3dTileset) google3dTileset.show = false;
-      applyGlobeImagery('hybrid');
+      if (osmBuildingsTileset) osmBuildingsTileset.show = true;
+      if (worldTerrainProvider) {
+        viewerInstance.terrainProvider = worldTerrainProvider;
+      }
+      await applyGlobeImagery('hybrid');
       viewerInstance.scene.globe.show = true;
-      activeRenderDetail = '3d-globe';
-      statusMessage = getGoogleMapsApiKey()
-        ? '3D Globe Hybrid (Google Maps)'
-        : '3D Globe Indonesia';
+      activeRenderDetail = '3d-ion-buildings';
+      statusMessage = '3D Cesium Ion (Gedung 3D & Terrain Indonesia)';
+    } else {
+      // Prioritas 2: Coba Google Photorealistic 3D Tileset bila ada kunci Google
+      const hasGoogle3D = await ensureGoogle3DTileset();
+      if (hasGoogle3D && google3dTileset) {
+        google3dTileset.show = true;
+        if (osmBuildingsTileset) osmBuildingsTileset.show = false;
+        await applyGlobeImagery('hybrid');
+        viewerInstance.scene.globe.show = true;
+        activeRenderDetail = '3d-photoreal';
+        statusMessage = '3D Photorealistic (Google Maps 3D)';
+      } else {
+        // Prioritas 3 (Fallback Standar): Tanpa token Cesium Ion, kembali ke CesiumJS standar
+        if (google3dTileset) google3dTileset.show = false;
+        if (osmBuildingsTileset) osmBuildingsTileset.show = false;
+        viewerInstance.terrainProvider = flatTerrainProvider;
+        await applyGlobeImagery('hybrid');
+        viewerInstance.scene.globe.show = true;
+        activeRenderDetail = '3d-globe';
+        statusMessage = '3D Globe Standar (Fallback Tanpa Token Ion)';
+      }
     }
   } else if (mode === '2d-sat') {
     if (google3dTileset) google3dTileset.show = false;
     if (osmBuildingsTileset) osmBuildingsTileset.show = false;
+    viewerInstance.terrainProvider = flatTerrainProvider;
     viewerInstance.scene.globe.show = true;
-    applyGlobeImagery('hybrid');
+    await applyGlobeImagery('hybrid');
     activeRenderDetail = '2d-sat';
-    statusMessage = '2D Satelit Hibrida (Google Maps)';
+    statusMessage = '2D Satelit Hibrida (High-DPI)';
   } else {
     // '2d-road' — Normal 2D Map Layer
     if (google3dTileset) google3dTileset.show = false;
     if (osmBuildingsTileset) osmBuildingsTileset.show = false;
+    viewerInstance.terrainProvider = flatTerrainProvider;
     viewerInstance.scene.globe.show = true;
-    applyGlobeImagery('road');
+    await applyGlobeImagery('road');
     activeRenderDetail = '2d-road';
     statusMessage = '2D Peta Normal (Google Maps)';
   }
@@ -324,7 +479,6 @@ export function flyToPreset(presetKey = 'jakarta', { duration = 1.4 } = {}) {
   const pitchDeg = is3D ? p.pitch3dDeg : -89.9;
   const headingDeg = is3D ? p.headingDeg : 0;
 
-  // Offset lintang sedikit ke selatan saat miring 3D supaya titik sasaran tepat di tengah layar
   const latOffset = is3D && height < 50000 ? (height / 111320) * 0.72 : 0;
 
   viewerInstance.camera.flyTo({
@@ -409,7 +563,7 @@ function enforceIndonesiaBounds(viewer) {
 }
 
 /**
- * Menginisialisasi Cesium.Viewer pada elemen wadah #mapCanvas.
+ * Menginisialisasi Cesium.Viewer pada elemen wadah #mapCanvas dengan optimasi tiling.
  * @param {string|HTMLElement} containerOrId
  * @returns {Promise<Cesium.Viewer|null>}
  */
@@ -424,11 +578,7 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
     return null;
   }
 
-  const ionToken = String(
-    import.meta.env.VITE_CESIUM_ION_TOKEN
-    || import.meta.env.CESIUM_ION_TOKEN
-    || '',
-  ).trim();
+  const ionToken = getCesiumIonToken();
   if (ionToken) {
     Cesium.Ion.defaultAccessToken = ionToken;
   }
@@ -445,24 +595,37 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
     selectionIndicator: false,
     timeline: false,
     navigationHelpButton: false,
-     navigationInstructionsInitiallyVisible: false,
+    navigationInstructionsInitiallyVisible: false,
     skyAtmosphere: new Cesium.SkyAtmosphere(),
     shouldAnimate: true,
     requestRenderMode: false,
+    msaaSamples: 4,
     baseLayer: new Cesium.ImageryLayer(create2DImageryProvider('hybrid')),
   });
 
   viewerInstance = viewer;
   baseImageryLayer = viewer.imageryLayers.get(0);
 
-  // Pengaturan visual Globe & pencahayaan
-  viewer.scene.globe.enableLighting = false;
-  viewer.scene.globe.depthTestAgainstTerrain = false;
-  viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0d1630');
-  viewer.scene.highDynamicRange = false;
+  // Optimasi Resolusi Layar (HiDPI / Retina) & Anti-Aliasing
+  viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 2.0);
   if (viewer.scene.postProcessStages?.fxaa) {
     viewer.scene.postProcessStages.fxaa.enabled = true;
   }
+
+  // Optimasi Tiling & Cache Globe agar pemuatan tile jauh lebih cepat dan tajam
+  const globe = viewer.scene.globe;
+  globe.enableLighting = false;
+  globe.depthTestAgainstTerrain = false;
+  globe.maximumScreenSpaceError = 1.35; // Lebih rendah dari default (2.0) = tile level lebih tajam
+  globe.tileCacheSize = 1000;           // Memperbesar cache dari 100 -> 1000 tile agar pan/zoom instan
+  globe.preloadAncestors = true;
+  globe.preloadSiblings = true;
+  globe.baseColor = Cesium.Color.fromCssColorString('#0d1630');
+
+  viewer.scene.fog.enabled = true;
+  viewer.scene.fog.density = 0.00018;
+  viewer.scene.fog.screenSpaceErrorFactor = 2.0;
+  viewer.scene.highDynamicRange = false;
 
   const ctrl = viewer.scene.screenSpaceCameraController;
   ctrl.minimumZoomDistance = 45;
@@ -474,7 +637,7 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
   // Set posisi awal ke Jakarta Pusat (Sudirman - Bundaran HI - Monas)
   const jkt = CAMERA_PRESETS.jakarta;
   viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(jkt.lon, jkt.lat - 0.012, jkt.height3d),
+    destination: Cesium.Cartesian3.fromDegrees(jkt.lon, jkt.lat - 0.011, jkt.height3d),
     orientation: {
       heading: Cesium.Math.toRadians(jkt.headingDeg),
       pitch: Cesium.Math.toRadians(jkt.pitch3dDeg),
@@ -482,7 +645,8 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
     },
   });
 
-  // Aktifkan mode 3D (akan memuat Google Photorealistic 3D Tiles jika API key tersedia)
+  // Aktifkan mode 3D (otomatis memakai Cesium Ion 3D Buildings + Terrain jika token ada,
+  // atau fallback ke CesiumJS standar jika token tidak ada)
   await setMapViewMode('3d', { fly: false });
 
   return viewer;
