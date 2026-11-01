@@ -92,6 +92,9 @@ export async function fetchFrame(camera) {
       if (!res.ok) throw new FrameError(`camera responded ${res.status}`);
       const contentType = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
       if (!contentType.startsWith('image/')) throw new FrameError('camera did not return an image');
+      // Some aggregators answer with an SVG "offline" placeholder instead of a real frame.
+      // Only raster photos are valid input for vision analysis.
+      if (contentType === 'image/svg+xml') throw new FrameError('camera offline (placeholder image)');
       const buffer = await readCapped(res, MAX_BYTES);
       if (!buffer.length) throw new FrameError('empty frame');
       return { buffer, contentType, fetchedAt: new Date().toISOString() };
