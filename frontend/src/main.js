@@ -13,7 +13,7 @@
      components  tombol, kartu, lencana, dan sejenisnya
      panels      isi panel kiri dan panggung kanan
      effects     animasi dan efek kedalaman
-     parts       bagian yang lahir bersama penyambungan ke backend
+     parts       bagian yang lahir bersama penyambungan ke backend & peta 3D
      responsive  penyesuaian layar, wajib paling bawah supaya bisa
                  menimpa aturan di atasnya tanpa perlu menaikkan
                  kekhususan pemilih
@@ -40,12 +40,11 @@ import { pasangPengendaliBackend } from './ui/controllers/backendController.js';
 import { pasangPengendaliAuth } from './ui/controllers/authController.js';
 import { pasangPengendaliPencarian } from './ui/controllers/searchController.js';
 import { pasangPengendaliHasil } from './ui/controllers/resultController.js';
+import { pasangPengendaliPeta } from './map/mapControls.js';
 
 function mulai() {
   const wadah = document.getElementById('app');
   if (!wadah) {
-    // Tidak seharusnya terjadi, tetapi kalau app.html diubah dan div#app
-    // terhapus, pesan ini jauh lebih mudah dilacak daripada halaman kosong.
     console.error('[JakSafe] Elemen #app tidak ditemukan di app.html.');
     return;
   }
@@ -58,12 +57,10 @@ function mulai() {
   pasangPengendaliPencarian();
   pasangPengendaliHasil();
   pasangPengendaliBackend();
+  pasangPengendaliPeta();
   pasangEfekMiring();
 }
 
-// Modul bertipe module selalu ditunda sampai dokumen selesai diurai, jadi
-// pemeriksaan ini hanya penjagaan tambahan kalau berkas ini nanti dimuat
-// dengan cara lain.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', mulai, { once: true });
 } else {

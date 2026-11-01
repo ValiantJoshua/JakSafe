@@ -1,10 +1,11 @@
 /*
    Pembungkus endpoint kamera CCTV.
 
-   Tiga endpoint backend yang dipakai.
+   Empat endpoint backend yang dipakai.
      GET /api/cctv/sources              seluruh kamera dalam katalog
      GET /api/cctv/nearest?coords=...   kamera terdekat dari satu titik
      GET /api/cctv/frame/:id            gambar terkini kamera tersebut
+     GET /api/cctv/analyze/:id          analisis AI Vision Gemini untuk kamera tersebut
 
    Hal paling penting yang perlu diketahui tentang bagian ini.
 
@@ -16,11 +17,6 @@
    Karena itu frontend tidak boleh dan tidak bisa memanggil alamat kamera
    secara langsung, dan penjelasan ini yang dipakai kalau ditanya kenapa
    gambar CCTV tidak diambil langsung saja dari sumbernya.
-
-   Hal kedua, katalog bisa kosong. Berkas backend/src/data/cctvCatalog.json
-   saat ini masih berisi array kosong karena daftar kamera belum diisi.
-   Jadi keadaan "tidak ada kamera" bukan galat, melainkan keadaan normal
-   yang harus ditampilkan dengan tenang, bukan dengan pesan merah.
 */
 
 import { minta, urlSumberDaya } from './httpClient.js';
@@ -31,10 +27,14 @@ import { toCoordParam } from '../utils/geo.js';
  * @typedef {object} Kamera
  * @property {string} id
  * @property {string} nama
+ * @property {string|null} city
  * @property {number} lat
  * @property {number} lon
  * @property {number|null} jarakM      hanya terisi pada hasil pencarian terdekat
  * @property {number|null} headingDeg  arah hadap kamera dalam derajat
+ * @property {number|null} pitchDeg
+ * @property {number|null} fovDeg
+ * @property {number|null} rangeM
  * @property {string|null} provider
  * @property {string|null} license
  */
@@ -43,11 +43,15 @@ import { toCoordParam } from '../utils/geo.js';
 function keKamera(c) {
   return {
     id: c.id,
-    nama: c.name,
-    lat: c.lat,
-    lon: c.lon,
-    jarakM: Number.isFinite(c.distanceM) ? c.distanceM : null,
-    headingDeg: c.headingDeg ?? null,
+    nama: c.name || c.nama || c.id,
+    city: c.city ?? 'Jakarta',
+    lat: Number(c.lat),
+    lon: Number(c.lon),
+    jarakM: Number.isFinite(c.distanceM) ? c.distanceM : (Number.isFinite(c.jarakM) ? c.jarakM : null),
+    headingDeg: Number.isFinite(c.headingDeg) ? Number(c.headingDeg) : null,
+    pitchDeg: Number.isFinite(c.pitchDeg) ? Number(c.pitchDeg) : null,
+    fovDeg: Number.isFinite(c.fovDeg) ? Number(c.fovDeg) : null,
+    rangeM: Number.isFinite(c.rangeM) ? Number(c.rangeM) : null,
     provider: c.provider ?? null,
     license: c.license ?? null,
   };
@@ -55,7 +59,7 @@ function keKamera(c) {
 
 /**
  * Mengambil seluruh kamera dalam katalog.
- * Dipakai nanti oleh lapisan penanda kamera di peta 3D.
+ * Dipakai oleh lapisan penanda kamera di peta 3D/2D.
  *
  * @param {AbortSignal} [signal]
  * @returns {Promise<Kamera[]>}
@@ -67,12 +71,6 @@ export async function ambilSemuaKamera(signal) {
 
 /**
  * Mencari kamera terdekat dari sebuah titik.
- *
- * Radius bawaan diambil dari SAMPLING.radiusKameraM, bukan dari radius
- * bawaan backend yang hanya lima ratus meter. Alasannya, titik contoh di
- * tengah rute belum tentu persis berada di jalan protokol yang dipasangi
- * kamera, jadi jangkauan sedikit dilebarkan supaya peluang menemukan bukti
- * visual lebih besar.
  *
  * @param {object} opsi
  * @param {{lat:number, lon:number}} opsi.titik
@@ -102,15 +100,30 @@ export async function ambilKameraTerdekat({
 /**
  * Menyusun alamat gambar satu kamera.
  *
- * Parameter t berisi penanda waktu dan hanya berfungsi memaksa peramban
- * mengambil gambar baru, bukan memakai yang tersimpan di cache. Backend
- * sudah mengirim header Cache-Control no-store, tetapi beberapa peramban
- * tetap memakai gambar lama kalau alamatnya persis sama, dan untuk kamera
- * lalu lintas gambar lama justru menyesatkan.
- *
  * @param {string} idKamera
+ * @param {number} [cacheBust]
  * @returns {string}
  */
-export function urlBingkaiKamera(idKamera) {
-  return urlSumberDaya(`/cctv/frame/${encodeURIComponent(idKamera)}`, { t: Date.now() });
+export function urlBingkaiKamera(idKamera, cacheBust = Date.now()) {
+  return urlSumberDaya(`/cctv/frame/${encodeURIComponent(idKamera)}`, { t: cacheBust });
+}
+
+/**
+ * Meminta analisis AI Vision (Gemini) untuk satu kamera CCTV dari backend.
+ *
+ * @param {string} idKamera
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<{camera:Kamera|null, fetchedAt:string|null, analysis:object|null, cached:boolean}>}
+ */
+export async function analisisKamera(idKamera, signal) {
+  const data = await minta(`/cctv/analyze/${encodeURIComponent(idKamera)}`, {
+    timeoutMs: TIMEOUT_MS.navigasi,
+    signal,
+  });
+  return {
+    camera: data.camera ? keKamera(data.camera) : null,
+    fetchedAt: data.fetchedAt || null,
+    analysis: data.analysis || null,
+    cached: Boolean(data.cached),
+  };
 }

@@ -127,3 +127,47 @@ export function labelGenangan(tingkat) {
   };
   return peta[String(tingkat || '').toLowerCase()] || 'Ada genangan';
 }
+
+/**
+ * Memformat objek observasi dari jejak penalaran agen menjadi kalimat ringkas.
+ * Mencegah kebocoran teks [object Object] di layar.
+ *
+ * @param {unknown} obs
+ * @returns {string}
+ */
+export function formatObservasi(obs) {
+  if (!obs) return '';
+  if (typeof obs === 'string') return obs;
+  if (typeof obs === 'object') {
+    if (obs.error) return `Pesan: ${obs.error}`;
+    if (Number.isFinite(obs.distanceM) && Number.isFinite(obs.durationS)) {
+      return `Rute ditemukan: ${formatJarak(obs.distanceM)}, estimasi dasar ${formatDurasi(obs.durationS)}`;
+    }
+    if (obs.analysis) {
+      const a = obs.analysis;
+      const genangan = a.genangan_air ? `ada genangan (${a.tingkat_genangan || 'rendah'})` : 'bebas genangan';
+      const conf = Number.isFinite(a.confidence) ? ` (${Math.round(a.confidence * 100)}%)` : '';
+      return `AI Vision: jalan ${a.kondisi_jalan || 'normal'}, ${genangan}, visibilitas ${a.visibilitas_kamera || 'jelas'}${conf}`;
+    }
+    if (obs.camera) {
+      return `CCTV terdekat: ${obs.camera.nama || obs.camera.name || 'Kamera lalu lintas'}`;
+    }
+    if (obs.currentSpeedKmH !== undefined || obs.delayPercent !== undefined) {
+      return `Lalu lintas TomTom: kecepatan ${obs.currentSpeedKmH ?? 0} km/j, delay ${obs.delayPercent ?? 0}%${obs.roadClosure ? ' (jalan ditutup)' : ''}`;
+    }
+    if (obs.pm2_5 !== undefined || obs.us_aqi !== undefined) {
+      return `Kualitas udara: PM2.5 ${obs.pm2_5 ?? 0} µg/m³, AQI ${obs.us_aqi ?? 0}`;
+    }
+    if (obs.results && Array.isArray(obs.results) && obs.results[0]?.values) {
+      const v = obs.results[0].values;
+      return `Kualitas udara: PM2.5 ${v.pm2_5 ?? 0} µg/m³, AQI ${v.us_aqi ?? 0}`;
+    }
+    try {
+      const s = JSON.stringify(obs);
+      return s.length > 80 ? `${s.slice(0, 80)}...` : s;
+    } catch {
+      return String(obs);
+    }
+  }
+  return String(obs);
+}

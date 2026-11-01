@@ -28,6 +28,7 @@
 */
 
 import { defineConfig, loadEnv } from 'vite';
+import cesium from 'vite-plugin-cesium';
 
 // Berkas masuk halaman. Sengaja bukan index.html, lihat catatan nomor 1.
 const ENTRY_HTML = 'app.html';
@@ -61,10 +62,22 @@ export default defineConfig(({ mode }) => {
   // supaya variabel tanpa awalan VITE_ pun ikut terbaca di sisi konfigurasi.
   const env = loadEnv(mode, process.cwd(), '');
   const backendOrigin = env.VITE_BACKEND_ORIGIN || 'http://localhost:3001';
+  const googleMapsKey = env.VITE_GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY || '';
+  const cesiumIonToken = env.VITE_CESIUM_ION_TOKEN || env.CESIUM_ION_TOKEN || '';
 
   return {
     appType: 'mpa',
-    plugins: [arahkanRootKeEntry()],
+    plugins: [
+      cesium(),
+      arahkanRootKeEntry(),
+    ],
+
+    define: {
+      'import.meta.env.GOOGLE_MAPS_API_KEY': JSON.stringify(googleMapsKey),
+      'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(googleMapsKey),
+      'import.meta.env.CESIUM_ION_TOKEN': JSON.stringify(cesiumIonToken),
+      'import.meta.env.VITE_CESIUM_ION_TOKEN': JSON.stringify(cesiumIonToken),
+    },
 
     server: {
       port: 5173,
@@ -72,8 +85,7 @@ export default defineConfig(({ mode }) => {
       open: `/${ENTRY_HTML}`,
       proxy: {
         // Semua jalur /api diteruskan apa adanya ke backend, termasuk
-        // /api/route, /api/aqi, /api/cctv, /api/tomtom, dan /api/navigate
-        // ketika endpoint agen itu nanti selesai dibuat.
+        // /api/route, /api/aqi, /api/cctv, /api/tomtom, dan /api/navigate.
         '/api': {
           target: backendOrigin,
           changeOrigin: true,
@@ -93,6 +105,7 @@ export default defineConfig(({ mode }) => {
 
     build: {
       outDir: 'dist',
+      chunkSizeWarningLimit: 1600,
       rollupOptions: {
         // Karena tidak ada index.html, berkas masuk harus disebutkan manual.
         input: { app: ENTRY_HTML },

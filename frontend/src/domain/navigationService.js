@@ -9,7 +9,7 @@
 
    JALUR SATU, AGEN.
    Frontend memanggil POST /api/navigate sekali. Backend yang menjalankan
-   agen ReAct, memanggil keempat tool, menghitung skor, lalu mengirim satu
+   agen ReAct, memanggil seluruh tool, menghitung skor, lalu mengirim satu
    objek hasil yang sudah lengkap. Ini jalur yang dituju dan satu satunya
    jalur yang akan tersisa setelah backend rampung.
 
@@ -65,6 +65,7 @@ export const TAHAP = [
  * @property {object} score        bentuknya sama dengan keluaran backend
  * @property {object|null} air     ringkasan kualitas udara
  * @property {object|null} visual  kamera dan hasil analisisnya
+ * @property {string|null} reason  penjelasan sintesis alasan dari agen
  * @property {object[]} alternatives
  * @property {object[]} jejak      catatan panggilan HTTP yang sungguh terjadi
  * @property {number} lamaMs       total waktu dari awal sampai hasil siap
@@ -123,6 +124,7 @@ export async function cariRute({
       score: balasan.score,
       air: balasan.air || null,
       visual: balasan.visual || null,
+      reason: balasan.reason || null,
       alternatives: balasan.alternatives || [],
       reasoning: balasan.reasoning || [],
       jejak: ambilJejak(),
@@ -202,14 +204,7 @@ async function rangkaiPratinjau({
     udara = null;
   }
 
-  // Tahap empat, kamera. Katalog kamera backend masih kosong, jadi tahap
-  // ini hampir pasti tidak menemukan apa apa untuk sekarang. Itu bukan
-  // kegagalan, hanya berarti tidak ada bukti visual yang bisa ditampilkan.
-  //
-  // Perlu dicatat, analisis citra TIDAK dikerjakan di sini. Tool
-  // analyze_image memakai Gemini dan kuncinya hanya ada di backend, jadi
-  // variabel analisis dibiarkan null dan previewScorer memperlakukan
-  // kondisi jalan dengan nilai netral atau dengan data TomTom saja.
+  // Tahap empat, kamera.
   saatTahap('cctv');
   let visual = null;
   try {
@@ -235,11 +230,6 @@ async function rangkaiPratinjau({
     weights: bobot,
   });
 
-  // Rute pilihan lain dinilai dengan data lingkungan yang sama. Ini
-  // penyederhanaan yang disengaja, karena mengambil data udara dan lalu
-  // lintas terpisah untuk setiap pilihan akan melipatgandakan jumlah
-  // panggilan tanpa mengubah banyak hasilnya di dalam satu kota. Agen di
-  // backend nanti bisa melakukannya dengan lebih cermat.
   const alternatives = routes.slice(1).map((r) => {
     const s = calculateRouteScore({
       durationS: r.durationS,
