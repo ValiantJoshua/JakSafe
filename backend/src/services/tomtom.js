@@ -274,3 +274,186 @@ export async function getFlowSegment(lat, lon) {
   if (segmentMemCache.size > 200) segmentMemCache.delete(segmentMemCache.keys().next().value);
   return result;
 }
+
+/**
+ * Pick representative interior coordinates along a route geometry for multi-segment traffic sampling.
+ * Avoids the very first/last 5% of the geometry (parking lots / minor origin-destination alleys)
+ * and adapts sample count to route distance:
+ *  - < 3 km   : 2 interior segments (33%, 67%)
+ *  - 3–10 km  : 3 interior segments (25%, 50%, 75%)
+ *  - >= 10 km : 4 interior segments (20%, 40%, 60%, 80%)
+ *
+ * @param {Array<[number, number]|{lat:number, lon:number}>} geometry
+ * @param {{ distanceM?: number, count?: number }} [opts]
+ * @returns {Array<{ lat: number, lon: number, ratio: number }>}
+ */
+export function pickTrafficSamplePoints(geometry, { distanceM = 0, count } = {}) {
+  if (!Array.isArray(geometry) || geometry.length === 0) return [];
+
+  // Normalize to { lat, lon }
+  const pts = geometry
+    .map((item) => {
+      if (Array.isArray(item) && item.length >= 2) {
+        return { lon: Number(item[0]), lat: Number(item[1]) };
+      }
+      if (item && typeof item === 'object') {
+        return { lon: Number(item.lon), lat: Number(item.lat) };
+      }
+      return null;
+    })
+    .filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon));
+
+  if (pts.length === 0) return [];
+  if (pts.length === 1) return [{ ...pts[0], ratio: 0.5 }];
+
+  let targetCount = count;
+  if (!Number.isInteger(targetCount) || targetCount < 1) {
+    if (distanceM >= 10000) targetCount = 4;
+    else if (distanceM >= 3000 || distanceM === 0) targetCount = 3;
+    else targetCount = 2;
+  }
+  targetCount = Math.min(Math.max(targetCount, 1), 5);
+
+  const seenKeys = new Set();
+  const samples = [];
+
+  for (let i = 1; i <= targetCount; i++) {
+    const ratio = Number((i / (targetCount + 1)).toFixed(2));
+    const idx = Math.min(pts.length - 1, Math.max(0, Math.round(ratio * (pts.length - 1))));
+    const pt = pts[idx];
+    const dedupKey = `${pt.lat.toFixed(3)},${pt.lon.toFixed(3)}`;
+    if (!seenKeys.has(dedupKey)) {
+      seenKeys.add(dedupKey);
+      samples.push({ lat: pt.lat, lon: pt.lon, ratio });
+    }
+  }
+
+  if (samples.length === 0) {
+    const mid = pts[Math.floor(pts.length / 2)];
+    samples.push({ lat: mid.lat, lon: mid.lon, ratio: 0.5 });
+  }
+
+  return samples;
+}
+
+/**
+ * Aggregate multiple TomTom Flow Segment measurements along a route into a unified traffic report.
+ * Uses a bottleneck-weighted delay formula (60% corridor average + 40% worst bottleneck)
+ * so long routes reflect both overall corridor flow and severe localized bottlenecks.
+ *
+ * @param {Array<object>} segments
+ * @returns {object|null}
+ */
+export function aggregateTrafficSegments(segments) {
+  const valid = (Array.isArray(segments) ? segments : []).filter(
+    (s) => s && Number.isFinite(Number(s.delayPercent))
+  );
+  if (valid.length === 0) return null;
+
+  let sumDelay = 0;
+  let maxDelay = 0;
+  let sumSpeed = 0;
+  let speedCount = 0;
+  let minSpeed = Infinity;
+  let sumFreeFlow = 0;
+  let freeFlowCount = 0;
+  let anyClosure = false;
+  let worstSegment = valid[0];
+
+  for (const seg of valid) {
+    const delay = Math.max(0, Number(seg.delayPercent) || 0);
+    sumDelay += delay;
+    if (delay > maxDelay || seg.roadClosure) {
+      if (delay > maxDelay) maxDelay = delay;
+      worstSegment = seg;
+    }
+    if (seg.roadClosure) {
+      anyClosure = true;
+    }
+    if (Number.isFinite(seg.currentSpeedKmH)) {
+      sumSpeed += seg.currentSpeedKmH;
+      speedCount += 1;
+      if (seg.currentSpeedKmH < minSpeed) minSpeed = seg.currentSpeedKmH;
+    }
+    if (Number.isFinite(seg.freeFlowSpeedKmH)) {
+      sumFreeFlow += seg.freeFlowSpeedKmH;
+      freeFlowCount += 1;
+    }
+  }
+
+  const avgDelayPercent = Math.round(sumDelay / valid.length);
+  // Bottleneck-aware effective delay: 60% corridor average + 40% peak bottleneck
+  const effectiveDelayPercent = valid.length === 1
+    ? maxDelay
+    : Math.round(avgDelayPercent * 0.60 + maxDelay * 0.40);
+
+  return {
+    lat: worstSegment.lat,
+    lon: worstSegment.lon,
+    currentSpeedKmH: speedCount > 0 ? Math.round(sumSpeed / speedCount) : null,
+    minSpeedKmH: minSpeed !== Infinity ? Math.round(minSpeed) : null,
+    freeFlowSpeedKmH: freeFlowCount > 0 ? Math.round(sumFreeFlow / freeFlowCount) : null,
+    delayPercent: effectiveDelayPercent,
+    avgDelayPercent,
+    maxDelayPercent: maxDelay,
+    roadClosure: anyClosure,
+    sampleCount: valid.length,
+    worstSegment: {
+      lat: worstSegment.lat,
+      lon: worstSegment.lon,
+      ratio: worstSegment.ratio ?? 0.5,
+      delayPercent: Math.max(0, Number(worstSegment.delayPercent) || 0),
+      currentSpeedKmH: worstSegment.currentSpeedKmH ?? null,
+      roadClosure: Boolean(worstSegment.roadClosure),
+    },
+    segments: valid,
+  };
+}
+
+/**
+ * Sample real-time TomTom traffic across multiple points along a route corridor in parallel.
+ *
+ * @param {object} opts
+ * @param {Array} [opts.geometry] Route geometry [[lon, lat], ...]
+ * @param {Array<{lat:number, lon:number}>} [opts.points] Explicit sample points
+ * @param {number} [opts.distanceM] Route length in meters (for adaptive sample count)
+ * @param {number} [opts.count] Explicit number of samples (1..5)
+ * @returns {Promise<object>}
+ */
+export async function sampleRouteTraffic({ geometry, points, distanceM = 0, count } = {}) {
+  const samplePts = Array.isArray(points) && points.length > 0
+    ? pickTrafficSamplePoints(points, { distanceM, count: points.length })
+    : pickTrafficSamplePoints(geometry, { distanceM, count });
+
+  if (samplePts.length === 0) {
+    throw new Error('invalid_coordinates');
+  }
+
+  const settled = await Promise.allSettled(
+    samplePts.map(async (pt) => {
+      const seg = await getFlowSegment(pt.lat, pt.lon);
+      return {
+        lat: pt.lat,
+        lon: pt.lon,
+        ratio: pt.ratio ?? 0.5,
+        ...seg,
+      };
+    })
+  );
+
+  const fulfilled = [];
+  let lastError = null;
+  for (const item of settled) {
+    if (item.status === 'fulfilled' && item.value) {
+      fulfilled.push(item.value);
+    } else if (item.status === 'rejected') {
+      lastError = item.reason;
+    }
+  }
+
+  if (fulfilled.length === 0) {
+    throw lastError || new Error('upstream_error');
+  }
+
+  return aggregateTrafficSegments(fulfilled);
+}

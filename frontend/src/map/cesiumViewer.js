@@ -147,6 +147,7 @@ export async function setBuildingsLayerEnabled(enabled) {
   }
   if (osmBuildingsTileset) {
     osmBuildingsTileset.show = buildingsEnabled && currentMode === '3d';
+    terapkanNadaBasemap();
   }
   viewerInstance?.scene.requestRender();
   notifyModeListeners();
@@ -174,34 +175,124 @@ function optimize3DTileset(tileset) {
 }
 
 /**
- * Gaya gedung 3D arsitektural yang bersih, terang, dan solid (Ala Google Maps 3D).
- * Menggunakan CustomShader UNLIT dengan shading arah pandang kamera (eye coordinates):
- * - Atap dan sisi atas gedung selalu putih bersih (#FFFFFF / #F5F8FC)
- * - Dinding samping mendapat bayangan arsitektural lembut (#D6E2F0 / light slate)
- * - 100% solid/opaque (alpha 1.0), tidak transparan/tembus pandang seperti x-ray
- * - Kebal terhadap posisi matahari ECEF dan waktu malam sehingga TIDAK pernah menjadi hitam.
+ * Gaya gedung 3D arsitektural "clean maket" (ala Google Maps 3D), versi 2.
+ *
+ * Seluruh perhitungan dilakukan di CustomShader UNLIT, sehingga gedung TIDAK pernah
+ * menjadi hitam akibat posisi matahari ECEF atau waktu malam. Peningkatan versi 2:
+ *
+ * 1. Cahaya arah TETAP di koordinat dunia (bukan mengikuti kamera).
+ *    Normal permukaan diubah ke ECEF lalu dibandingkan dengan arah cahaya dari
+ *    barat laut-atas pada bidang lokal East-North-Up. Hasilnya sisi gedung yang sama
+ *    selalu terang/gelap secara konsisten walau peta diputar, sehingga sudut dan
+ *    volume bangunan terbaca jelas.
+ * 2. Gradasi kaki gedung (ambient occlusion palsu).
+ *    Dinding sedikit lebih gelap di dekat tanah dan makin terang ke atas, supaya gedung
+ *    terasa berdiri di tanah dan tidak "mengambang". Acuan ketinggian tanah diambil
+ *    dari minimumHeight bounding region tile yang sedang tampil (lihat
+ *    pasangAcuanTanahGedung), karena Jakarta datar sehingga satu acuan per tampilan cukup.
+ * 3. Kabut jarak (distance fade).
+ *    Gedung jauh perlahan menyatu ke warna basemap sehingga ada kedalaman perspektif.
+ *    Jarak kabut menyesuaikan ketinggian kamera (lihat perbaruiKabutGedung).
+ * 4. Tint menurut ketinggian (Cesium3DTileStyle, blend HIGHLIGHT = perkalian).
+ *    Pencakar langit diberi rona biru-kaca sesuai palet JakSafe, gedung menengah
+ *    netral, rumah rendah putih hangat. Gaya per-fitur ini dikalikan SETELAH custom
+ *    shader, jadi pencahayaan tetap utuh.
  */
+
+/** Warna kabut = warna basemap 3D setelah diredupkan (lihat terapkanNadaBasemap). */
+const BUILDING_FOG_COLOR = new Cesium.Cartesian3(0.925, 0.94, 0.957);
+
+/** @type {Cesium.CustomShader|null} */
+let buildingShader = null;
+
+function buatShaderGedung() {
+  return new Cesium.CustomShader({
+    lightingModel: Cesium.LightingModel.UNLIT,
+    uniforms: {
+      u_groundHeight: { type: Cesium.UniformType.FLOAT, value: 0.0 },
+      u_aoStrength: { type: Cesium.UniformType.FLOAT, value: 0.0 },
+      u_fogNear: { type: Cesium.UniformType.FLOAT, value: 2200.0 },
+      u_fogFar: { type: Cesium.UniformType.FLOAT, value: 9000.0 },
+      u_fogColor: { type: Cesium.UniformType.VEC3, value: BUILDING_FOG_COLOR },
+    },
+    fragmentShaderText: `
+      void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
+        vec3 posWC = fsInput.attributes.positionWC;
+
+        // --- Bidang lokal East-North-Up di titik fragmen ---
+        vec3 up = normalize(posWC);
+        vec3 east = normalize(cross(vec3(0.0, 0.0, 1.0), up));
+        vec3 north = cross(up, east);
+
+        // Normal permukaan dalam koordinat dunia (ECEF)
+        vec3 nWC = normalize(czm_inverseViewRotation * normalize(fsInput.attributes.normalEC));
+
+        // --- 1. Cahaya arah tetap dari barat laut-atas ---
+        vec3 lightDir = normalize(-0.55 * east + 0.45 * north + 0.70 * up);
+        float lambert = clamp(dot(nWC, lightDir), 0.0, 1.0);
+        float upness = dot(nWC, up);
+        float roofness = smoothstep(0.55, 0.85, upness);
+
+        vec3 roofColor = vec3(0.985, 0.990, 1.000);
+        vec3 wallLit   = vec3(0.955, 0.966, 0.984);
+        vec3 wallShade = vec3(0.735, 0.785, 0.865);   // bayangan slate kebiruan (palet navy)
+        vec3 wall = mix(wallShade, wallLit, lambert);
+        vec3 color = mix(wall, roofColor, roofness);
+
+        // --- 2. Gradasi kaki gedung (ambient occlusion palsu) ---
+        float a = 6378137.0;
+        float b = 6356752.3142;
+        float rp = length(posWC);
+        float sinLat = posWC.z / rp;
+        float cosLat = sqrt(max(0.0, 1.0 - sinLat * sinLat));
+        float rEll = (a * b) / sqrt((b * cosLat) * (b * cosLat) + (a * sinLat) * (a * sinLat));
+        float heightAboveGround = (rp - rEll) - u_groundHeight;
+        float ao = smoothstep(0.0, 24.0, heightAboveGround);
+        float aoFactor = mix(0.80, 1.0, ao);
+        color *= mix(1.0, aoFactor, u_aoStrength * (1.0 - roofness));
+
+        // --- 3. Kabut jarak: gedung jauh menyatu ke warna basemap ---
+        float dist = length(fsInput.attributes.positionEC);
+        float fog = smoothstep(u_fogNear, u_fogFar, dist) * 0.62;
+        color = mix(color, u_fogColor, fog);
+
+        material.diffuse = color;
+        material.alpha = 1.0;
+      }
+    `,
+  });
+}
+
+/**
+ * Tint per-gedung menurut ketinggian. Nilai warna dikalikan dengan hasil shader
+ * (Cesium3DTileColorBlendMode.HIGHLIGHT), jadi semua warna dibuat mendekati putih.
+ */
+function buatGayaTintKetinggian() {
+  const h = 'Number(${feature["cesium#estimatedHeight"]})';
+  return new Cesium.Cesium3DTileStyle({
+    color: {
+      conditions: [
+        [`${h} >= 150`, 'color("#BFD3F2", 1.0)'],   // pencakar langit: biru-kaca
+        [`${h} >= 80`, 'color("#D2E0F6", 1.0)'],    // tower tinggi
+        [`${h} >= 40`, 'color("#E6EDF8", 1.0)'],    // gedung menengah
+        [`${h} >= 15`, 'color("#F5F6F8", 1.0)'],    // ruko / gedung rendah: netral
+        ['true', 'color("#FFFAF3", 1.0)'],          // rumah tapak: putih hangat
+      ],
+    },
+  });
+}
+
 function applyCleanArchitecturalLook(tileset) {
   try {
-    tileset.style = undefined;
-    tileset.customShader = new Cesium.CustomShader({
-      lightingModel: Cesium.LightingModel.UNLIT,
-      fragmentShaderText: `
-        void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
-          // Arah cahaya lembut dari sudut kanan-atas layar kamera
-          vec3 lightDir = normalize(vec3(0.25, 0.70, 0.65));
-          float diff = clamp(dot(normalize(fsInput.attributes.normalEC), lightDir), 0.0, 1.0);
-
-          // Palet maket arsitektur Google Maps (putih bersih, dinding bergradasi lembut)
-          vec3 roofColor = vec3(0.98, 0.99, 1.0);
-          vec3 wallShade = vec3(0.84, 0.89, 0.95);
-          material.diffuse = mix(wallShade, roofColor, diff);
-          material.alpha = 1.0;
-        }
-      `,
-    });
+    buildingShader = buatShaderGedung();
+    tileset.customShader = buildingShader;
+    tileset.colorBlendMode = Cesium.Cesium3DTileColorBlendMode.HIGHLIGHT;
+    tileset.style = buatGayaTintKetinggian();
+    pasangAcuanTanahGedung(tileset);
   } catch (err) {
     console.warn('[JakSafe Map] CustomShader fallback ke Cesium3DTileStyle:', err);
+    buildingShader = null;
+    tileset.customShader = undefined;
     tileset.style = new Cesium.Cesium3DTileStyle({
       color: {
         conditions: [
@@ -217,6 +308,70 @@ function applyCleanArchitecturalLook(tileset) {
   if (tileset.imageBasedLighting) {
     tileset.imageBasedLighting.imageBasedLightingFactor = new Cesium.Cartesian2(1.0, 1.0);
   }
+}
+
+/**
+ * Menentukan acuan ketinggian tanah untuk gradasi kaki gedung.
+ *
+ * Gedung OSM ditempatkan pada ketinggian medan aslinya, sedangkan globe JakSafe
+ * memakai ellipsoid rata. Karena itu acuan tanah diambil dari median minimumHeight
+ * bounding region milik tile yang sedang tampil, lalu dihaluskan antar-frame supaya
+ * tidak berkedip. Bila belum ada sampel, gradasi dimatikan (u_aoStrength = 0).
+ */
+function pasangAcuanTanahGedung(tileset) {
+  if (!viewerInstance || !buildingShader) return;
+  const scene = viewerInstance.scene;
+  let sampel = [];
+  let frame = 0;
+  let acuan = null;
+
+  tileset.tileVisible.addEventListener((tile) => {
+    const minH = tile?.boundingVolume?.minimumHeight;
+    if (Number.isFinite(minH) && sampel.length < 600) sampel.push(minH);
+  });
+
+  scene.preRender.addEventListener(() => {
+    sampel = [];
+  });
+
+  scene.postRender.addEventListener(() => {
+    frame += 1;
+    if (frame % 12 !== 0 || sampel.length === 0 || !buildingShader) return;
+    const urut = sampel.slice().sort((x, y) => x - y);
+    const median = urut[Math.floor(urut.length / 2)];
+    const baru = acuan === null ? median : acuan + (median - acuan) * 0.25;
+    if (acuan === null || Math.abs(baru - acuan) > 0.05) {
+      acuan = baru;
+      buildingShader.setUniform('u_groundHeight', acuan);
+      buildingShader.setUniform('u_aoStrength', 1.0);
+    }
+  });
+}
+
+/** Menyesuaikan jarak kabut gedung dengan ketinggian kamera (dipanggil tiap preRender). */
+function perbaruiKabutGedung() {
+  if (!viewerInstance || !buildingShader) return;
+  const h = viewerInstance.camera.positionCartographic?.height;
+  if (!Number.isFinite(h)) return;
+  const near = Math.max(1200, Math.min(30000, h * 1.6));
+  buildingShader.setUniform('u_fogNear', near);
+  buildingShader.setUniform('u_fogFar', near * 3.6);
+}
+
+/**
+ * Nada basemap. Di mode 3D dengan gedung aktif, basemap sedikit diredupkan dan
+ * dikurangi saturasinya supaya gedung putih, garis rute, dan layer lalu lintas
+ * lebih menonjol, dan label jalan yang tercetak di citra tidak terlalu ramai.
+ * Di mode 2D basemap kembali ke warna aslinya.
+ */
+function terapkanNadaBasemap() {
+  if (!baseImageryLayer) return;
+  const redup = currentMode === '3d' && buildingsEnabled && Boolean(osmBuildingsTileset);
+  baseImageryLayer.brightness = redup ? 0.96 : 1.0;
+  baseImageryLayer.contrast = redup ? 0.94 : 1.02;
+  baseImageryLayer.saturation = redup ? 0.55 : 1.0;
+  baseImageryLayer.gamma = redup ? 1.04 : 1.0;
+  viewerInstance?.scene.requestRender();
 }
 
 /**
@@ -260,6 +415,7 @@ async function applyGlobeImagery(style = 'road') {
   baseImageryLayer.brightness = 1.0;
   baseImageryLayer.contrast = 1.02;
   baseImageryLayer.saturation = 1.0;
+  terapkanNadaBasemap();
 }
 
 /**
@@ -380,6 +536,8 @@ export async function setMapViewMode(mode, { fly = true } = {}) {
     statusMessage = '2D Peta Normal';
   }
 
+  // Nada basemap diterapkan setelah status gedung 3D pasti (redup hanya di 3D + gedung aktif)
+  terapkanNadaBasemap();
   if (fly) {
     adjustCameraForMode(mode);
   }
@@ -575,6 +733,8 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
   viewer.scene.light = cameraLight;
   viewer.scene.preRender.addEventListener(() => {
     Cesium.Cartesian3.clone(viewer.camera.directionWC, cameraLight.direction);
+    // Jarak kabut gedung 3D menyesuaikan ketinggian kamera
+    perbaruiKabutGedung();
   });
 
   // Optimasi Globe: permukaan rata bebas gelombang

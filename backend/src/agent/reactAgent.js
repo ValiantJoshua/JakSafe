@@ -15,6 +15,7 @@ import { getCctvSnapshotDeclaration, getCctvSnapshot } from './tools/getCctvSnap
 import { analyzeImageDeclaration, analyzeImage } from './tools/analyzeImage.js';
 import { getTrafficDeclaration, getTraffic } from './tools/getTraffic.js';
 import { calculateRouteScore, DEFAULT_WEIGHTS } from '../scoring/routeScorer.js';
+import { findNearest, publicView } from '../services/cctvCatalog.js';
 import { saveExecutionLog } from '../db/mongoClient.js';
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
@@ -208,13 +209,16 @@ export async function runNavigationAgent({
           let toolResult = null;
 
           if (call.name === 'get_route') {
-            toolResult = await getRoute(call.args);
+            toolResult = await getRoute({ ...call.args, alternatives: true });
             if (toolResult.ok && toolResult.routes?.length > 0) {
               primaryRoute = toolResult.routes[0];
               alternativeRoutes = toolResult.routes.slice(1);
             }
           } else if (call.name === 'get_traffic') {
-            toolResult = await getTraffic(call.args);
+            const trafficArgs = primaryRoute?.geometry?.length > 1 && !call.args?.points
+              ? { ...call.args, geometry: primaryRoute.geometry, distanceM: primaryRoute.distanceM }
+              : call.args;
+            toolResult = await getTraffic(trafficArgs);
             if (toolResult.ok) {
               trafficData = toolResult;
             }
@@ -326,9 +330,12 @@ export async function runNavigationAgent({
 
   const midpoint = getMidpoint(primaryRoute.geometry) || { lat: origin.lat, lon: origin.lon };
 
-  // Ensure traffic check was performed
-  if (!trafficData) {
-    const trafficRes = await getTraffic(midpoint);
+  // Ensure multi-segment traffic check was performed along the route corridor
+  if (!trafficData || ((trafficData.sampleCount ?? 1) < 2 && primaryRoute.geometry?.length > 2)) {
+    const trafficRes = await getTraffic({
+      geometry: primaryRoute.geometry,
+      distanceM: primaryRoute.distanceM,
+    });
     if (trafficRes.ok) {
       trafficData = trafficRes;
     }
@@ -344,7 +351,8 @@ export async function runNavigationAgent({
     }
   }
 
-  // Ensure visual check was attempted if camera is nearby or analysis is pending
+  // Ensure visual check was attempted if camera is nearby or analysis is pending.
+  // Prioritize the most congested segment (worstSegment) on the route before falling back to midpoint.
   if (lastCctvSnapshot?.image?.base64 && visualResult && !visualResult.analysis) {
     const visionRes = await analyzeImage({
       image_base64: lastCctvSnapshot.image.base64,
@@ -356,7 +364,13 @@ export async function runNavigationAgent({
       visualResult.analisis = visionRes.analysis;
     }
   } else if (!visualResult) {
-    const cctvRes = await getCctvSnapshot({ lat: midpoint.lat, lon: midpoint.lon, radius_m: 1000 });
+    const bottleneckPt = trafficData?.worstSegment?.delayPercent > 0
+      ? { lat: trafficData.worstSegment.lat, lon: trafficData.worstSegment.lon }
+      : midpoint;
+    let cctvRes = await getCctvSnapshot({ lat: bottleneckPt.lat, lon: bottleneckPt.lon, radius_m: 1000 });
+    if (!cctvRes.ok && (bottleneckPt.lat !== midpoint.lat || bottleneckPt.lon !== midpoint.lon)) {
+      cctvRes = await getCctvSnapshot({ lat: midpoint.lat, lon: midpoint.lon, radius_m: 1000 });
+    }
     if (cctvRes.ok && cctvRes.image?.base64) {
       const visionRes = await analyzeImage({
         image_base64: cctvRes.image.base64,
@@ -390,24 +404,92 @@ export async function runNavigationAgent({
     weights,
   });
 
-  // Score alternative routes for comparison
-  const alternatives = alternativeRoutes.map((alt) => {
-    const altScore = calculateRouteScore({
-      durationS: alt.durationS,
-      trafficData: null,
-      aqiData: aqiData || {},
-      visualAnalysis: null,
-      weights,
-    });
-    return {
-      distanceM: alt.distanceM,
-      durationS: alt.durationS,
-      geometry: alt.geometry,
-      totalScore: altScore.totalScore,
-      label: altScore.label,
-      color: altScore.color,
-    };
-  });
+  // Score alternative routes with multi-segment corridor traffic, AQI & nearest CCTV metadata
+  const alternatives = await Promise.all(
+    alternativeRoutes.map(async (alt, idx) => {
+      const altMid = getMidpoint(alt.geometry) || midpoint;
+
+      let altTraffic = null;
+      try {
+        const tr = await getTraffic({
+          geometry: alt.geometry,
+          distanceM: alt.distanceM,
+        });
+        if (tr.ok) altTraffic = tr;
+      } catch {
+        altTraffic = trafficData;
+      }
+
+      let altAir = airSummary;
+      try {
+        const altPts = samplePoints(alt.geometry, 2);
+        const aq = await getAqi({ points: altPts });
+        if (aq.ok && Array.isArray(aq.results) && aq.results.length > 0) {
+          altAir = summarizeAqiResults(aq.results);
+        }
+      } catch {
+        altAir = airSummary;
+      }
+
+      let altVisual = null;
+      try {
+        const altTarget = altTraffic?.worstSegment?.delayPercent > 0
+          ? altTraffic.worstSegment
+          : altMid;
+        let nearestList = findNearest(altTarget.lat, altTarget.lon, { radiusM: 1000, limit: 1 });
+        if (nearestList.length === 0 && altTarget !== altMid) {
+          nearestList = findNearest(altMid.lat, altMid.lon, { radiusM: 1000, limit: 1 });
+        }
+        if (nearestList.length > 0) {
+          const found = nearestList[0];
+          const camView = publicView(found.camera);
+          const sameAsPrimary = visualResult?.cameraId === camView.id;
+          altVisual = {
+            cameraId: camView.id,
+            cameraName: camView.name,
+            fetchedAt: new Date().toISOString(),
+            analysis: sameAsPrimary ? visualResult.analysis : null,
+            kamera: {
+              id: camView.id,
+              nama: camView.name,
+              jarakM: found.distanceM,
+              provider: camView.provider || null,
+              license: camView.license || null,
+            },
+            analisis: sameAsPrimary ? visualResult.analisis : null,
+          };
+        }
+      } catch {
+        altVisual = null;
+      }
+
+      const altScore = calculateRouteScore({
+        durationS: alt.durationS,
+        trafficData: altTraffic || trafficData,
+        aqiData: altAir ? { pm2_5: altAir.pm2_5, us_aqi: altAir.us_aqi } : aqiData || {},
+        visualAnalysis: altVisual?.analysis || null,
+        weights,
+      });
+
+      return {
+        distanceM: alt.distanceM,
+        durationS: alt.durationS,
+        summary: alt.summary || `Jalur Alternatif ${idx + 2}`,
+        geometry: alt.geometry,
+        totalScore: altScore.totalScore,
+        label: altScore.label,
+        color: altScore.color,
+        score: altScore,
+        air: altAir
+          ? {
+              ...altAir,
+              titikTerburuk: { time: altAir.time },
+            }
+          : null,
+        visual: altVisual,
+      };
+    })
+  );
 
   const totalDurationMs = Date.now() - startTime;
 
@@ -416,6 +498,7 @@ export async function runNavigationAgent({
     route: {
       distanceM: primaryRoute.distanceM,
       durationS: primaryRoute.durationS,
+      summary: primaryRoute.summary || 'Jalur Utama',
       geometry: primaryRoute.geometry,
     },
     score: primaryScore,
