@@ -61,7 +61,8 @@ export default defineConfig(({ mode }) => {
   // loadEnv membaca berkas .env di folder ini. Argumen ketiga dikosongkan
   // supaya variabel tanpa awalan VITE_ pun ikut terbaca di sisi konfigurasi.
   const env = loadEnv(mode, process.cwd(), '');
-  const backendOrigin = env.VITE_BACKEND_ORIGIN || 'http://localhost:3001';
+  const rawBackendOrigin = env.VITE_BACKEND_ORIGIN || 'http://127.0.0.1:3001';
+  const backendOrigin = rawBackendOrigin.replace('://localhost:', '://127.0.0.1:');
   const googleMapsKey = env.VITE_GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY || '';
   const cesiumIonToken = env.VITE_CESIUM_ION_TOKEN || env.CESIUM_ION_TOKEN || '';
 
@@ -92,6 +93,8 @@ export default defineConfig(({ mode }) => {
           // Tile vektor TomTom berbentuk biner (.pbf). Dibiarkan lewat
           // tanpa diubah supaya byte-nya tidak rusak.
           ws: false,
+          timeout: 65000,
+          proxyTimeout: 65000,
         },
       },
     },

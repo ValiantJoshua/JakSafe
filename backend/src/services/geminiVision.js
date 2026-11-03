@@ -4,8 +4,9 @@
 
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
-const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
-const TIMEOUT_MS = 30_000;
+const DEFAULT_MODEL = 'gemini-2.5-flash';
+const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+const TIMEOUT_MS = 20_000;
 const CONFIDENCE_FLOOR = 0.4; // guide §13: below this -> downgrade to "hati_hati"
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -92,7 +93,7 @@ export function normalizeAnalysis(raw) {
 }
 
 /**
- * Analyse one image.
+ * Analyse one image with automatic model fallback on 503 / 429 / 404.
  * @param {object} opts
  * @param {string} opts.base64    image bytes, base64 (no data: prefix)
  * @param {string} [opts.mimeType]
@@ -104,28 +105,42 @@ export async function analyzeRoadImage({ base64, mimeType = 'image/jpeg', contex
   if (!ALLOWED_MIME.has(mime)) throw new VisionError(`unsupported image type: ${mime}`, 400);
   if (Buffer.byteLength(base64, 'base64') > MAX_IMAGE_BYTES) throw new VisionError('image too large', 413);
 
-  const model = getClient().getGenerativeModel({
-    model: process.env.GEMINI_VISION_MODEL || DEFAULT_MODEL,
-    systemInstruction: SYSTEM_INSTRUCTION,
-    generationConfig: {
-      temperature: 0,
-      responseMimeType: 'application/json',
-      responseSchema: RESPONSE_SCHEMA,
-    },
-  });
-
+  const primaryModel = process.env.GEMINI_VISION_MODEL || DEFAULT_MODEL;
+  const candidateModels = [...new Set([primaryModel, ...FALLBACK_MODELS])];
   const prompt = `Analisis gambar CCTV ini. Lokasi/konteks: ${String(context).slice(0, 200) || 'tidak diketahui'}.`;
 
-  let text;
-  try {
-    const result = await model.generateContent(
-      [prompt, { inlineData: { data: base64, mimeType: mime } }],
-      { timeout: TIMEOUT_MS },
-    );
-    text = result.response.text();
-  } catch (e) {
-    const msg = String(e?.message || '');
-    if (/API key|API_KEY|permission|403|401/i.test(msg)) throw new VisionError('Gemini API key rejected', 503);
+  let text = null;
+  let lastError = null;
+
+  for (const modelName of candidateModels) {
+    try {
+      const model = getClient().getGenerativeModel({
+        model: modelName,
+        systemInstruction: SYSTEM_INSTRUCTION,
+        generationConfig: {
+          temperature: 0,
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_SCHEMA,
+        },
+      });
+      const result = await model.generateContent(
+        [prompt, { inlineData: { data: base64, mimeType: mime } }],
+        { timeout: TIMEOUT_MS },
+      );
+      text = result.response.text();
+      break;
+    } catch (e) {
+      lastError = e;
+      const msg = String(e?.message || '');
+      if (/API key|API_KEY|permission|403|401/i.test(msg)) {
+        throw new VisionError('Gemini API key rejected', 503);
+      }
+      // Jika 503 (High Demand), 429, atau 404, lanjutkan ke model cadangan berikutnya
+    }
+  }
+
+  if (!text) {
+    const msg = String(lastError?.message || '');
     if (/429|quota|rate/i.test(msg)) throw new VisionError('Gemini quota/rate limit reached', 429);
     throw new VisionError('Gemini vision request failed');
   }
@@ -138,4 +153,3 @@ export async function analyzeRoadImage({ base64, mimeType = 'image/jpeg', contex
   }
   return normalizeAnalysis(parsed);
 }
-
