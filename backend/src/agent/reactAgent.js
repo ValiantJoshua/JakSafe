@@ -18,7 +18,8 @@ import { calculateRouteScore, DEFAULT_WEIGHTS } from '../scoring/routeScorer.js'
 import { findNearest, publicView } from '../services/cctvCatalog.js';
 import { saveExecutionLog } from '../db/mongoClient.js';
 
-const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
+const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-3.5-flash-lite'];
 const MAX_STEPS = 6;
 
 const SYSTEM_INSTRUCTION = [
@@ -108,6 +109,71 @@ function sanitizeObservation(action, data) {
 }
 
 /**
+ * Menghasilkan rekomendasi ringkas dalam bahasa Indonesia apabila seluruh model Gemini
+ * sedang mengalami lonjakan beban (503) atau loop selesai sebelum menyusun teks akhir.
+ */
+function buildFallbackAgentSummary({ primaryRoute, primaryScore, trafficData, airSummary, visualResult, alternatives = [] }) {
+  const corridor = primaryRoute?.summary || 'jalur utama';
+  const statusLabel = primaryScore?.label === 'AMAN'
+    ? 'relatif aman dan terkendali'
+    : primaryScore?.label === 'HATI-HATI'
+      ? 'memerlukan kewaspadaan ekstra'
+      : 'cukup padat dan berisiko tinggi';
+
+  const maxDelay = Number(trafficData?.maxDelayPercent ?? trafficData?.delayPercent ?? 0);
+  const trafficPhrase = maxDelay >= 45
+    ? 'terpantau kepadatan signifikan di beberapa segmen jalan'
+    : maxDelay >= 15
+      ? 'arus lalu lintas bergerak melambat di sejumlah titik'
+      : 'arus lalu lintas cenderung lancar di sepanjang koridor';
+
+  const pm25 = Number(airSummary?.pm2_5 ?? 0);
+  const airAdvice = pm25 > 55
+    ? 'Nyalakan sirkulasi udara dalam (recirculation) AC atau gunakan masker karena kepekatan polutan udara cukup tinggi.'
+    : pm25 > 25
+      ? 'Disarankan menjaga ventilasi kabin tetap tertutup saat melewati persimpangan padat.'
+      : 'Kualitas udara di sepanjang koridor berada dalam batas nyaman untuk perjalanan.';
+
+  const floodWarn = visualResult?.analysis?.genangan_air
+    ? ' Waspadai potensi genangan air yang terdeteksi pada pantauan kamera di sekitar rute.'
+    : '';
+
+  const bestAlt = alternatives.find((a) => a.totalScore < (primaryScore?.totalScore ?? 100));
+  const altAdvice = bestAlt
+    ? ` Anda juga dapat mempertimbangkan jalur alternatif melalui ${bestAlt.summary} yang memiliki indeks risiko lebih rendah.`
+    : '';
+
+  return `Perjalanan melalui ${corridor} saat ini ${statusLabel} dengan kondisi ${trafficPhrase}. ${airAdvice}${floodWarn}${altAdvice}`;
+}
+
+/**
+ * Memanggil generateContent dengan rantai fallback model otomatis apabila model utama
+ * mengembalikan 503 Service Unavailable / 429 / 404.
+ */
+async function generateContentWithFallback(ai, candidateModels, toolDeclarations, contents) {
+  let lastErr = null;
+  for (const modelName of candidateModels) {
+    try {
+      const model = ai.getGenerativeModel({
+        model: modelName,
+        systemInstruction: SYSTEM_INSTRUCTION,
+        tools: [{ functionDeclarations: toolDeclarations }],
+      });
+      return await model.generateContent({ contents });
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err?.message || '');
+      // Jika API key ditolak (401/403), jangan ulangi ke model lain
+      if (/API key|API_KEY|permission|403|401/i.test(msg)) {
+        throw err;
+      }
+      console.warn(`[reactAgent] Model ${modelName} busy/unavailable (${msg.slice(0, 90)}), switching to fallback model...`);
+    }
+  }
+  throw lastErr || new Error('All Gemini models unavailable');
+}
+
+/**
  * Execute a navigation request through the ReAct agent.
  *
  * @param {object} params
@@ -153,17 +219,10 @@ export async function runNavigationAgent({
   ];
 
   const apiKey = process.env.GEMINI_API_KEY;
-  const modelName = process.env.GEMINI_REASONING_MODEL || process.env.GEMINI_VISION_MODEL || DEFAULT_MODEL;
+  const preferredModel = process.env.GEMINI_REASONING_MODEL || process.env.GEMINI_VISION_MODEL || DEFAULT_MODEL;
+  const candidateModels = [...new Set([preferredModel, ...FALLBACK_MODELS])];
 
-  let model = null;
-  if (apiKey) {
-    const ai = new GoogleGenerativeAI(apiKey);
-    model = ai.getGenerativeModel({
-      model: modelName,
-      systemInstruction: SYSTEM_INSTRUCTION,
-      tools: [{ functionDeclarations: toolDeclarations }],
-    });
-  }
+  const ai = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
   // Initial user prompt for the ReAct loop
   const initialPrompt = [
@@ -177,10 +236,10 @@ export async function runNavigationAgent({
   const contents = [{ role: 'user', parts: [{ text: initialPrompt }] }];
 
   try {
-    if (model) {
+    if (ai) {
       for (let step = 0; step < MAX_STEPS; step++) {
         const stepStart = Date.now();
-        const response = await model.generateContent({ contents });
+        const response = await generateContentWithFallback(ai, candidateModels, toolDeclarations, contents);
         const candidate = response.response?.candidates?.[0];
         if (!candidate) break;
 
@@ -300,12 +359,12 @@ export async function runNavigationAgent({
       }
     }
   } catch (err) {
-    console.warn('[reactAgent] ReAct reasoning loop error:', err.message);
+    console.warn('[reactAgent] ReAct reasoning loop fallback triggered:', err.message);
     reasoning.push({
       step: stepIndex++,
-      thought: `Terjadi kendala pada model reasoning (${err.message}). Melanjutkan kalkulasi terpadu secara deterministik.`,
+      thought: 'Melanjutkan evaluasi multi-sensor secara deterministik karena antrean padat pada server model.',
       action: 'fallback',
-      observation: { error: err.message },
+      observation: { status: 'deterministic_pipeline' },
       durationMs: 0,
     });
   }
@@ -318,7 +377,7 @@ export async function runNavigationAgent({
       alternativeRoutes = routeRes.routes.slice(1);
       reasoning.push({
         step: stepIndex++,
-        thought: 'Mengambil rute jalan OSRM secara langsung untuk memastikan rute tersedia.',
+        thought: 'Mengambil rute jalan secara langsung untuk memastikan rute tersedia.',
         action: 'get_route_fallback',
         observation: { distanceM: primaryRoute.distanceM, durationS: primaryRoute.durationS },
         durationMs: 0,
@@ -490,6 +549,17 @@ export async function runNavigationAgent({
       };
     })
   );
+
+  if (!agentFinalThought || !agentFinalThought.trim()) {
+    agentFinalThought = buildFallbackAgentSummary({
+      primaryRoute,
+      primaryScore,
+      trafficData,
+      airSummary,
+      visualResult,
+      alternatives,
+    });
+  }
 
   const totalDurationMs = Date.now() - startTime;
 

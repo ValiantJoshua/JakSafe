@@ -47,6 +47,7 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
   if (!kotak || !daftar) return;
 
   let timerDebounce = null;
+  let pengendaliSaran = null;
 
   const gambarSaran = async () => {
     const val = kotak.value.trim();
@@ -54,7 +55,11 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
     daftar.hidden = false;
     kotak.setAttribute('aria-expanded', 'true');
 
-    const hasil = await searchPlacesLive(val);
+    pengendaliSaran?.abort();
+    const ctrl = new AbortController();
+    pengendaliSaran = ctrl;
+    const hasil = await searchPlacesLive(val, 6, ctrl.signal);
+    if (ctrl.signal.aborted) return;
     if (hasil.length === 0) {
       daftar.innerHTML = '<p class="saran__kosong">Lokasi tidak ditemukan. Coba ketik nama jalan, gedung, atau koordinat.</p>';
     } else {
@@ -71,7 +76,9 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
   kotak.addEventListener('focus', () => { gambarSaran(); });
   kotak.addEventListener('input', () => {
     clearTimeout(timerDebounce);
-    timerDebounce = setTimeout(gambarSaran, 250);
+    clearTimeout(timerDebounce);
+    pengendaliSaran?.abort();
+    timerDebounce = setTimeout(gambarSaran, 280);
   });
 
   // Pemilihan ditangkap di tingkat daftar saran
