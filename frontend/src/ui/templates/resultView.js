@@ -8,7 +8,49 @@ export function templateResultView() {
   return `
 <section id="viewResult" hidden>
 
-  <div class="scorecard rise rise-1" id="scoreCard" data-status="hati">
+  <!-- Header Petunjuk Arah & Titik Awal/Tujuan ala Waze / Google Maps -->
+  <div class="dirhead rise rise-1">
+    <div class="dirhead__topbar">
+      <button type="button" class="dirhead__back press" id="btnBackSearch" title="Ubah titik pencarian">
+        ${ikon('i-arrow-r', 15, 'dirhead__backicon')}
+        <span>Ubah Rute</span>
+      </button>
+      <span class="dirhead__title">Petunjuk Arah</span>
+      <span class="dirhead__mode" id="sProfileBadge">Mobil</span>
+    </div>
+
+    <div class="dirhead__endpoints">
+      <div class="dirhead__track" aria-hidden="true">
+        <span class="dirhead__dot dirhead__dot--origin"></span>
+        <span class="dirhead__line"></span>
+        <span class="dirhead__dot dirhead__dot--dest"></span>
+      </div>
+      <div class="dirhead__pills">
+        <button type="button" class="dirhead__pill" id="btnEditOrigin" title="Klik untuk ganti titik awal">
+          <span class="dirhead__pillname" id="sDirOriginName">-</span>
+          <span class="dirhead__pillsub" id="sDirOriginArea"></span>
+        </button>
+        <button type="button" class="dirhead__pill" id="btnEditDest" title="Klik untuk ganti tujuan">
+          <span class="dirhead__pillname" id="sDirDestName">-</span>
+          <span class="dirhead__pillsub" id="sDirDestArea"></span>
+        </button>
+      </div>
+      <button type="button" class="dirhead__swap press" id="btnResultSwap" title="Putar balik awal & tujuan" aria-label="Tukar titik awal dan tujuan">
+        ${ikon('i-swap', 16)}
+      </button>
+    </div>
+  </div>
+
+  <!-- Interactive Alternative Route Selector (Pilihan Rute 1, 2, 3...) -->
+  <div class="routeselect rise rise-1" id="routeSelectorBox">
+    <div class="routeselect__head">
+      <span class="routeselect__title">Pilihan Rute</span>
+      <span class="routeselect__sub" id="routeSelectorSub">Klik rute untuk membandingkan</span>
+    </div>
+    <div class="routeselect__list" id="routeOptionsList" role="listbox" aria-label="Pilihan rute perjalanan"></div>
+  </div>
+
+  <div class="scorecard rise rise-2" id="scoreCard" data-status="hati">
     <p class="scorecard__route">
       <span id="sRouteFrom"></span>
       ${ikon('i-arrow-r', 17, 'scorecard__arrow')}

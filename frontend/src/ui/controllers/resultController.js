@@ -19,7 +19,8 @@ import {
   labelKondisiJalan, labelGenangan, formatObservasi, KOSONG,
 } from '../../utils/format.js';
 import { pitaDariSkor, kunciDariLabel, kalimatArti, susunAlasan } from '../../domain/scoreLabels.js';
-import { PM25_BANDS, SUMBER_HASIL, DEFAULT_WEIGHTS } from '../../config/constants.js';
+import { calculateRouteScore } from '../../domain/previewScorer.js';
+import { PM25_BANDS, SUMBER_HASIL, DEFAULT_WEIGHTS, PROFILES } from '../../config/constants.js';
 import { urlBingkaiKamera } from '../../api/cctvApi.js';
 import { ikon } from '../icons.js';
 import { getState, setState } from '../../state/appState.js';
@@ -333,32 +334,240 @@ function renderMarkdownAman(md) {
 }
 
 /**
+ * Menghitung jam perkiraan tiba (ETA) berdasarkan durasi efektif menit dari waktu sekarang.
+ * @param {number} durasiMenit
+ * @returns {string} contoh "16.32"
+ */
+function formatJamTiba(durasiMenit) {
+  const mnt = Number.isFinite(durasiMenit) && durasiMenit > 0 ? durasiMenit : 1;
+  const tiba = new Date(Date.now() + mnt * 60000);
+  const hh = String(tiba.getHours()).padStart(2, '0');
+  const mm = String(tiba.getMinutes()).padStart(2, '0');
+  return `${hh}.${mm}`;
+}
+
+/**
+ * Menyusun daftar seluruh kandidat rute (Rute 1, 2, 3...) dengan struktur seragam
+ * sehingga pengguna dapat mengklik dan berpindah rute secara interaktif.
+ *
+ * @param {object} hasil
+ * @returns {Array<object>}
+ */
+export function susunDaftarPilihanRute(hasil) {
+  if (Array.isArray(hasil?.semuaPilihan) && hasil.semuaPilihan.length > 0) {
+    return hasil.semuaPilihan;
+  }
+
+  const utama = {
+    index: 0,
+    route: {
+      distanceM: hasil.route?.distanceM ?? 0,
+      durationS: hasil.route?.durationS ?? 0,
+      summary: hasil.route?.summary || 'Jalur Utama Rekomendasi',
+      geometry: hasil.route?.geometry || [],
+    },
+    score: hasil.score,
+    air: hasil.air || null,
+    visual: hasil.visual || null,
+    reason: hasil.reason || null,
+  };
+
+  const alts = (Array.isArray(hasil.alternatives) ? hasil.alternatives : []).map((alt, i) => {
+    const fallbackScore = alt.score?.breakdown
+      ? alt.score
+      : calculateRouteScore({
+          durationS: alt.durationS,
+          trafficData: null,
+          aqiData: {
+            pm2_5: alt.air?.pm2_5 ?? hasil.air?.pm2_5,
+            us_aqi: alt.air?.us_aqi ?? hasil.air?.us_aqi,
+          },
+          visualAnalysis: alt.visual?.analysis || null,
+          weights: DEFAULT_WEIGHTS,
+        });
+
+    return {
+      index: i + 1,
+      route: {
+        distanceM: alt.distanceM ?? 0,
+        durationS: alt.durationS ?? 0,
+        summary: alt.summary || `Jalur Alternatif ${i + 2}`,
+        geometry: alt.geometry || [],
+      },
+      score: fallbackScore,
+      air: alt.air || hasil.air || null,
+      visual: alt.visual || null,
+      reason: null,
+    };
+  });
+
+  const semua = [utama, ...alts];
+
+  // Tandai rute dengan skor risiko terendah sebagai "TERBAIK" (BEST)
+  let minScore = Infinity;
+  let bestIdx = 0;
+  semua.forEach((opt, idx) => {
+    const s = Number(opt.score?.totalScore ?? 100);
+    if (s < minScore) {
+      minScore = s;
+      bestIdx = idx;
+    }
+  });
+  semua.forEach((opt, idx) => {
+    opt.isBest = idx === bestIdx;
+  });
+
+  return semua;
+}
+
+/**
+ * Menggambar daftar pemilih rute interaktif (1, 2, 3...) ala Waze / Google Maps.
+ * @param {Array<object>} daftarPilihan
+ * @param {number} indeksAktif
+ */
+function gambarPilihanRute(daftarPilihan, indeksAktif = 0) {
+  const wadah = $('#routeOptionsList');
+  const subJudul = $('#routeSelectorSub');
+  if (!wadah) return;
+
+  if (subJudul) {
+    subJudul.textContent = daftarPilihan.length > 1
+      ? `${daftarPilihan.length} opsi rute · Klik untuk membandingkan`
+      : '1 rute optimal ditemukan';
+  }
+
+  wadah.innerHTML = daftarPilihan.map((opt, idx) => {
+    const aktif = idx === indeksAktif;
+    const effMin = opt.score?.breakdown?.time?.effectiveDurationMin
+      ?? Math.max(1, Math.round((opt.route.durationS || 0) / 60));
+    const durTeks = formatDurasi(effMin * 60);
+    const etaTeks = formatJamTiba(effMin);
+    const jarakTeks = formatJarak(opt.route.distanceM);
+    const koridor = opt.route.summary || (idx === 0 ? 'Jalur Utama' : `Jalur Alternatif ${idx + 1}`);
+    const kunciStatus = kunciDariLabel(opt.score?.label) || pitaDariSkor(opt.score?.totalScore ?? 20).key;
+    const delayPct = Number(opt.score?.breakdown?.time?.delayPercent) || 0;
+    const infoTraffic = delayPct >= 40
+      ? `Padat (+${delayPct}%)`
+      : delayPct >= 15
+        ? `Sedang (+${delayPct}%)`
+        : 'Arus lancar';
+    const pm = Number(opt.air?.pm2_5 ?? opt.score?.breakdown?.aqi?.pm2_5);
+    const infoAqi = Number.isFinite(pm) ? `PM2.5 ${formatAngka(pm)}` : '';
+
+    return `
+      <button type="button" class="routeopt press" role="option"
+              data-route-index="${idx}"
+              data-active="${aktif ? '1' : '0'}"
+              aria-selected="${aktif}">
+        <span class="routeopt__num">${idx + 1}</span>
+        <div class="routeopt__body">
+          <div class="routeopt__top">
+            <span class="routeopt__dur">${durTeks}</span>
+            <span class="routeopt__eta">Tiba ${etaTeks}</span>
+            <span class="routeopt__badges">
+              ${opt.isBest ? '<span class="routeopt__best">TERBAIK</span>' : ''}
+              <span class="routeopt__score" data-status="${kunciStatus}">
+                Skor ${opt.score?.totalScore ?? '-'} · ${opt.score?.label || 'AMAN'}
+              </span>
+            </span>
+          </div>
+          <p class="routeopt__via">${koridor}</p>
+          <div class="routeopt__meta">
+            <span class="routeopt__dist">${jarakTeks}</span>
+            <span class="routeopt__sep">·</span>
+            <span>${infoTraffic}</span>
+            ${infoAqi ? `<span class="routeopt__sep">·</span><span>${infoAqi}</span>` : ''}
+          </div>
+        </div>
+      </button>`;
+  }).join('');
+}
+
+/**
+ * Memilih salah satu rute kandidat berdasarkan indeks (0, 1, 2...),
+ * memperbarui kartu skor/detail di sidebar serta menyorot rute terpilih di peta 3D.
+ *
+ * @param {number} index
+ */
+export function pilihRuteByIndex(index) {
+  const keadaan = getState();
+  const hasilSekarang = keadaan.hasil;
+  if (!hasilSekarang) return;
+
+  const semuaPilihan = susunDaftarPilihanRute(hasilSekarang);
+  const target = semuaPilihan[index];
+  if (!target) return;
+
+  const hasilBaru = {
+    ...hasilSekarang,
+    semuaPilihan,
+    indeksRuteAktif: index,
+    hanyaGantiPilihan: true,
+    route: target.route,
+    score: target.score,
+    air: target.air,
+    visual: target.visual,
+  };
+
+  gambarHasil(hasilBaru);
+  setState({ hasil: hasilBaru });
+}
+
+/**
  * Menggambar seluruh layar hasil dari satu objek hasil navigasi.
  * @param {object} hasil
  */
 export function gambarHasil(hasil) {
+  const semuaPilihan = susunDaftarPilihanRute(hasil);
+  const indeksAktif = Number.isInteger(hasil.indeksRuteAktif) ? hasil.indeksRuteAktif : 0;
+  const aktifOpt = semuaPilihan[indeksAktif] || semuaPilihan[0];
+
+  hasil.semuaPilihan = semuaPilihan;
+  hasil.indeksRuteAktif = indeksAktif;
+
   gambarSumber(hasil.sumber);
 
-  setText($('#sRouteFrom'), hasil.asal?.nama || 'Titik awal');
-  setText($('#sRouteTo'), hasil.tujuan?.nama || 'Tujuan');
+  const namaAsal = hasil.asal?.nama || 'Titik awal';
+  const namaTujuan = hasil.tujuan?.nama || 'Tujuan';
+  setText($('#sRouteFrom'), namaAsal);
+  setText($('#sRouteTo'), namaTujuan);
 
-  setText($('#sDistance'), formatJarak(hasil.route?.distanceM));
-  setText($('#sDuration'), formatDurasi(hasil.route?.durationS));
+  // Header Petunjuk Arah (dirhead)
+  setText($('#sDirOriginName'), namaAsal);
+  setText($('#sDirOriginArea'), hasil.asal?.area || '');
+  setText($('#sDirDestName'), namaTujuan);
+  setText($('#sDirDestArea'), hasil.tujuan?.area || '');
 
-  gambarSkor(hasil.score);
+  const infoProfil = PROFILES.find((p) => p.key === (hasil.profil || getState().profil));
+  setText($('#sProfileBadge'), infoProfil ? infoProfil.nama : 'Mobil');
+
+  // Gambar daftar pemilih rute interaktif (1, 2, 3...)
+  gambarPilihanRute(semuaPilihan, indeksAktif);
+
+  // Kartu metrik & skor mengikuti rute yang sedang dipilih
+  const effMin = aktifOpt.score?.breakdown?.time?.effectiveDurationMin;
+  const durDetikEfektif = Number.isFinite(effMin) ? effMin * 60 : aktifOpt.route?.durationS;
+  setText($('#sDistance'), formatJarak(aktifOpt.route?.distanceM));
+  setText($('#sDuration'), formatDurasi(durDetikEfektif));
+
+  gambarSkor(aktifOpt.score);
 
   const elReason = $('#sReason');
   if (elReason) {
-    if (hasil.reason) {
+    if (indeksAktif === 0 && hasil.reason) {
       elReason.innerHTML = renderMarkdownAman(hasil.reason);
+    } else if (indeksAktif > 0) {
+      const koridor = aktifOpt.route?.summary || `Jalur Alternatif ${indeksAktif + 1}`;
+      const ringkasanAlt = `**Rute ${indeksAktif + 1} (${koridor})** memiliki skor risiko gabungan **${aktifOpt.score.totalScore}/100 (${aktifOpt.score.label})**. ${susunAlasan(aktifOpt.score)}`;
+      elReason.innerHTML = renderMarkdownAman(ringkasanAlt);
     } else {
-      setText(elReason, susunAlasan(hasil.score));
+      setText(elReason, susunAlasan(aktifOpt.score));
     }
   }
 
-  gambarRincian(hasil.score);
-  gambarUdara(hasil.air, hasil.score);
-  gambarKamera(hasil.visual);
+  gambarRincian(aktifOpt.score);
+  gambarUdara(aktifOpt.air, aktifOpt.score);
+  gambarKamera(aktifOpt.visual);
   gambarJejak(hasil);
 
   // Tombol simpan dikembalikan ke keadaan awal tiap hasil baru.
@@ -370,6 +579,37 @@ export function gambarHasil(hasil) {
  * Memasang perilaku tombol di layar hasil. Dipanggil sekali dari main.js.
  */
 export function pasangPengendaliHasil() {
+  // Klik pada salah satu kartu rute di daftar Pilihan Rute (#routeOptionsList)
+  $('#routeOptionsList')?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-route-index]');
+    if (!item) return;
+    const idx = Number(item.dataset.routeIndex);
+    if (Number.isInteger(idx)) {
+      pilihRuteByIndex(idx);
+    }
+  });
+
+  // Tombol kembali / ubah titik awal atau tujuan di header Petunjuk Arah
+  $('#btnBackSearch')?.addEventListener('click', () => {
+    setState({ tampilan: 'siap' });
+  });
+
+  $('#btnEditOrigin')?.addEventListener('click', () => {
+    setState({ tampilan: 'siap' });
+    setTimeout(() => $('#inpOrigin')?.focus(), 60);
+  });
+
+  $('#btnEditDest')?.addEventListener('click', () => {
+    setState({ tampilan: 'siap' });
+    setTimeout(() => $('#inpDest')?.focus(), 60);
+  });
+
+  // Tombol tukar arah (swap) langsung dari layar hasil
+  $('#btnResultSwap')?.addEventListener('click', () => {
+    $('#btnSwap')?.click();
+    $('#btnSearch')?.click();
+  });
+
   const tombolLog = $('#btnLog');
   tombolLog?.addEventListener('click', () => {
     const terbuka = tombolLog.getAttribute('aria-expanded') === 'true';

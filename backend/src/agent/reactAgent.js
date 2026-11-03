@@ -15,6 +15,7 @@ import { getCctvSnapshotDeclaration, getCctvSnapshot } from './tools/getCctvSnap
 import { analyzeImageDeclaration, analyzeImage } from './tools/analyzeImage.js';
 import { getTrafficDeclaration, getTraffic } from './tools/getTraffic.js';
 import { calculateRouteScore, DEFAULT_WEIGHTS } from '../scoring/routeScorer.js';
+import { findNearest, publicView } from '../services/cctvCatalog.js';
 import { saveExecutionLog } from '../db/mongoClient.js';
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
@@ -208,7 +209,7 @@ export async function runNavigationAgent({
           let toolResult = null;
 
           if (call.name === 'get_route') {
-            toolResult = await getRoute(call.args);
+            toolResult = await getRoute({ ...call.args, alternatives: true });
             if (toolResult.ok && toolResult.routes?.length > 0) {
               primaryRoute = toolResult.routes[0];
               alternativeRoutes = toolResult.routes.slice(1);
@@ -390,24 +391,83 @@ export async function runNavigationAgent({
     weights,
   });
 
-  // Score alternative routes for comparison
-  const alternatives = alternativeRoutes.map((alt) => {
-    const altScore = calculateRouteScore({
-      durationS: alt.durationS,
-      trafficData: null,
-      aqiData: aqiData || {},
-      visualAnalysis: null,
-      weights,
-    });
-    return {
-      distanceM: alt.distanceM,
-      durationS: alt.durationS,
-      geometry: alt.geometry,
-      totalScore: altScore.totalScore,
-      label: altScore.label,
-      color: altScore.color,
-    };
-  });
+  // Score alternative routes with real corridor traffic, AQI & nearest CCTV metadata for interactive switching
+  const alternatives = await Promise.all(
+    alternativeRoutes.map(async (alt, idx) => {
+      const altMid = getMidpoint(alt.geometry) || midpoint;
+
+      let altTraffic = null;
+      try {
+        const tr = await getTraffic(altMid);
+        if (tr.ok) altTraffic = tr;
+      } catch {
+        altTraffic = trafficData;
+      }
+
+      let altAir = airSummary;
+      try {
+        const altPts = samplePoints(alt.geometry, 2);
+        const aq = await getAqi({ points: altPts });
+        if (aq.ok && Array.isArray(aq.results) && aq.results.length > 0) {
+          altAir = summarizeAqiResults(aq.results);
+        }
+      } catch {
+        altAir = airSummary;
+      }
+
+      let altVisual = null;
+      try {
+        const nearestList = findNearest(altMid.lat, altMid.lon, { radiusM: 1000, limit: 1 });
+        if (nearestList.length > 0) {
+          const found = nearestList[0];
+          const camView = publicView(found.camera);
+          const sameAsPrimary = visualResult?.cameraId === camView.id;
+          altVisual = {
+            cameraId: camView.id,
+            cameraName: camView.name,
+            fetchedAt: new Date().toISOString(),
+            analysis: sameAsPrimary ? visualResult.analysis : null,
+            kamera: {
+              id: camView.id,
+              nama: camView.name,
+              jarakM: found.distanceM,
+              provider: camView.provider || null,
+              license: camView.license || null,
+            },
+            analisis: sameAsPrimary ? visualResult.analisis : null,
+          };
+        }
+      } catch {
+        altVisual = null;
+      }
+
+      const altScore = calculateRouteScore({
+        durationS: alt.durationS,
+        trafficData: altTraffic || trafficData,
+        aqiData: altAir ? { pm2_5: altAir.pm2_5, us_aqi: altAir.us_aqi } : aqiData || {},
+        visualAnalysis: altVisual?.analysis || null,
+        weights,
+      });
+
+      return {
+        distanceM: alt.distanceM,
+        durationS: alt.durationS,
+        summary: alt.summary || `Jalur Alternatif ${idx + 2}`,
+        geometry: alt.geometry,
+        totalScore: altScore.totalScore,
+        label: altScore.label,
+        color: altScore.color,
+        score: altScore,
+        air: altAir
+          ? {
+              ...altAir,
+              titikTerburuk: { time: altAir.time },
+            }
+          : null,
+        visual: altVisual,
+      };
+    })
+  );
 
   const totalDurationMs = Date.now() - startTime;
 
@@ -416,6 +476,7 @@ export async function runNavigationAgent({
     route: {
       distanceM: primaryRoute.distanceM,
       durationS: primaryRoute.durationS,
+      summary: primaryRoute.summary || 'Jalur Utama',
       geometry: primaryRoute.geometry,
     },
     score: primaryScore,

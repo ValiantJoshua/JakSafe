@@ -716,3 +716,383 @@
 .reason__divider { border: 0; border-top: 1px solid rgba(255,255,255,.15); margin: var(--s3, 12px) 0; }
 .reason__list { margin: var(--s2, 8px) 0 var(--s3, 12px); padding-left: var(--s4, 16px); display: flex; flex-direction: column; gap: 4px; }
 .reason__item { list-style: disc; }
+
+/* =====================================================================
+   HEADER PETUNJUK ARAH & PEMILIH RUTE ALTERNATIF INTERAKTIF (WAZE/GMAPS)
+   ===================================================================== */
+
+.dirhead {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s3) var(--s4) var(--s4);
+  margin-bottom: var(--s3);
+  box-shadow: var(--sh-1);
+}
+
+.dirhead__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--border);
+}
+
+.dirhead__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--text-2);
+  transition: all var(--dur-1) var(--ease);
+}
+
+.dirhead__back:hover {
+  background: var(--surface-3);
+  color: var(--jk-blue-1);
+  border-color: var(--jk-blue-1);
+}
+
+.dirhead__backicon {
+  transform: rotate(180deg);
+}
+
+.dirhead__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 800;
+  color: var(--text-1);
+  letter-spacing: -0.01em;
+}
+
+.dirhead__mode {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: rgba(42, 64, 208, 0.10);
+  color: var(--jk-blue-1);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dirhead__endpoints {
+  display: grid;
+  grid-template-columns: 18px 1fr 34px;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.dirhead__track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: 58px;
+  padding: 6px 0;
+}
+
+.dirhead__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dirhead__dot--origin {
+  border: 3px solid #0EA5E9;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.16);
+}
+
+.dirhead__dot--dest {
+  border: 3px solid #EF4444;
+  background: #EF4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.16);
+}
+
+.dirhead__line {
+  flex: 1;
+  width: 0;
+  border-left: 2px dotted var(--border-strong);
+  margin: 3px 0;
+}
+
+.dirhead__pills {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dirhead__pill {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: all var(--dur-1) var(--ease);
+}
+
+.dirhead__pill:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.dirhead__pillname {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dirhead__pillsub {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dirhead__swap {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  transition: all var(--dur-1) var(--ease);
+}
+
+.dirhead__swap:hover {
+  background: var(--grad-blue);
+  color: #FFFFFF;
+  border-color: transparent;
+  transform: rotate(180deg);
+}
+
+/* Daftar Pemilih Rute (Routes 1, 2, 3...) */
+.routeselect {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: var(--s4);
+  box-shadow: var(--sh-2);
+}
+
+.routeselect__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px var(--s4);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.routeselect__title {
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.routeselect__sub {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.routeselect__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.routeopt {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 14px var(--s4) 14px 18px;
+  background: var(--surface);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+
+.routeopt:last-child {
+  border-bottom: 0;
+}
+
+.routeopt::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: transparent;
+  transition: background var(--dur-1) var(--ease);
+}
+
+.routeopt:hover {
+  background: var(--surface-2);
+}
+
+.routeopt[data-active="1"] {
+  background: rgba(42, 64, 208, 0.065);
+}
+
+.routeopt[data-active="1"]::before {
+  background: var(--jk-blue-1, #2A40D0);
+}
+
+[data-theme="gelap"] .routeopt[data-active="1"] {
+  background: rgba(61, 80, 213, 0.18);
+}
+
+.routeopt__num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex: 0 0 24px;
+  margin-top: 2px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 800;
+  transition: all var(--dur-1) var(--ease);
+}
+
+.routeopt[data-active="1"] .routeopt__num {
+  background: #0EA5E9;
+  color: #FFFFFF;
+  box-shadow: 0 3px 10px rgba(14, 165, 233, 0.35);
+}
+
+.routeopt__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.routeopt__top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.routeopt__dur {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-1);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.routeopt__eta {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.routeopt__badges {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.routeopt__best {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #0EA5E9;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.routeopt__score {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.routeopt__score[data-status="aman"] {
+  background: var(--st-aman-bg);
+  color: var(--st-aman);
+}
+
+.routeopt__score[data-status="hati"] {
+  background: var(--st-hati-bg);
+  color: var(--st-hati);
+}
+
+.routeopt__score[data-status="hindari"] {
+  background: var(--st-hindari-bg);
+  color: var(--st-hindari);
+}
+
+.routeopt__via {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.routeopt__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.routeopt__dist {
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--text-2);
+}
+
+.routeopt__sep {
+  opacity: 0.6;
+}

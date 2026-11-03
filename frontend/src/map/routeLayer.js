@@ -14,9 +14,12 @@ import * as Cesium from 'cesium';
 import { getViewer, getMapViewMode } from './cesiumViewer.js';
 import { boundsOf } from '../utils/geo.js';
 import { pitaDariSkor, kunciDariLabel } from '../domain/scoreLabels.js';
+import { pilihRuteByIndex, susunDaftarPilihanRute } from '../ui/controllers/resultController.js';
 
 /** @type {Cesium.CustomDataSource|null} */
 let routeDataSource = null;
+/** @type {Cesium.ScreenSpaceEventHandler|null} */
+let routeClickHandler = null;
 
 const pinCache = new Map();
 
@@ -170,7 +173,7 @@ export function flyToRouteBounds(geometry) {
 }
 
 /**
- * Menggambar hasil rute navigasi lengkap (rute utama, alternatif, pin A & B) dan mengarahkan kamera.
+ * Menggambar hasil rute navigasi lengkap (rute utama, alternatif interaktif, pin A & B) dan mengarahkan kamera.
  * @param {object|null} hasil
  */
 export function renderRouteOnMap(hasil) {
@@ -182,49 +185,94 @@ export function renderRouteOnMap(hasil) {
     return;
   }
 
+  const semuaPilihan = susunDaftarPilihanRute(hasil);
+  const indeksAktif = Number.isInteger(hasil.indeksRuteAktif) ? hasil.indeksRuteAktif : 0;
+
   const kunci = kunciDariLabel(hasil.score?.label)
     || pitaDariSkor(hasil.score?.totalScore ?? 20).key;
   const warnaUtama = warnaStatusRute(kunci);
 
-  // 1. Gambar rute alternatif (bila ada) sebagai garis putus-putus abu-kebiruan
-  const alternatives = Array.isArray(hasil.alternatives) ? hasil.alternatives : [];
-  alternatives.forEach((alt, idx) => {
-    if (!Array.isArray(alt?.geometry) || alt.geometry.length < 2) return;
-    const altPositions = geometryToCartesianArray(alt.geometry, 13);
+  // 1. Gambar seluruh rute tidak terpilih (alternatif) dengan gaya ala Waze / Google Maps
+  //    dan dapat diklik langsung di peta untuk berganti rute aktif.
+  semuaPilihan.forEach((opt, idx) => {
+    if (idx === indeksAktif) return;
+    const geom = opt.route?.geometry;
+    if (!Array.isArray(geom) || geom.length < 2) return;
+
+    const altPositions = geometryToCartesianArray(geom, 14);
+
+    // Casing tepi gelap tipis agar garis alternatif kontras di atas jalan
     routeDataSource.entities.add({
-      id: `route-alt-${idx}`,
+      id: `route-alt-casing-${idx}`,
+      properties: { routeOptionIndex: idx },
       polyline: {
         positions: altPositions,
-        width: 5,
+        width: 9,
         clampToGround: true,
-        material: new Cesium.PolylineDashMaterialProperty({
-          color: Cesium.Color.fromCssColorString('#94A3B8').withAlpha(0.75),
-          dashLength: 16,
-        }),
+        material: Cesium.Color.fromCssColorString('#1E293B').withAlpha(0.65),
       },
     });
+
+    // Garis inti ungu-kebiruan (secondary route)
+    routeDataSource.entities.add({
+      id: `route-alt-line-${idx}`,
+      properties: { routeOptionIndex: idx },
+      polyline: {
+        positions: altPositions,
+        width: 5.5,
+        clampToGround: true,
+        material: Cesium.Color.fromCssColorString('#8B5CF6').withAlpha(0.82),
+      },
+    });
+
+    // Lencana (pill) melayang pada rute alternatif agar pengguna dapat melihat & mengklik langsung di peta
+    const anchorRatio = Math.min(0.75, Math.max(0.28, 0.35 + (idx - 1) * 0.22));
+    const midPair = geom[Math.floor(geom.length * anchorRatio)];
+    if (Array.isArray(midPair) && midPair.length >= 2) {
+      const effMin = opt.score?.breakdown?.time?.effectiveDurationMin
+        ?? Math.max(1, Math.round((opt.route.durationS || 0) / 60));
+      routeDataSource.entities.add({
+        id: `route-alt-badge-${idx}`,
+        position: Cesium.Cartesian3.fromDegrees(midPair[0], midPair[1], 28),
+        properties: { routeOptionIndex: idx },
+        label: {
+          text: `Rute ${idx + 1} · ${effMin} mnt (Skor ${opt.score?.totalScore ?? '-'})`,
+          font: '700 12px Manrope, sans-serif',
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.94),
+          backgroundPadding: new Cesium.Cartesian2(10, 6),
+          fillColor: Cesium.Color.fromCssColorString('#1E293B'),
+          style: Cesium.LabelStyle.FILL,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -10),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+    }
   });
 
-  // 2. Gambar rute utama dengan efek pendar (PolylineGlow)
+  // 2. Gambar rute aktif (terpilih) paling atas dengan efek pendar (PolylineGlow)
   const mainPositions = geometryToCartesianArray(hasil.route.geometry, 18);
   if (mainPositions.length >= 2) {
     // Lapisan dasar gelap agar kontras di atas jalan terang
     routeDataSource.entities.add({
       id: 'route-main-casing',
+      properties: { routeOptionIndex: indeksAktif },
       polyline: {
         positions: mainPositions,
-        width: 13,
+        width: 14,
         clampToGround: true,
-        material: Cesium.Color.fromCssColorString('#0E1430').withAlpha(0.85),
+        material: Cesium.Color.fromCssColorString('#0E1430').withAlpha(0.88),
       },
     });
 
     // Garis inti berwarna status keamanan (Aman / Hati-hati / Hindari)
     routeDataSource.entities.add({
       id: 'route-main-line',
+      properties: { routeOptionIndex: indeksAktif },
       polyline: {
         positions: mainPositions,
-        width: 8,
+        width: 8.5,
         clampToGround: true,
         material: new Cesium.PolylineGlowMaterialProperty({
           glowPower: 0.22,
@@ -275,7 +323,7 @@ export function renderRouteOnMap(hasil) {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `${tujuan.nama} (Skor ${hasil.score?.totalScore ?? '-'})`,
+        text: `${tujuan.nama} (Rute ${indeksAktif + 1} · Skor ${hasil.score?.totalScore ?? '-'})`,
         font: '800 13px Manrope, sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.fromCssColorString('#0E1430'),
@@ -288,7 +336,9 @@ export function renderRouteOnMap(hasil) {
     });
   }
 
-  flyToRouteBounds(hasil.route.geometry);
+  if (!hasil.hanyaGantiPilihan) {
+    flyToRouteBounds(hasil.route.geometry);
+  }
   getViewer()?.scene.requestRender();
 }
 
@@ -304,5 +354,18 @@ export async function initRouteLayer() {
   if (!routeDataSource) {
     routeDataSource = new Cesium.CustomDataSource('jaksafe-route');
     await viewer.dataSources.add(routeDataSource);
+  }
+
+  if (!routeClickHandler) {
+    routeClickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    routeClickHandler.setInputAction((movement) => {
+      const picked = viewer.scene.pick(movement.position);
+      if (!Cesium.defined(picked) || !picked.id) return;
+      const entity = picked.id;
+      const routeIdx = entity?.properties?.routeOptionIndex?.getValue?.();
+      if (Number.isInteger(routeIdx)) {
+        pilihRuteByIndex(routeIdx);
+      }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   }
 }
