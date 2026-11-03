@@ -178,7 +178,9 @@ function renderEntitasKamera() {
     const fov = Number.isFinite(cam.fovDeg) ? cam.fovDeg : 55;
     const rangeM = Number.isFinite(cam.rangeM) ? cam.rangeM : 140;
 
-    // 1. Kerucut pandang (Viewshed Cone) di permukaan tanah
+    // 1. Kerucut pandang (Viewshed Cone) di permukaan tanah.
+    //    Memakai ClassificationType.TERRAIN supaya kerucut hanya menempel di jalan
+    //    dan tidak "mengecat" dinding/atap gedung 3D menjadi biru muda.
     const coneCoords = hitungKerucutPandang(cam.lat, cam.lon, heading, fov, rangeM);
     const flatDegrees = coneCoords.flatMap(([lon, lat]) => [lon, lat]);
     const coneColor = isSelected
@@ -197,12 +199,12 @@ function renderEntitasKamera() {
       polygon: {
         hierarchy: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
         material: coneColor,
-        classificationType: Cesium.ClassificationType.BOTH,
+        classificationType: Cesium.ClassificationType.TERRAIN,
       },
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
         width: isSelected || isRouteCam ? 2.4 : 1.5,
-        material: coneOutline,
+        material: coneOutline, classificationType: Cesium.ClassificationType.TERRAIN,
         clampToGround: true,
       },
     });

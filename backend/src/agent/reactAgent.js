@@ -215,7 +215,10 @@ export async function runNavigationAgent({
               alternativeRoutes = toolResult.routes.slice(1);
             }
           } else if (call.name === 'get_traffic') {
-            toolResult = await getTraffic(call.args);
+            const trafficArgs = primaryRoute?.geometry?.length > 1 && !call.args?.points
+              ? { ...call.args, geometry: primaryRoute.geometry, distanceM: primaryRoute.distanceM }
+              : call.args;
+            toolResult = await getTraffic(trafficArgs);
             if (toolResult.ok) {
               trafficData = toolResult;
             }
@@ -327,9 +330,12 @@ export async function runNavigationAgent({
 
   const midpoint = getMidpoint(primaryRoute.geometry) || { lat: origin.lat, lon: origin.lon };
 
-  // Ensure traffic check was performed
-  if (!trafficData) {
-    const trafficRes = await getTraffic(midpoint);
+  // Ensure multi-segment traffic check was performed along the route corridor
+  if (!trafficData || ((trafficData.sampleCount ?? 1) < 2 && primaryRoute.geometry?.length > 2)) {
+    const trafficRes = await getTraffic({
+      geometry: primaryRoute.geometry,
+      distanceM: primaryRoute.distanceM,
+    });
     if (trafficRes.ok) {
       trafficData = trafficRes;
     }
@@ -345,7 +351,8 @@ export async function runNavigationAgent({
     }
   }
 
-  // Ensure visual check was attempted if camera is nearby or analysis is pending
+  // Ensure visual check was attempted if camera is nearby or analysis is pending.
+  // Prioritize the most congested segment (worstSegment) on the route before falling back to midpoint.
   if (lastCctvSnapshot?.image?.base64 && visualResult && !visualResult.analysis) {
     const visionRes = await analyzeImage({
       image_base64: lastCctvSnapshot.image.base64,
@@ -357,7 +364,13 @@ export async function runNavigationAgent({
       visualResult.analisis = visionRes.analysis;
     }
   } else if (!visualResult) {
-    const cctvRes = await getCctvSnapshot({ lat: midpoint.lat, lon: midpoint.lon, radius_m: 1000 });
+    const bottleneckPt = trafficData?.worstSegment?.delayPercent > 0
+      ? { lat: trafficData.worstSegment.lat, lon: trafficData.worstSegment.lon }
+      : midpoint;
+    let cctvRes = await getCctvSnapshot({ lat: bottleneckPt.lat, lon: bottleneckPt.lon, radius_m: 1000 });
+    if (!cctvRes.ok && (bottleneckPt.lat !== midpoint.lat || bottleneckPt.lon !== midpoint.lon)) {
+      cctvRes = await getCctvSnapshot({ lat: midpoint.lat, lon: midpoint.lon, radius_m: 1000 });
+    }
     if (cctvRes.ok && cctvRes.image?.base64) {
       const visionRes = await analyzeImage({
         image_base64: cctvRes.image.base64,
@@ -391,14 +404,17 @@ export async function runNavigationAgent({
     weights,
   });
 
-  // Score alternative routes with real corridor traffic, AQI & nearest CCTV metadata for interactive switching
+  // Score alternative routes with multi-segment corridor traffic, AQI & nearest CCTV metadata
   const alternatives = await Promise.all(
     alternativeRoutes.map(async (alt, idx) => {
       const altMid = getMidpoint(alt.geometry) || midpoint;
 
       let altTraffic = null;
       try {
-        const tr = await getTraffic(altMid);
+        const tr = await getTraffic({
+          geometry: alt.geometry,
+          distanceM: alt.distanceM,
+        });
         if (tr.ok) altTraffic = tr;
       } catch {
         altTraffic = trafficData;
@@ -417,7 +433,13 @@ export async function runNavigationAgent({
 
       let altVisual = null;
       try {
-        const nearestList = findNearest(altMid.lat, altMid.lon, { radiusM: 1000, limit: 1 });
+        const altTarget = altTraffic?.worstSegment?.delayPercent > 0
+          ? altTraffic.worstSegment
+          : altMid;
+        let nearestList = findNearest(altTarget.lat, altTarget.lon, { radiusM: 1000, limit: 1 });
+        if (nearestList.length === 0 && altTarget !== altMid) {
+          nearestList = findNearest(altMid.lat, altMid.lon, { radiusM: 1000, limit: 1 });
+        }
         if (nearestList.length > 0) {
           const found = nearestList[0];
           const camView = publicView(found.camera);

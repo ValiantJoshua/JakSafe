@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getFlowTile,
   getFlowSegment,
+  sampleRouteTraffic,
   getCurrentBudget,
   getDailyBudgetLimit,
 } from '../services/tomtom.js';
@@ -53,10 +54,17 @@ router.get('/flow/:z/:x/:y.pbf', async (req, res) => {
   }
 });
 
-// GET /api/tomtom/segment?point=lat,lon (or coords=lon,lat)
-// Returns real-time speed, free-flow speed, and delay percentage for a single coordinate.
+// GET /api/tomtom/segment?point=lat,lon (or coords=lon,lat[;lon2,lat2;...])
+// Returns real-time speed, free-flow speed, and delay percentage for a single coordinate or multi-segment corridor.
 router.get('/segment', async (req, res) => {
   try {
+    if (req.query.coords && String(req.query.coords).includes(';')) {
+      const coords = parseCoords(req.query.coords, 2);
+      const points = coords.map(([pLon, pLat]) => ({ lat: pLat, lon: pLon }));
+      const data = await sampleRouteTraffic({ points });
+      return res.json({ ok: true, lat: data.lat, lon: data.lon, data });
+    }
+
     let lat, lon;
     if (req.query.point) {
       const parts = String(req.query.point).split(',');

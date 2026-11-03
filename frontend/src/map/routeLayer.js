@@ -208,7 +208,7 @@ export function renderRouteOnMap(hasil) {
       polyline: {
         positions: altPositions,
         width: 9,
-        clampToGround: true,
+        clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN,
         material: Cesium.Color.fromCssColorString('#1E293B').withAlpha(0.65),
       },
     });
@@ -220,7 +220,7 @@ export function renderRouteOnMap(hasil) {
       polyline: {
         positions: altPositions,
         width: 5.5,
-        clampToGround: true,
+        clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN,
         material: Cesium.Color.fromCssColorString('#8B5CF6').withAlpha(0.82),
       },
     });
@@ -261,7 +261,7 @@ export function renderRouteOnMap(hasil) {
       polyline: {
         positions: mainPositions,
         width: 14,
-        clampToGround: true,
+        clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN,
         material: Cesium.Color.fromCssColorString('#0E1430').withAlpha(0.88),
       },
     });
@@ -273,7 +273,7 @@ export function renderRouteOnMap(hasil) {
       polyline: {
         positions: mainPositions,
         width: 8.5,
-        clampToGround: true,
+        clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN,
         material: new Cesium.PolylineGlowMaterialProperty({
           glowPower: 0.22,
           color: warnaUtama,

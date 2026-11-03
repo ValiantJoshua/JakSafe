@@ -114,7 +114,13 @@ function gambarRincian(score) {
   if (catatan) {
     const baris = [];
     if (time.trafficSource === 'TomTom Live') {
-      baris.push(`Waktu tempuh dikalibrasi dengan data lalu lintas TomTom. Waktu dasar ${time.baseDurationMin} menit, keterlambatan ${time.delayPercent} persen.`);
+      const jmlSampel = Number(time.sampleCount) || 1;
+      const maxDelay = Number(time.maxDelayPercent);
+      const infoSegmen = jmlSampel > 1 ? ` pada ${jmlSampel} segmen koridor rute` : '';
+      const infoPuncak = Number.isFinite(maxDelay) && maxDelay > time.delayPercent
+        ? ` (titik terpadat +${maxDelay}%)`
+        : '';
+      baris.push(`Waktu tempuh dikalibrasi dengan sensor lalu lintas TomTom${infoSegmen}. Waktu dasar ${time.baseDurationMin} menit, keterlambatan efektif +${time.delayPercent}%${infoPuncak}.`);
     } else {
       baris.push('Waktu tempuh memakai perkiraan dasar OSRM. Data lalu lintas TomTom belum tersedia, jadi angkanya belum memperhitungkan kemacetan saat ini.');
     }
