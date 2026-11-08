@@ -389,8 +389,8 @@ function create2DImageryProvider(style = 'road') {
     return new Cesium.UrlTemplateImageryProvider({
       url: `https://mt1.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}&scale=2&hl=id&gl=ID${keyQuery}`,
       maximumLevel: 20,
-      tileWidth: 512,
-      tileHeight: 512,
+      tileWidth: 256,
+      tileHeight: 256,
       credit: new Cesium.Credit('Google Maps'),
     });
   } catch {

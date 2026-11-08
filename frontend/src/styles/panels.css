@@ -485,3 +485,11 @@
 }
 .mapctrl .iconbtn { border-color: transparent; background: transparent; }
 .mapctrl .iconbtn[disabled] { opacity: .4; cursor: not-allowed; }
+#btnMapLocate.is-loading svg {
+  animation: pulseLocate 1s ease-in-out infinite;
+  color: var(--jk-blue-1);
+}
+@keyframes pulseLocate {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.45; }
+}

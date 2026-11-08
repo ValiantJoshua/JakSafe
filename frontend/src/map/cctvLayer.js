@@ -28,6 +28,8 @@ let daftarKamera = [];
 let layerEnabled = true;
 /** @type {string|null} */
 let highlightedCameraId = null;
+/** @type {number[][]|null} Geometri rute aktif [[lon, lat], ...] untuk filter koridor */
+let activeRouteGeometry = null;
 /** @type {string|null} */
 let selectedCameraId = null;
 
@@ -171,17 +173,67 @@ function hitungKerucutPandang(lat, lon, headingDeg = 0, fovDeg = 55, rangeM = 13
 }
 
 /**
+ * Menghitung jarak terdekat (dalam meter) dari titik (lon, lat) ke garis rute [[lon, lat], ...].
+ * @param {number} lon
+ * @param {number} lat
+ * @param {number[][]} routeGeom
+ * @returns {number}
+ */
+function jarakKameraKeRuteM(lon, lat, routeGeom) {
+  if (!Array.isArray(routeGeom) || routeGeom.length < 2) return Infinity;
+  const mPerDegLat = 110540;
+  const mPerDegLon = 111320 * Math.cos((lat * Math.PI) / 180);
+
+  let minDistSq = Infinity;
+
+  for (let i = 0; i < routeGeom.length - 1; i += 1) {
+    const [lon1, lat1] = routeGeom[i];
+    const [lon2, lat2] = routeGeom[i + 1];
+
+    const px = (lon - lon1) * mPerDegLon;
+    const py = (lat - lat1) * mPerDegLat;
+    const vx = (lon2 - lon1) * mPerDegLon;
+    const vy = (lat2 - lat1) * mPerDegLat;
+
+    const segLenSq = vx * vx + vy * vy;
+    let t = 0;
+    if (segLenSq > 0.0001) {
+      t = Math.max(0, Math.min(1, (px * vx + py * vy) / segLenSq));
+    }
+
+    const dx = px - t * vx;
+    const dy = py - t * vy;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < minDistSq) {
+      minDistSq = distSq;
+    }
+  }
+  return Math.sqrt(minDistSq);
+}
+
+/**
  * Membangun ulang entitas Cesium untuk semua kamera di daftarKamera.
+ * Mendukung Smart Corridor Focus: saat rute aktif digambar, kamera di sepanjang koridor rute
+ * tampil penuh (100% + kerucut pandang), sedangkan kamera yang jauh di luar rute
+ * diredupkan drastis (opacity 20%, ukuran diperkecil, tanpa kerucut pandang).
  */
 function renderEntitasKamera() {
   if (!cctvDataSource) return;
   cctvDataSource.entities.removeAll();
+
+  const hasActiveRoute = Array.isArray(activeRouteGeometry) && activeRouteGeometry.length >= 2;
+  const CORRIDOR_RADIUS_M = 380;
 
   for (const cam of daftarKamera) {
     if (!Number.isFinite(cam.lat) || !Number.isFinite(cam.lon)) continue;
 
     const isSelected = cam.id === selectedCameraId;
     const isRouteCam = cam.id === highlightedCameraId;
+    const isNearRoute = hasActiveRoute
+      ? (isSelected || isRouteCam || jarakKameraKeRuteM(cam.lon, cam.lat, activeRouteGeometry) <= CORRIDOR_RADIUS_M)
+      : true;
+    const isDimmedOutside = hasActiveRoute && !isNearRoute;
+
     const variant = isSelected ? 'selected' : isRouteCam ? 'route' : 'normal';
 
     const heading = Number.isFinite(cam.headingDeg) ? cam.headingDeg : 0;
@@ -189,55 +241,62 @@ function renderEntitasKamera() {
     const rangeM = Number.isFinite(cam.rangeM) ? cam.rangeM : 140;
 
     // 1. Kerucut pandang (Viewshed Cone) di permukaan tanah.
-    //    Memakai ClassificationType.TERRAIN supaya kerucut hanya menempel di jalan
-    //    dan tidak "mengecat" dinding/atap gedung 3D menjadi biru muda.
-    const coneCoords = hitungKerucutPandang(cam.lat, cam.lon, heading, fov, rangeM);
-    const flatDegrees = coneCoords.flatMap(([lon, lat]) => [lon, lat]);
-    const coneColor = isSelected
-      ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.32)
-      : isRouteCam
-        ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.28)
-        : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.18);
-    const coneOutline = isSelected
-      ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.85)
-      : isRouteCam
-        ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.8)
-        : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.55);
+    //    Hanya digambar untuk kamera di koridor rute (atau saat tidak ada rute aktif).
+    if (!isDimmedOutside) {
+      const coneCoords = hitungKerucutPandang(cam.lat, cam.lon, heading, fov, rangeM);
+      const flatDegrees = coneCoords.flatMap(([lon, lat]) => [lon, lat]);
+      const coneColor = isSelected
+        ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.32)
+        : isRouteCam
+          ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.28)
+          : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.18);
+      const coneOutline = isSelected
+        ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.85)
+        : isRouteCam
+          ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.8)
+          : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.55);
 
-    cctvDataSource.entities.add({
-      id: `cctv-cone-${cam.id}`,
-      polygon: {
-        hierarchy: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
-        material: coneColor,
-        classificationType: Cesium.ClassificationType.TERRAIN,
-      },
-      polyline: {
-        positions: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
-        width: isSelected || isRouteCam ? 2.4 : 1.5,
-        material: coneOutline, classificationType: Cesium.ClassificationType.TERRAIN,
-        clampToGround: true,
-      },
-    });
+      cctvDataSource.entities.add({
+        id: `cctv-cone-${cam.id}`,
+        polygon: {
+          hierarchy: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
+          material: coneColor,
+          classificationType: Cesium.ClassificationType.TERRAIN,
+        },
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
+          width: isSelected || isRouteCam ? 2.4 : 1.5,
+          material: coneOutline,
+          classificationType: Cesium.ClassificationType.TERRAIN,
+          clampToGround: true,
+        },
+      });
+    }
 
     // 2. Penanda Billboard & Label Kamera
-    cctvDataSource.entities.add({
+    const markerSize = isSelected ? 40 : isRouteCam ? 36 : isDimmedOutside ? 18 : 28;
+    const entityDef = {
       id: `cctv-node-${cam.id}`,
       position: Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat, 18),
-       properties: {
+      properties: {
         isCctvMarker: true,
         cameraId: cam.id,
       },
       billboard: {
         image: buatIkonBillboardKamera(variant),
-        width: isSelected ? 40 : isRouteCam ? 36 : 30,
-        height: isSelected ? 40 : isRouteCam ? 36 : 30,
+        width: markerSize,
+        height: markerSize,
+        color: isDimmedOutside ? Cesium.Color.WHITE.withAlpha(0.20) : Cesium.Color.WHITE,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scaleByDistance: new Cesium.NearFarScalar(800, 1.15, 35000, 0.55),
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isSelected || isRouteCam ? 65000 : 45000),
       },
-      label: {
+    };
+
+    if (!isDimmedOutside) {
+      entityDef.label = {
         text: cam.nama,
         font: '700 12px Manrope, sans-serif',
         fillColor: Cesium.Color.WHITE,
@@ -249,8 +308,10 @@ function renderEntitasKamera() {
         pixelOffset: new Cesium.Cartesian2(0, -22),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isSelected || isRouteCam ? 25000 : 1200),
-      },
-    });
+      };
+    }
+
+    cctvDataSource.entities.add(entityDef);
   }
 
   const viewer = getViewer();
@@ -633,11 +694,14 @@ export function toggleCctvLayer() {
 }
 
 /**
- * Menyorot kamera tertentu yang dipakai pada rute hasil navigasi.
+ * Menyorot kamera tertentu yang dipakai pada rute hasil navigasi
+ * serta mengaktifkan Mode Fokus Koridor Rute (meredupkan kamera di luar koridor).
  * @param {string|null} cameraId
+ * @param {number[][]|null} [routeGeometry]
  */
-export function highlightRouteCamera(cameraId) {
+export function highlightRouteCamera(cameraId, routeGeometry = null) {
   highlightedCameraId = cameraId || null;
+  activeRouteGeometry = Array.isArray(routeGeometry) && routeGeometry.length >= 2 ? routeGeometry : null;
   renderEntitasKamera();
 }
 

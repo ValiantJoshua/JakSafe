@@ -21,7 +21,7 @@ export function templateStage() {
     <div class="mapcanvas" id="mapCanvas"></div>
   </div>
 
-  <!-- Kiri Atas: Switch Mode 3D / 2D Peta Normal / Satelit & Wilayah -->
+  <!-- Kiri Atas: Switch Mode 3D / 2D Peta Normal / Satelit -->
   <div class="mapstage__float mapstage__float--tl" id="mapModeWrap">
     <div class="maphud-bar">
       <div class="mapmode-group" role="group" aria-label="Mode tampilan peta">
@@ -38,21 +38,15 @@ export function templateStage() {
           <span>Satelit</span>
         </button>
       </div>
-
-      <div class="mappreset-group" role="group" aria-label="Fokus wilayah">
-        <button type="button" class="mappreset-btn" data-map-preset="jakarta" title="Fokus ke Jakarta Pusat">Jakarta</button>
-        <button type="button" class="mappreset-btn" data-map-preset="jabodetabek" title="Fokus ke Jabodetabek">Jabodetabek</button>
-        <button type="button" class="mappreset-btn" data-map-preset="indonesia" title="Fokus ke Indonesia">Indonesia</button>
-      </div>
     </div>
   </div>
 
-  <!-- Kanan Atas: Kendali Zoom & Fokus Kamera -->
+  <!-- Kanan Atas: Kendali Zoom & Lokasi Saya -->
   <div class="mapstage__float mapstage__float--tr" id="mapCtrlWrap">
     <div class="mapctrl">
       <button type="button" class="iconbtn" id="btnMapZoomIn" aria-label="Perbesar peta" title="Perbesar">${ikon('i-plus', 17)}</button>
       <button type="button" class="iconbtn" id="btnMapZoomOut" aria-label="Perkecil peta" title="Perkecil">${ikon('i-minus', 17)}</button>
-      <button type="button" class="iconbtn" id="btnMapLocate" aria-label="Fokus ke rute atau Jakarta" title="Fokus ke Rute / Jakarta">${ikon('i-locate', 17)}</button>
+      <button type="button" class="iconbtn" id="btnMapLocate" aria-label="Menuju lokasi saya saat ini" title="Lokasi Saya Saat Ini">${ikon('i-locate', 17)}</button>
     </div>
   </div>
 

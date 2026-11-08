@@ -434,6 +434,93 @@ export function clearRouteOnMap() {
   getViewer()?.scene.requestRender();
 }
 
+let pinUserLocationDataUrl = null;
+
+/**
+ * Membuat ikon titik lokasi pengguna saat ini (blue GPS beacon dengan outer halo).
+ */
+function buatPinLokasiPengguna() {
+  if (pinUserLocationDataUrl) return pinUserLocationDataUrl;
+
+  const size = 52;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
+
+  // 1. Pendaran luar lembut
+  ctx.beginPath();
+  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(37, 99, 235, 0.25)';
+  ctx.fill();
+
+  // 2. Lingkaran putih penegas
+  ctx.beginPath();
+  ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.shadowColor = 'rgba(14, 20, 48, 0.35)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  // 3. Inti biru pekat (GPS beacon core)
+  ctx.beginPath();
+  ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+  ctx.fillStyle = '#2563EB';
+  ctx.fill();
+
+  // 4. Titik pusat putih
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+
+  pinUserLocationDataUrl = canvas.toDataURL('image/png');
+  return pinUserLocationDataUrl;
+}
+
+/**
+ * Menampilkan penanda lokasi pengguna saat ini pada peta Cesium.
+ * @param {number} lon
+ * @param {number} lat
+ */
+export function showUserLocationOnMap(lon, lat) {
+  if (!routeDataSource) return;
+
+  const existing = routeDataSource.entities.getById('user-current-location');
+  if (existing) {
+    routeDataSource.entities.remove(existing);
+  }
+
+  routeDataSource.entities.add({
+    id: 'user-current-location',
+    position: Cesium.Cartesian3.fromDegrees(lon, lat, 24),
+    billboard: {
+      image: buatPinLokasiPengguna(),
+      width: 38,
+      height: 38,
+      verticalOrigin: Cesium.VerticalOrigin.CENTER,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+    label: {
+      text: 'Lokasi Anda',
+      font: '800 12px Manrope, sans-serif',
+      fillColor: Cesium.Color.WHITE,
+      outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
+      outlineWidth: 3.5,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -22),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+  });
+
+  getViewer()?.scene.requestRender();
+}
+
 export async function initRouteLayer() {
   const viewer = getViewer();
   if (!viewer) return;
