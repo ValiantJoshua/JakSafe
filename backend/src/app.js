@@ -1,3 +1,4 @@
+import dns from 'node:dns';
 import express from 'express';
 import cors from 'cors';
 import routeRouter from './routes/route.js';
@@ -6,6 +7,9 @@ import cctvRouter from './routes/cctv.js';
 import tomtomRouter from './routes/tomtom.js';
 import navigateRouter from './routes/navigate.js';
 import geocodeRouter from './routes/geocode.js';
+
+// Utamakan IPv4 untuk mencegah galat "fetch failed" / ETIMEDOUT pada jaringan ISP Indonesia
+dns.setDefaultResultOrder('ipv4first');
 
 /**
  * Express application factory for JakSafe backend.

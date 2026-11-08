@@ -13,7 +13,8 @@
 */
 
 import * as Cesium from 'cesium';
-import { ambilSemuaKamera, urlBingkaiKamera, analisisKamera } from '../api/cctvApi.js';
+import Hls from 'hls.js';
+import { ambilSemuaKamera, urlBingkaiKamera, urlStreamKamera, analisisKamera } from '../api/cctvApi.js';
 import { getViewer, flyToCoordinates } from './cesiumViewer.js';
 import { labelKondisiJalan, labelGenangan } from '../utils/format.js';
 
@@ -27,8 +28,19 @@ let daftarKamera = [];
 let layerEnabled = true;
 /** @type {string|null} */
 let highlightedCameraId = null;
+/** @type {number[][]|null} Geometri rute aktif [[lon, lat], ...] untuk filter koridor */
+let activeRouteGeometry = null;
 /** @type {string|null} */
 let selectedCameraId = null;
+
+/** @type {Hls|null} */
+let activeHls = null;
+/** @type {number|null} */
+let activeSnapTimer = null;
+/** @type {boolean} */
+let autoRefreshEnabled = true;
+/** @type {'video'|'snapshot'} */
+let currentViewMode = 'video';
 
 /** @type {Set<(state:{enabled:boolean, count:number, selected:object|null})=>void>} */
 const listeners = new Set();
@@ -161,71 +173,130 @@ function hitungKerucutPandang(lat, lon, headingDeg = 0, fovDeg = 55, rangeM = 13
 }
 
 /**
+ * Menghitung jarak terdekat (dalam meter) dari titik (lon, lat) ke garis rute [[lon, lat], ...].
+ * @param {number} lon
+ * @param {number} lat
+ * @param {number[][]} routeGeom
+ * @returns {number}
+ */
+function jarakKameraKeRuteM(lon, lat, routeGeom) {
+  if (!Array.isArray(routeGeom) || routeGeom.length < 2) return Infinity;
+  const mPerDegLat = 110540;
+  const mPerDegLon = 111320 * Math.cos((lat * Math.PI) / 180);
+
+  let minDistSq = Infinity;
+
+  for (let i = 0; i < routeGeom.length - 1; i += 1) {
+    const [lon1, lat1] = routeGeom[i];
+    const [lon2, lat2] = routeGeom[i + 1];
+
+    const px = (lon - lon1) * mPerDegLon;
+    const py = (lat - lat1) * mPerDegLat;
+    const vx = (lon2 - lon1) * mPerDegLon;
+    const vy = (lat2 - lat1) * mPerDegLat;
+
+    const segLenSq = vx * vx + vy * vy;
+    let t = 0;
+    if (segLenSq > 0.0001) {
+      t = Math.max(0, Math.min(1, (px * vx + py * vy) / segLenSq));
+    }
+
+    const dx = px - t * vx;
+    const dy = py - t * vy;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < minDistSq) {
+      minDistSq = distSq;
+    }
+  }
+  return Math.sqrt(minDistSq);
+}
+
+/**
  * Membangun ulang entitas Cesium untuk semua kamera di daftarKamera.
+ * Mendukung Smart Corridor Focus: saat rute aktif digambar, kamera di sepanjang koridor rute
+ * tampil penuh (100% + kerucut pandang), sedangkan kamera yang jauh di luar rute
+ * diredupkan drastis (opacity 20%, ukuran diperkecil, tanpa kerucut pandang).
  */
 function renderEntitasKamera() {
   if (!cctvDataSource) return;
   cctvDataSource.entities.removeAll();
+
+  const hasActiveRoute = Array.isArray(activeRouteGeometry) && activeRouteGeometry.length >= 2;
+  const CORRIDOR_RADIUS_M = 380;
 
   for (const cam of daftarKamera) {
     if (!Number.isFinite(cam.lat) || !Number.isFinite(cam.lon)) continue;
 
     const isSelected = cam.id === selectedCameraId;
     const isRouteCam = cam.id === highlightedCameraId;
+    const isNearRoute = hasActiveRoute
+      ? (isSelected || isRouteCam || jarakKameraKeRuteM(cam.lon, cam.lat, activeRouteGeometry) <= CORRIDOR_RADIUS_M)
+      : true;
+    const isDimmedOutside = hasActiveRoute && !isNearRoute;
+
     const variant = isSelected ? 'selected' : isRouteCam ? 'route' : 'normal';
 
     const heading = Number.isFinite(cam.headingDeg) ? cam.headingDeg : 0;
     const fov = Number.isFinite(cam.fovDeg) ? cam.fovDeg : 55;
     const rangeM = Number.isFinite(cam.rangeM) ? cam.rangeM : 140;
 
-    // 1. Kerucut pandang (Viewshed Cone) di permukaan tanah
-    const coneCoords = hitungKerucutPandang(cam.lat, cam.lon, heading, fov, rangeM);
-    const flatDegrees = coneCoords.flatMap(([lon, lat]) => [lon, lat]);
-    const coneColor = isSelected
-      ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.32)
-      : isRouteCam
-        ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.28)
-        : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.18);
-    const coneOutline = isSelected
-      ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.85)
-      : isRouteCam
-        ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.8)
-        : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.55);
+    // 1. Kerucut pandang (Viewshed Cone) di permukaan tanah.
+    //    Hanya digambar untuk kamera di koridor rute (atau saat tidak ada rute aktif).
+    if (!isDimmedOutside) {
+      const coneCoords = hitungKerucutPandang(cam.lat, cam.lon, heading, fov, rangeM);
+      const flatDegrees = coneCoords.flatMap(([lon, lat]) => [lon, lat]);
+      const coneColor = isSelected
+        ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.32)
+        : isRouteCam
+          ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.28)
+          : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.18);
+      const coneOutline = isSelected
+        ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.85)
+        : isRouteCam
+          ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.8)
+          : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.55);
 
-    cctvDataSource.entities.add({
-      id: `cctv-cone-${cam.id}`,
-      polygon: {
-        hierarchy: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
-        material: coneColor,
-        classificationType: Cesium.ClassificationType.BOTH,
-      },
-      polyline: {
-        positions: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
-        width: isSelected || isRouteCam ? 2.4 : 1.5,
-        material: coneOutline,
-        clampToGround: true,
-      },
-    });
+      cctvDataSource.entities.add({
+        id: `cctv-cone-${cam.id}`,
+        polygon: {
+          hierarchy: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
+          material: coneColor,
+          classificationType: Cesium.ClassificationType.TERRAIN,
+        },
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
+          width: isSelected || isRouteCam ? 2.4 : 1.5,
+          material: coneOutline,
+          classificationType: Cesium.ClassificationType.TERRAIN,
+          clampToGround: true,
+        },
+      });
+    }
 
     // 2. Penanda Billboard & Label Kamera
-    cctvDataSource.entities.add({
+    const markerSize = isSelected ? 40 : isRouteCam ? 36 : isDimmedOutside ? 18 : 28;
+    const entityDef = {
       id: `cctv-node-${cam.id}`,
       position: Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat, 18),
-       properties: {
+      properties: {
         isCctvMarker: true,
         cameraId: cam.id,
       },
       billboard: {
         image: buatIkonBillboardKamera(variant),
-        width: isSelected ? 40 : isRouteCam ? 36 : 30,
-        height: isSelected ? 40 : isRouteCam ? 36 : 30,
+        width: markerSize,
+        height: markerSize,
+        color: isDimmedOutside ? Cesium.Color.WHITE.withAlpha(0.20) : Cesium.Color.WHITE,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scaleByDistance: new Cesium.NearFarScalar(800, 1.15, 35000, 0.55),
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isSelected || isRouteCam ? 65000 : 45000),
       },
-      label: {
+    };
+
+    if (!isDimmedOutside) {
+      entityDef.label = {
         text: cam.nama,
         font: '700 12px Manrope, sans-serif',
         fillColor: Cesium.Color.WHITE,
@@ -237,12 +308,179 @@ function renderEntitasKamera() {
         pixelOffset: new Cesium.Cartesian2(0, -22),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isSelected || isRouteCam ? 25000 : 1200),
-      },
-    });
+      };
+    }
+
+    cctvDataSource.entities.add(entityDef);
   }
 
   const viewer = getViewer();
   viewer?.scene.requestRender();
+}
+
+/**
+ * Menghentikan pemutaran stream HLS aktif dan interval auto-refresh snapshot.
+ */
+function hentikanStreamKamera() {
+  if (activeHls) {
+    try {
+      activeHls.stopLoad();
+      activeHls.destroy();
+    } catch { /* ignore */ }
+    activeHls = null;
+  }
+  if (activeSnapTimer) {
+    clearInterval(activeSnapTimer);
+    activeSnapTimer = null;
+  }
+
+  const videoEl = /** @type {HTMLVideoElement|null} */ (document.getElementById('mapCctvVideo'));
+  if (videoEl) {
+    try {
+      videoEl.pause();
+      videoEl.removeAttribute('src');
+      videoEl.load();
+    } catch { /* ignore */ }
+  }
+
+  const frameEl = document.getElementById('mapCctvFrame');
+  frameEl?.removeAttribute('data-gagal');
+  setLoadingSpinner(false);
+}
+
+/**
+ * Mengatur visibilitas dan teks indikator loading/buffer video.
+ * @param {boolean} visible
+ * @param {string} [teks]
+ */
+function setLoadingSpinner(visible, teks = 'Menghubungkan ke live stream...') {
+  const spinWrap = document.getElementById('mapCctvSpinner');
+  const spinTxt = document.getElementById('mapCctvSpinnerText');
+  if (spinWrap) spinWrap.hidden = !visible;
+  if (spinTxt && teks) spinTxt.textContent = teks;
+}
+
+/**
+ * Mengalihkan mode tampilan kamera antara 'video' (Live HLS) dan 'snapshot' (Foto realtime).
+ * @param {import('../api/cctvApi.js').Kamera} cam
+ * @param {'video'|'snapshot'} mode
+ */
+function tampilkanModeKamera(cam, mode) {
+  hentikanStreamKamera();
+  currentViewMode = mode;
+
+  const tabVid = document.getElementById('tabMapCctvVideo');
+  const tabSnap = document.getElementById('tabMapCctvSnapshot');
+  const videoEl = /** @type {HTMLVideoElement|null} */ (document.getElementById('mapCctvVideo'));
+  const imgEl = /** @type {HTMLImageElement|null} */ (document.getElementById('mapCctvImg'));
+  const liveBadge = document.getElementById('mapCctvLiveBadge');
+  const liveLabel = document.getElementById('mapCctvLiveLabel');
+  const qualityEl = document.getElementById('mapCctvQuality');
+  const frameEl = document.getElementById('mapCctvFrame');
+  const fallbackMsg = document.getElementById('mapCctvFallbackMsg');
+
+  // Perbarui status tombol tab
+  if (tabVid) tabVid.setAttribute('data-active', mode === 'video' ? '1' : '0');
+  if (tabSnap) tabSnap.setAttribute('data-active', mode === 'snapshot' ? '1' : '0');
+
+  // Update badge label
+  if (mode === 'video') {
+    if (liveBadge) liveBadge.style.display = 'inline-flex';
+    if (liveLabel) liveLabel.textContent = 'LIVE STREAM';
+    if (qualityEl) qualityEl.textContent = cam.hasLiveStream ? 'HLS 640p' : 'HLS N/A';
+  } else {
+    if (liveBadge) liveBadge.style.display = 'inline-flex';
+    if (liveLabel) liveLabel.textContent = 'FOTO REALTIME';
+    if (qualityEl) qualityEl.textContent = 'FOTO 720p';
+  }
+
+  if (mode === 'video') {
+    // Mode Live HLS Video
+    if (imgEl) imgEl.hidden = true;
+    if (videoEl) {
+      videoEl.hidden = false;
+      videoEl.muted = true;
+    }
+
+    if (!cam.hasLiveStream) {
+      // Kamera tidak memiliki stream HLS langsung, alihkan ke snapshot
+      tampilkanModeKamera(cam, 'snapshot');
+      return;
+    }
+
+    setLoadingSpinner(true, 'Menghubungkan ke live stream...');
+
+    const streamUrl = urlStreamKamera(cam.id);
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: 30,
+        maxBufferLength: 15,
+        liveSyncDurationCount: 3,
+      });
+      activeHls = hls;
+
+      hls.loadSource(streamUrl);
+      if (videoEl) hls.attachMedia(videoEl);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setLoadingSpinner(false);
+        videoEl?.play().catch(() => {});
+      });
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          console.warn('[JakSafe HLS] Fatal stream error, switching to snapshot:', data.type, data.details);
+          hentikanStreamKamera();
+          tampilkanModeKamera(cam, 'snapshot');
+          if (fallbackMsg) fallbackMsg.textContent = 'Live video offline, beralih ke Snapshot';
+        }
+      });
+
+      if (videoEl) {
+        videoEl.onplaying = () => setLoadingSpinner(false);
+        videoEl.onwaiting = () => setLoadingSpinner(true, 'Memuat segmen video...');
+        videoEl.onerror = () => {
+          hentikanStreamKamera();
+          tampilkanModeKamera(cam, 'snapshot');
+        };
+      }
+    } else if (videoEl && videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+      // Dukungan native HLS (Safari macOS / iOS)
+      videoEl.src = streamUrl;
+      videoEl.onloadedmetadata = () => {
+        setLoadingSpinner(false);
+        videoEl.play().catch(() => {});
+      };
+      videoEl.onerror = () => {
+        tampilkanModeKamera(cam, 'snapshot');
+      };
+    } else {
+      tampilkanModeKamera(cam, 'snapshot');
+    }
+  } else {
+    // Mode Snapshot (Foto)
+    if (videoEl) videoEl.hidden = true;
+    if (imgEl) {
+      imgEl.hidden = false;
+      frameEl?.removeAttribute('data-gagal');
+      imgEl.src = urlBingkaiKamera(cam.id, Date.now());
+    }
+    setLoadingSpinner(false);
+
+    // Pasang interval auto-refresh jika diaktifkan pengguna
+    if (autoRefreshEnabled) {
+      activeSnapTimer = window.setInterval(() => {
+        if (!selectedCameraId || currentViewMode !== 'snapshot') return;
+        const currentImg = /** @type {HTMLImageElement|null} */ (document.getElementById('mapCctvImg'));
+        if (currentImg && !currentImg.hidden) {
+          currentImg.src = urlBingkaiKamera(selectedCameraId, Date.now());
+        }
+      }, 3000);
+    }
+  }
 }
 
 /**
@@ -254,6 +492,7 @@ export function bukaPopupKameraPeta(cam) {
   if (!popup) return;
 
   if (!cam) {
+    hentikanStreamKamera();
     selectedCameraId = null;
     popup.hidden = true;
     renderEntitasKamera();
@@ -265,20 +504,16 @@ export function bukaPopupKameraPeta(cam) {
   renderEntitasKamera();
   notifyListeners();
 
-  const imgEl = document.getElementById('mapCctvImg');
   const titleEl = document.getElementById('mapCctvTitle');
   const metaEl = document.getElementById('mapCctvMeta');
   const aiBoxEl = document.getElementById('mapCctvAiResult');
   const btnAnalyze = document.getElementById('btnMapCctvAnalyze');
+  const tabVid = document.getElementById('tabMapCctvVideo');
 
   if (titleEl) titleEl.textContent = cam.nama;
   if (metaEl) {
     const arah = Number.isFinite(cam.headingDeg) ? `Arah ${cam.headingDeg}°` : 'Arah 360°';
     metaEl.textContent = `${cam.provider || 'CCTV Jakarta'} · ${arah} · ${cam.lat.toFixed(4)}, ${cam.lon.toFixed(4)}`;
-  }
-  if (imgEl) {
-    imgEl.closest('.mapcctv__frame')?.removeAttribute('data-gagal');
-    imgEl.src = urlBingkaiKamera(cam.id, Date.now());
   }
   if (aiBoxEl) {
     aiBoxEl.hidden = true;
@@ -289,7 +524,16 @@ export function bukaPopupKameraPeta(cam) {
     btnAnalyze.textContent = 'Analisis AI Vision (Gemini)';
   }
 
+  if (tabVid) {
+    tabVid.style.opacity = cam.hasLiveStream ? '1' : '0.45';
+    tabVid.title = cam.hasLiveStream ? 'Tonton siaran langsung live video' : 'Kamera ini hanya menyediakan foto berkala';
+  }
+
   popup.hidden = false;
+
+  // Jalankan mode sesuai kapabilitas kamera
+  const targetMode = cam.hasLiveStream ? 'video' : 'snapshot';
+  tampilkanModeKamera(cam, targetMode);
 }
 
 /**
@@ -326,13 +570,50 @@ function pasangTombolPopupKamera() {
     bukaPopupKameraPeta(null);
   });
 
-  document.getElementById('btnMapCctvRefresh')?.addEventListener('click', () => {
-    if (!selectedCameraId) return;
-    const imgEl = document.getElementById('mapCctvImg');
-    if (imgEl) {
-      imgEl.closest('.mapcctv__frame')?.removeAttribute('data-gagal');
-      imgEl.src = urlBingkaiKamera(selectedCameraId, Date.now());
+  // Tab Live Video
+  document.getElementById('tabMapCctvVideo')?.addEventListener('click', () => {
+    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    if (!cam) return;
+    tampilkanModeKamera(cam, 'video');
+  });
+
+  // Tab Snapshot
+  document.getElementById('tabMapCctvSnapshot')?.addEventListener('click', () => {
+    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    if (!cam) return;
+    tampilkanModeKamera(cam, 'snapshot');
+  });
+
+  // Toggle Auto-Refresh
+  document.getElementById('btnMapCctvAutoRefresh')?.addEventListener('click', () => {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    const lbl = document.getElementById('lblMapCctvAutoRefresh');
+    if (lbl) {
+      lbl.textContent = autoRefreshEnabled ? 'ON' : 'OFF';
+      lbl.style.color = autoRefreshEnabled ? '#22C55E' : '#94A3B8';
     }
+    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    if (cam && currentViewMode === 'snapshot') {
+      tampilkanModeKamera(cam, 'snapshot');
+    }
+  });
+
+  // Layar Penuh (Fullscreen)
+  document.getElementById('btnMapCctvFullscreen')?.addEventListener('click', () => {
+    const frame = document.getElementById('mapCctvFrame');
+    if (!frame) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      frame.requestFullscreen?.().catch(() => {});
+    }
+  });
+
+  // Muat Ulang (Refresh)
+  document.getElementById('btnMapCctvRefresh')?.addEventListener('click', () => {
+    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    if (!cam) return;
+    tampilkanModeKamera(cam, currentViewMode);
   });
 
   document.getElementById('btnMapCctvFly')?.addEventListener('click', () => {
@@ -393,10 +674,7 @@ function pasangTombolPopupKamera() {
   });
 }
 
-/**
- * Menyalakan atau mematikan layer CCTV di peta (ON / OFF).
- * @param {boolean} enabled
- */
+
 export function setCctvLayerEnabled(enabled) {
   layerEnabled = Boolean(enabled);
   if (cctvDataSource) {
@@ -416,11 +694,14 @@ export function toggleCctvLayer() {
 }
 
 /**
- * Menyorot kamera tertentu yang dipakai pada rute hasil navigasi.
+ * Menyorot kamera tertentu yang dipakai pada rute hasil navigasi
+ * serta mengaktifkan Mode Fokus Koridor Rute (meredupkan kamera di luar koridor).
  * @param {string|null} cameraId
+ * @param {number[][]|null} [routeGeometry]
  */
-export function highlightRouteCamera(cameraId) {
+export function highlightRouteCamera(cameraId, routeGeometry = null) {
   highlightedCameraId = cameraId || null;
+  activeRouteGeometry = Array.isArray(routeGeometry) && routeGeometry.length >= 2 ? routeGeometry : null;
   renderEntitasKamera();
 }
 

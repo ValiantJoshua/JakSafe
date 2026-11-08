@@ -150,6 +150,10 @@ let layerEnabled = true;
 let currentSourceMode = 'arteri';
 /** @type {number} */
 let activeRoadCount = 0;
+/** @type {boolean} Apakah sedang dalam Mode Fokus Rute (rute aktif digambar di peta) */
+let routeFocusActive = false;
+/** @type {Array<{id:string, highway?:string, trafficLevel:number, coords:number[][]}>} */
+let lastRenderedRoads = KORIDOR_ARTERI_JAKARTA;
 
 /** @type {Set<(info:{enabled:boolean, mode:string, roadCount:number})=>void>} */
 const listeners = new Set();
@@ -186,26 +190,26 @@ export function getTrafficLayerStatus() {
  * Menentukan warna garis jalan dan partikel berdasarkan tingkat kelancaran (0.0 macet .. 1.0 lancar).
  * @param {number} level
  */
-function warnaLaluLintas(level) {
+function warnaLaluLintas(level, dimmed = false) {
   const l = Number.isFinite(level) ? level : 0.65;
   if (l < 0.36) {
     // Macet berat -> Merah lembut transparan
     return {
-      line: Cesium.Color.fromCssColorString('#EF4444').withAlpha(0.55),
-      dot: Cesium.Color.fromCssColorString('#FCA5A5').withAlpha(0.70),
+      line: Cesium.Color.fromCssColorString('#EF4444').withAlpha(dimmed ? 0.28 : 0.55),
+      dot: Cesium.Color.fromCssColorString('#FCA5A5').withAlpha(dimmed ? 0.45 : 0.70),
     };
   }
   if (l < 0.68) {
     // Padat merayap -> Kuning / Oranye lembut transparan
     return {
-      line: Cesium.Color.fromCssColorString('#F59E0B').withAlpha(0.52),
-      dot: Cesium.Color.fromCssColorString('#FDE68A').withAlpha(0.68),
+      line: Cesium.Color.fromCssColorString('#F59E0B').withAlpha(dimmed ? 0.22 : 0.50),
+      dot: Cesium.Color.fromCssColorString('#FDE68A').withAlpha(dimmed ? 0.40 : 0.68),
     };
   }
   // Lancar -> Hijau zamrud lembut transparan
   return {
-    line: Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.48),
-    dot: Cesium.Color.fromCssColorString('#86EFAC').withAlpha(0.62),
+    line: Cesium.Color.fromCssColorString('#22C55E').withAlpha(dimmed ? 0.16 : 0.46),
+    dot: Cesium.Color.fromCssColorString('#86EFAC').withAlpha(dimmed ? 0.35 : 0.62),
   };
 }
 
@@ -339,6 +343,7 @@ function renderRoadsAndParticles(roads) {
   const viewer = getViewer();
   if (!viewer || !roadLineCollection || !particleCollection) return;
 
+  lastRenderedRoads = roads;
   roadLineCollection.removeAll();
   particleCollection.removeAll();
   activeParticles = [];
@@ -346,14 +351,19 @@ function renderRoadsAndParticles(roads) {
   const cappedRoads = roads.slice(0, 260);
   activeRoadCount = cappedRoads.length;
 
+  // Partikel titik hanya muncul saat zoom dekat (< 3.000m) agar tidak menimbulkan
+  // efek "manik-manik" saat kamera melihat keseluruhan rute dari jauh.
+  const maxParticleDistance = routeFocusActive ? 2200 : 3000;
+
   for (const road of cappedRoads) {
     if (!Array.isArray(road.coords) || road.coords.length < 2) continue;
 
     const { lengths, total } = computeCumulativeLengths(road.coords);
     if (total < 45) continue;
 
-    const style = warnaLaluLintas(road.trafficLevel);
-    const width = road.highway === 'motorway' ? 4.5 : road.highway === 'trunk' ? 3.8 : 2.8;
+    const style = warnaLaluLintas(road.trafficLevel, routeFocusActive);
+    const baseWidth = road.highway === 'motorway' ? 4.2 : road.highway === 'trunk' ? 3.5 : 2.6;
+    const width = routeFocusActive ? baseWidth * 0.8 : baseWidth;
 
     const positions = road.coords.map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(lon, lat, 10));
 
@@ -363,7 +373,7 @@ function renderRoadsAndParticles(roads) {
       material: Cesium.Material.fromType('Color', { color: style.line }),
     });
 
-    // Buat partikel kendaraan bergerak di sepanjang jalan
+    // Buat partikel kendaraan bergerak di sepanjang jalan (tampil hanya pada zoom dekat)
     const particleCount = Math.max(1, Math.min(8, Math.floor(total / 380)));
     // Kecepatan gerak partikel proporsional terhadap kelancaran lalu lintas (m/s)
     const speedMps = 18 + Math.max(0.12, road.trafficLevel ?? 0.6) * 55;
@@ -373,11 +383,13 @@ function renderRoadsAndParticles(roads) {
       const initialPos = interpolateAlongRoad(road.coords, lengths, total, startOffset);
       const pointPrimitive = particleCollection.add({
         position: initialPos,
-        pixelSize: road.highway === 'motorway' ? 5.2 : 4.2,
+        pixelSize: road.highway === 'motorway' ? 4.8 : 3.8,
         color: style.dot,
-        outlineColor: Cesium.Color.fromCssColorString('#0E1430').withAlpha(0.40),
+        outlineColor: Cesium.Color.fromCssColorString('#0E1430').withAlpha(routeFocusActive ? 0.25 : 0.40),
         outlineWidth: 1.0,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, maxParticleDistance),
+        scaleByDistance: new Cesium.NearFarScalar(400, 1.0, maxParticleDistance, 0.45),
       });
 
       activeParticles.push({
@@ -506,6 +518,21 @@ export function setTrafficLayerEnabled(enabled) {
 export function toggleTrafficLayer() {
   setTrafficLayerEnabled(!layerEnabled);
   return layerEnabled;
+}
+
+/**
+ * Mengatur Mode Fokus Rute pada layer Traffic.
+ * Saat rute aktif digambar di peta, garis traffic latar belakang diredupkan agar
+ * garis rute utama tetap dominan dan mudah dibaca.
+ * @param {boolean} active
+ */
+export function setTrafficRouteFocusMode(active) {
+  const next = Boolean(active);
+  if (routeFocusActive === next) return;
+  routeFocusActive = next;
+  if (layerEnabled && lastRenderedRoads.length > 0) {
+    renderRoadsAndParticles(lastRenderedRoads);
+  }
 }
 
 /**

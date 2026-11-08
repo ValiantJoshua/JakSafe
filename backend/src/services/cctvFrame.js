@@ -33,7 +33,7 @@ function isPrivateIp(ip) {
   return true;
 }
 
-async function assertPublicHttpUrl(urlStr) {
+export async function assertPublicHttpUrl(urlStr) {
   let u;
   try { u = new URL(urlStr); } catch { throw new FrameError('invalid camera url'); }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new FrameError('unsupported protocol');

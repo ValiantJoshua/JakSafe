@@ -5,7 +5,8 @@
 */
 
 import { subscribe, getState } from '../state/appState.js';
-import { findPlaceById } from '../config/jakartaPlaces.js';
+import { findPlaceById, registerCustomPlace } from '../config/jakartaPlaces.js';
+import { toast } from '../ui/toast.js';
 import {
   initCesiumViewer,
   setMapViewMode,
@@ -14,6 +15,7 @@ import {
   isBuildingsLayerEnabled,
   flyToPreset,
   zoomMap,
+  flyToCoordinates,
   onMapModeChange,
   getViewer,
 } from './cesiumViewer.js';
@@ -22,6 +24,7 @@ import {
   toggleTrafficLayer,
   isTrafficLayerEnabled,
   onTrafficLayerChange,
+  setTrafficRouteFocusMode,
 } from './trafficLayer.js';
 import {
   initCctvLayer,
@@ -35,6 +38,7 @@ import {
   renderRouteOnMap,
   previewEndpointsOnMap,
   flyToRouteBounds,
+  showUserLocationOnMap,
 } from './routeLayer.js';
 import {
   initAqiLayer,
@@ -113,6 +117,69 @@ function toggleSidebar(forceOpen) {
   }, 260);
 }
 
+/**
+ * Meminta izin akses lokasi browser dan mengarahkan kamera peta ke titik koordinat pengguna saat ini.
+ */
+function arahkanKeLokasiPengguna() {
+  if (!('geolocation' in navigator)) {
+    toast('Browser Anda tidak mendukung deteksi lokasi (Geolocation).');
+    return;
+  }
+
+  const btnLocate = document.getElementById('btnMapLocate');
+  if (btnLocate) btnLocate.classList.add('is-loading');
+
+  toast('Mendeteksi lokasi Anda saat ini...');
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      if (btnLocate) btnLocate.classList.remove('is-loading');
+      const { latitude, longitude } = pos.coords;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        toast('Koordinat lokasi tidak valid.');
+        return;
+      }
+
+      flyToCoordinates({
+        lon: longitude,
+        lat: latitude,
+        height: 1200,
+        pitchDeg: -40,
+        duration: 1.4,
+      });
+
+      showUserLocationOnMap(longitude, latitude);
+
+      registerCustomPlace({
+        id: 'user-gps-location',
+        nama: 'Lokasi Saya Saat Ini',
+        area: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+        lat: latitude,
+        lon: longitude,
+      });
+
+      toast('Lokasi Anda berhasil ditemukan.');
+    },
+    (err) => {
+      if (btnLocate) btnLocate.classList.remove('is-loading');
+      let msg = 'Gagal mendeteksi lokasi saat ini.';
+      if (err.code === 1) { // PERMISSION_DENIED
+        msg = 'Izin lokasi ditolak. Harap izinkan akses lokasi pada peramban web Anda.';
+      } else if (err.code === 2) { // POSITION_UNAVAILABLE
+        msg = 'Sinyal lokasi GPS tidak tersedia.';
+      } else if (err.code === 3) { // TIMEOUT
+        msg = 'Waktu permintaan lokasi habis. Coba klik kembali.';
+      }
+      toast(msg);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 30000,
+    }
+  );
+}
+
 /** Memasang seluruh event klik pada HUD peta & sidebar. */
 function pasangEventHudPeta() {
   // 0. Tombol Lipat / Buka Sidebar (di Topbar & di Tepi Sidebar)
@@ -127,15 +194,7 @@ function pasangEventHudPeta() {
     });
   });
 
-  // 2. Preset Wilayah Indonesia (Jakarta / Jabodetabek / Indonesia)
-  document.querySelectorAll('[data-map-preset]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const preset = btn.getAttribute('data-map-preset');
-      if (preset) flyToPreset(preset);
-    });
-  });
-
-  // 3. Sakelar Layer ON / OFF (Traffic, CCTV, Gedung 3D, Udara)
+  // 2. Sakelar Layer ON / OFF (Traffic, CCTV, Gedung 3D, Udara)
   document.getElementById('btnLayerTraffic')?.addEventListener('click', () => {
     toggleTrafficLayer();
   });
@@ -156,7 +215,7 @@ function pasangEventHudPeta() {
     toggleAqiLayer();
   });
 
-  // 4. Tombol Zoom In / Out / Fokus Rute atau Jakarta
+  // 3. Tombol Zoom In / Out / Menuju Lokasi Pengguna (Geolocation)
   document.getElementById('btnMapZoomIn')?.addEventListener('click', () => {
     zoomMap(1);
   });
@@ -166,12 +225,7 @@ function pasangEventHudPeta() {
   });
 
   document.getElementById('btnMapLocate')?.addEventListener('click', () => {
-    const { hasil } = getState();
-    if (hasil?.route?.geometry?.length >= 2) {
-      flyToRouteBounds(hasil.route.geometry);
-    } else {
-      flyToPreset('jakarta');
-    }
+    arahkanKeLokasiPengguna();
   });
 
   // 5. Langganan status perubahan mode dan layer
@@ -227,8 +281,8 @@ export async function pasangPengendaliPeta() {
   ]);
 
   const awal = getState();
-  if (!awal.hasil) {
-    previewEndpointsOnMap(findPlaceById(awal.idAsal), findPlaceById(awal.idTujuan));
+  if (!awal.hasil && (awal.idAsal || awal.idTujuan)) {
+    previewEndpointsOnMap(findPlaceById(awal.idAsal), findPlaceById(awal.idTujuan), { fly: false });
   }
 
   subscribe((keadaan, berubah) => {
@@ -238,17 +292,19 @@ export async function pasangPengendaliPeta() {
         toggleSidebar(true);
         renderRouteOnMap(keadaan.hasil);
         const camId = keadaan.hasil.visual?.cameraId || keadaan.hasil.visual?.kamera?.id || null;
-        highlightRouteCamera(camId);
+        highlightRouteCamera(camId, keadaan.hasil.route?.geometry || null);
+        setTrafficRouteFocusMode(true);
         updateRouteAqiOnMap(keadaan.hasil);
       } else {
-        highlightRouteCamera(null);
-        previewEndpointsOnMap(findPlaceById(keadaan.idAsal), findPlaceById(keadaan.idTujuan));
+        highlightRouteCamera(null, null);
+        setTrafficRouteFocusMode(false);
+        previewEndpointsOnMap(findPlaceById(keadaan.idAsal), findPlaceById(keadaan.idTujuan), { fly: false });
       }
       return;
     }
 
     if ((berubah.includes('idAsal') || berubah.includes('idTujuan')) && !keadaan.hasil) {
-      previewEndpointsOnMap(findPlaceById(keadaan.idAsal), findPlaceById(keadaan.idTujuan));
+      previewEndpointsOnMap(findPlaceById(keadaan.idAsal), findPlaceById(keadaan.idTujuan), { fly: true });
     }
   });
 }

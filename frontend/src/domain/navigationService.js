@@ -230,7 +230,7 @@ async function rangkaiPratinjau({
     weights: bobot,
   });
 
-  const alternatives = routes.slice(1).map((r) => {
+  const alternatives = routes.slice(1).map((r, idx) => {
     const s = calculateRouteScore({
       durationS: r.durationS,
       trafficData: laluLintas,
@@ -241,8 +241,14 @@ async function rangkaiPratinjau({
     return {
       distanceM: r.distanceM,
       durationS: r.durationS,
+      summary: r.summary || `Jalur Alternatif ${idx + 2}`,
+      geometry: r.geometry,
       totalScore: s.totalScore,
       label: s.label,
+      color: s.color,
+      score: s,
+      air: udara,
+      visual: null,
     };
   });
 

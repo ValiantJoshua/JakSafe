@@ -53,6 +53,7 @@ function keKamera(c) {
     fovDeg: Number.isFinite(c.fovDeg) ? Number(c.fovDeg) : null,
     rangeM: Number.isFinite(c.rangeM) ? Number(c.rangeM) : null,
     provider: c.provider ?? null,
+    hasLiveStream: Boolean(c.hasLiveStream),
     license: c.license ?? null,
   };
 }
@@ -106,6 +107,16 @@ export async function ambilKameraTerdekat({
  */
 export function urlBingkaiKamera(idKamera, cacheBust = Date.now()) {
   return urlSumberDaya(`/cctv/frame/${encodeURIComponent(idKamera)}`, { t: cacheBust });
+}
+
+/**
+ * Menyusun URL playlist HLS (.m3u8) video live stream untuk satu kamera.
+ *
+ * @param {string} idKamera
+ * @returns {string}
+ */
+export function urlStreamKamera(idKamera) {
+  return urlSumberDaya(`/cctv/stream/${encodeURIComponent(idKamera)}.m3u8`);
 }
 
 /**

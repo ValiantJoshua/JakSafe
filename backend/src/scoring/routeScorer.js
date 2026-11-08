@@ -84,12 +84,15 @@ export function normalizeConditionScore(analysis, trafficData = null) {
     else floodScore = 50;
   }
 
-  // Traffic congestion score: prioritize TomTom sensor delay if available, else vision analysis
+  // Traffic congestion score: prioritize TomTom sensor peak/corridor delay if available, else vision analysis
   let trafficScore = 0;
-  if (trafficData && Number.isFinite(trafficData.delayPercent)) {
-    if (trafficData.delayPercent >= 80) trafficScore = 30;       // Severe congestion
-    else if (trafficData.delayPercent >= 30) trafficScore = 15;  // Moderate congestion
-    else trafficScore = 0;                                       // Free flow
+  const peakDelay = trafficData
+    ? Number(trafficData.maxDelayPercent ?? trafficData.delayPercent)
+    : NaN;
+  if (Number.isFinite(peakDelay)) {
+    if (peakDelay >= 80) trafficScore = 30;       // Severe congestion bottleneck
+    else if (peakDelay >= 30) trafficScore = 15;  // Moderate congestion
+    else trafficScore = 0;                        // Free flow
   } else if (analysis?.kondisi_jalan) {
     const traffic = String(analysis.kondisi_jalan).toLowerCase();
     if (traffic === 'padat' || traffic === 'merayap') trafficScore = 15;
@@ -190,6 +193,8 @@ export function calculateRouteScore({
         baseDurationMin: Math.round(durationS / 60),
         effectiveDurationMin: Math.round(effectiveDurationS / 60),
         delayPercent,
+        maxDelayPercent: Number.isFinite(trafficData?.maxDelayPercent) ? trafficData.maxDelayPercent : delayPercent,
+        sampleCount: Number.isInteger(trafficData?.sampleCount) ? trafficData.sampleCount : (trafficData ? 1 : 0),
         trafficSource: trafficData ? 'TomTom Live' : 'OSRM Baseline',
       },
       aqi: {

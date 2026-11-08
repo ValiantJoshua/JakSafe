@@ -47,6 +47,7 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
   if (!kotak || !daftar) return;
 
   let timerDebounce = null;
+  let pengendaliSaran = null;
 
   const gambarSaran = async () => {
     const val = kotak.value.trim();
@@ -54,7 +55,11 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
     daftar.hidden = false;
     kotak.setAttribute('aria-expanded', 'true');
 
-    const hasil = await searchPlacesLive(val);
+    pengendaliSaran?.abort();
+    const ctrl = new AbortController();
+    pengendaliSaran = ctrl;
+    const hasil = await searchPlacesLive(val, 6, ctrl.signal);
+    if (ctrl.signal.aborted) return;
     if (hasil.length === 0) {
       daftar.innerHTML = '<p class="saran__kosong">Lokasi tidak ditemukan. Coba ketik nama jalan, gedung, atau koordinat.</p>';
     } else {
@@ -71,7 +76,13 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
   kotak.addEventListener('focus', () => { gambarSaran(); });
   kotak.addEventListener('input', () => {
     clearTimeout(timerDebounce);
-    timerDebounce = setTimeout(gambarSaran, 250);
+    const val = kotak.value.trim();
+    if (!val) {
+      setState({ [kunciKeadaan]: null });
+    }
+    pengendaliSaran?.abort();
+    // Debounce optimal 380ms agar ketukan kata tidak membombardir geocoding API
+    timerDebounce = setTimeout(gambarSaran, 380);
   });
 
   // Pemilihan ditangkap di tingkat daftar saran
@@ -109,16 +120,18 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
       daftar.hidden = true;
       kotak.setAttribute('aria-expanded', 'false');
       const val = kotak.value.trim();
+      if (!val) {
+        setState({ [kunciKeadaan]: null });
+        return;
+      }
       const sekarang = findPlaceById(getState()[kunciKeadaan]);
       if (!sekarang || sekarang.nama !== val) {
-        if (val) {
-          const hits = await searchPlacesLive(val, 1);
-          if (hits.length > 0) {
-            registerCustomPlace(hits[0]);
-            kotak.value = hits[0].nama;
-            setState({ [kunciKeadaan]: hits[0].id });
-            return;
-          }
+        const hits = await searchPlacesLive(val, 1);
+        if (hits.length > 0) {
+          registerCustomPlace(hits[0]);
+          kotak.value = hits[0].nama;
+          setState({ [kunciKeadaan]: hits[0].id });
+          return;
         }
         if (sekarang) kotak.value = sekarang.nama;
       }
@@ -227,9 +240,9 @@ async function jalankanPencarian() {
  * Memasang seluruh perilaku layar pencarian. Dipanggil sekali dari main.js.
  */
 export function pasangPengendaliPencarian() {
-  setState({ idAsal: DEFAULT_TRIP.origin, idTujuan: DEFAULT_TRIP.destination });
-  isiKotak('#inpOrigin', DEFAULT_TRIP.origin);
-  isiKotak('#inpDest', DEFAULT_TRIP.destination);
+  setState({ idAsal: DEFAULT_TRIP.origin || null, idTujuan: DEFAULT_TRIP.destination || null });
+  if (DEFAULT_TRIP.origin) isiKotak('#inpOrigin', DEFAULT_TRIP.origin);
+  if (DEFAULT_TRIP.destination) isiKotak('#inpDest', DEFAULT_TRIP.destination);
 
   pasangKotakIsian('#inpOrigin', '#saranOrigin', 'idAsal');
   pasangKotakIsian('#inpDest', '#saranDest', 'idTujuan');
