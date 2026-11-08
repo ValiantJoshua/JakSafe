@@ -227,8 +227,8 @@ export async function pasangPengendaliPeta() {
   ]);
 
   const awal = getState();
-  if (!awal.hasil) {
-    previewEndpointsOnMap(findPlaceById(awal.idAsal), findPlaceById(awal.idTujuan));
+  if (!awal.hasil && (awal.idAsal || awal.idTujuan)) {
+    previewEndpointsOnMap(findPlaceById(awal.idAsal), findPlaceById(awal.idTujuan), { fly: false });
   }
 
   subscribe((keadaan, berubah) => {
@@ -248,7 +248,7 @@ export async function pasangPengendaliPeta() {
     }
 
     if ((berubah.includes('idAsal') || berubah.includes('idTujuan')) && !keadaan.hasil) {
-      previewEndpointsOnMap(findPlaceById(keadaan.idAsal), findPlaceById(keadaan.idTujuan));
+      previewEndpointsOnMap(findPlaceById(keadaan.idAsal), findPlaceById(keadaan.idTujuan), { fly: true });
     }
   });
 }
