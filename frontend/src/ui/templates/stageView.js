@@ -21,7 +21,7 @@ export function templateStage() {
     <div class="mapcanvas" id="mapCanvas"></div>
   </div>
 
-  <!-- Kiri Atas: Switch Mode 3D / 2D Peta Normal / Satelit & Wilayah -->
+  <!-- Kiri Atas: Switch Mode 3D / 2D Peta Normal / Satelit -->
   <div class="mapstage__float mapstage__float--tl" id="mapModeWrap">
     <div class="maphud-bar">
       <div class="mapmode-group" role="group" aria-label="Mode tampilan peta">
@@ -38,21 +38,15 @@ export function templateStage() {
           <span>Satelit</span>
         </button>
       </div>
-
-      <div class="mappreset-group" role="group" aria-label="Fokus wilayah">
-        <button type="button" class="mappreset-btn" data-map-preset="jakarta" title="Fokus ke Jakarta Pusat">Jakarta</button>
-        <button type="button" class="mappreset-btn" data-map-preset="jabodetabek" title="Fokus ke Jabodetabek">Jabodetabek</button>
-        <button type="button" class="mappreset-btn" data-map-preset="indonesia" title="Fokus ke Indonesia">Indonesia</button>
-      </div>
     </div>
   </div>
 
-  <!-- Kanan Atas: Kendali Zoom & Fokus Kamera -->
+  <!-- Kanan Atas: Kendali Zoom & Lokasi Saya -->
   <div class="mapstage__float mapstage__float--tr" id="mapCtrlWrap">
     <div class="mapctrl">
       <button type="button" class="iconbtn" id="btnMapZoomIn" aria-label="Perbesar peta" title="Perbesar">${ikon('i-plus', 17)}</button>
       <button type="button" class="iconbtn" id="btnMapZoomOut" aria-label="Perkecil peta" title="Perkecil">${ikon('i-minus', 17)}</button>
-      <button type="button" class="iconbtn" id="btnMapLocate" aria-label="Fokus ke rute atau Jakarta" title="Fokus ke Rute / Jakarta">${ikon('i-locate', 17)}</button>
+      <button type="button" class="iconbtn" id="btnMapLocate" aria-label="Menuju lokasi saya saat ini" title="Lokasi Saya Saat Ini">${ikon('i-locate', 17)}</button>
     </div>
   </div>
 
@@ -93,7 +87,10 @@ export function templateStage() {
   <aside class="mapcctv-popup" id="mapCctvPopup" aria-label="Pratinjau kamera CCTV" hidden>
     <div class="mapcctv__head">
       <div class="mapcctv__titlewrap">
-        <span class="mapcctv__live"><span class="mapcctv__livedot"></span>LIVE CCTV</span>
+        <div class="mapcctv__tagline">
+          <span class="mapcctv__live" id="mapCctvLiveBadge"><span class="mapcctv__livedot"></span><span id="mapCctvLiveLabel">LIVE STREAM</span></span>
+          <span class="mapcctv__quality" id="mapCctvQuality">HLS 640p</span>
+        </div>
         <h3 class="mapcctv__title" id="mapCctvTitle">Kamera Jakarta</h3>
         <p class="mapcctv__meta" id="mapCctvMeta">Memuat info kamera...</p>
       </div>
@@ -102,12 +99,37 @@ export function templateStage() {
       </button>
     </div>
 
-    <div class="mapcctv__frame">
-      <img class="mapcctv__img" id="mapCctvImg" alt="Cuplikan langsung kamera CCTV"
+    <!-- Tab mode pilihan: Live Video vs Snapshot -->
+    <div class="mapcctv__tabs">
+      <button type="button" class="mapcctv__tab press" id="tabMapCctvVideo" data-active="1">
+        <span class="mapcctv__tabdot"></span>
+        <span>Live Video</span>
+      </button>
+      <button type="button" class="mapcctv__tab press" id="tabMapCctvSnapshot" data-active="0">
+        <span>Snapshot (Foto)</span>
+      </button>
+      <button type="button" class="mapcctv__tabbtn" id="btnMapCctvAutoRefresh" title="Aktifkan/nonaktifkan pembaruan otomatis tiap 3 detik">
+        Auto: <strong id="lblMapCctvAutoRefresh">ON</strong>
+      </button>
+    </div>
+
+    <div class="mapcctv__frame" id="mapCctvFrame">
+      <!-- Player Video HLS HTML5 -->
+      <video class="mapcctv__video" id="mapCctvVideo" autoplay muted playsinline controls preload="auto"></video>
+
+      <!-- Tampilan Snapshot Gambar -->
+      <img class="mapcctv__img" id="mapCctvImg" alt="Cuplikan langsung kamera CCTV" hidden
            onerror="this.closest('.mapcctv__frame').setAttribute('data-gagal','1')">
+
+      <!-- Status Buffer / Spinner -->
+      <div class="mapcctv__spinner-wrap" id="mapCctvSpinner" hidden>
+        <span class="mapcctv__spinner"></span>
+        <span class="mapcctv__spinnerText" id="mapCctvSpinnerText">Menghubungkan ke live stream...</span>
+      </div>
+
       <div class="mapcctv__fallback">
         ${ikon('i-camera-off', 20)}
-        <span>Bingkai kamera sedang tidak merespons</span>
+        <span id="mapCctvFallbackMsg">Kamera sedang tidak merespons</span>
       </div>
     </div>
 
@@ -115,7 +137,10 @@ export function templateStage() {
       <button type="button" class="mapcctv__btn" id="btnMapCctvFly" title="Arahkan kamera 3D ke sudut pandang CCTV ini">
         ${ikon('i-locate', 13)} Sudut Pandang 3D
       </button>
-      <button type="button" class="mapcctv__btn" id="btnMapCctvRefresh" title="Muat ulang gambar terbaru">
+      <button type="button" class="mapcctv__btn" id="btnMapCctvFullscreen" title="Tonton dalam layar penuh">
+        Layar Penuh
+      </button>
+      <button type="button" class="mapcctv__btn" id="btnMapCctvRefresh" title="Muat ulang siaran langsung">
         Muat Ulang
       </button>
       <button type="button" class="mapcctv__btn mapcctv__btn--primary" id="btnMapCctvAnalyze" title="Analisis kondisi jalan & banjir dengan Gemini Vision">

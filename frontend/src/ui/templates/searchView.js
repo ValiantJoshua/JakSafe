@@ -3,30 +3,7 @@
 */
 
 import { ikon } from '../icons.js';
-import { routeThumb } from '../brand.js';
 import { PROFILES } from '../../config/constants.js';
-import { findPlaceById } from '../../config/jakartaPlaces.js';
-
-const PINTASAN_RUTE = [
-  { asal: 'sudirman', tujuan: 'monas', varian: 'pagi' },
-  { asal: 'kuningan', tujuan: 'kelapa-gading', varian: 'siang' },
-  { asal: 'blokm', tujuan: 'grogol', varian: 'sore' },
-  { asal: 'cawang', tujuan: 'thamrin', varian: 'pagi' },
-];
-
-function kartuPintasan({ asal, tujuan, varian }) {
-  const a = findPlaceById(asal);
-  const b = findPlaceById(tujuan);
-  if (!a || !b) return '';
-  return `
-<button type="button" class="routecard press" data-pintasan-asal="${asal}" data-pintasan-tujuan="${tujuan}">
-  <span class="routecard__thumb">${routeThumb(varian)}</span>
-  <span class="routecard__body">
-    <span class="routecard__name">${a.nama}</span>
-    <span class="routecard__to">${ikon('i-arrow-r', 12)} ${b.nama}</span>
-  </span>
-</button>`;
-}
 
 function barisProfil() {
   return PROFILES.map((p, i) => `
@@ -82,11 +59,6 @@ export function templateSearchView() {
   <div id="savedBox" hidden style="margin-bottom:var(--s5)">
     <p class="sectlabel">${ikon('i-star', 14)} Rute Tersimpan</p>
     <div class="savedlist" id="savedList"></div>
-  </div>
-
-  <p class="sectlabel">Pintasan Koridor</p>
-  <div class="routecards scroll-x" id="routeCards" style="margin-bottom:var(--s4)">
-    ${PINTASAN_RUTE.map(kartuPintasan).join('')}
   </div>
 
   <div class="promo" id="promoBox">

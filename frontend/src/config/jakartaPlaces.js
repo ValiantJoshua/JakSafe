@@ -56,14 +56,17 @@ export const JAKARTA_PLACES = [
   { id: 'soetta', nama: 'Bandara Soekarno Hatta', area: 'Tangerang', lat: -6.1256, lon: 106.6559 },
 ];
 
-/** Titik awal dan tujuan yang terisi saat halaman pertama dibuka. */
+/** Titik awal dan tujuan default saat halaman pertama dibuka (kosong). */
 export const DEFAULT_TRIP = {
-  origin: 'sudirman',
-  destination: 'monas',
+  origin: null,
+  destination: null,
 };
 
 /** Peta memori untuk menyimpan lokasi dinamis hasil pencarian geocoding live */
 const customPlaces = new Map();
+/** Cache hasil pencarian geocoding di sisi klien agar query yang sama tidak hit API berulang */
+const clientGeocodeCache = new Map();
+const MAX_CLIENT_CACHE = 120;
 
 /**
  * Mendaftarkan lokasi dinamis hasil pencarian geocoding
@@ -134,6 +137,11 @@ export async function searchPlacesLive(teks, maks = 6, signal) {
   const kunci = String(teks || '').trim();
   if (!kunci) return JAKARTA_PLACES.slice(0, maks);
 
+  const cacheKey = kunci.toLowerCase();
+  if (clientGeocodeCache.has(cacheKey)) {
+    return clientGeocodeCache.get(cacheKey);
+  }
+
   // 1. Cek kecocokan lokal di preset Jakarta
   const localHits = searchPlaces(kunci, maks);
   if (
@@ -169,7 +177,13 @@ export async function searchPlacesLive(teks, maks = 6, signal) {
             hasil.push(loc);
           }
         }
-        return hasil.slice(0, maks);
+        const finalHits = hasil.slice(0, maks);
+        clientGeocodeCache.set(cacheKey, finalHits);
+        if (clientGeocodeCache.size > MAX_CLIENT_CACHE) {
+          const firstKey = clientGeocodeCache.keys().next().value;
+          clientGeocodeCache.delete(firstKey);
+        }
+        return finalHits;
       }
     }
   } catch (err) {

@@ -102,6 +102,7 @@ export function publicView(c) {
     fovDeg: c.fovDeg ?? null,
     rangeM: c.rangeM ?? null,
     feedType: c.feedType,
+    hasLiveStream: Boolean(c.hlsUrl),
     license: c.license ?? null,
   };
 }
