@@ -13,7 +13,8 @@
 */
 
 import * as Cesium from 'cesium';
-import { ambilSemuaKamera, urlBingkaiKamera, analisisKamera } from '../api/cctvApi.js';
+import Hls from 'hls.js';
+import { ambilSemuaKamera, urlBingkaiKamera, urlStreamKamera, analisisKamera } from '../api/cctvApi.js';
 import { getViewer, flyToCoordinates } from './cesiumViewer.js';
 import { labelKondisiJalan, labelGenangan } from '../utils/format.js';
 
@@ -29,6 +30,15 @@ let layerEnabled = true;
 let highlightedCameraId = null;
 /** @type {string|null} */
 let selectedCameraId = null;
+
+/** @type {Hls|null} */
+let activeHls = null;
+/** @type {number|null} */
+let activeSnapTimer = null;
+/** @type {boolean} */
+let autoRefreshEnabled = true;
+/** @type {'video'|'snapshot'} */
+let currentViewMode = 'video';
 
 /** @type {Set<(state:{enabled:boolean, count:number, selected:object|null})=>void>} */
 const listeners = new Set();
@@ -248,6 +258,171 @@ function renderEntitasKamera() {
 }
 
 /**
+ * Menghentikan pemutaran stream HLS aktif dan interval auto-refresh snapshot.
+ */
+function hentikanStreamKamera() {
+  if (activeHls) {
+    try {
+      activeHls.stopLoad();
+      activeHls.destroy();
+    } catch { /* ignore */ }
+    activeHls = null;
+  }
+  if (activeSnapTimer) {
+    clearInterval(activeSnapTimer);
+    activeSnapTimer = null;
+  }
+
+  const videoEl = /** @type {HTMLVideoElement|null} */ (document.getElementById('mapCctvVideo'));
+  if (videoEl) {
+    try {
+      videoEl.pause();
+      videoEl.removeAttribute('src');
+      videoEl.load();
+    } catch { /* ignore */ }
+  }
+
+  const frameEl = document.getElementById('mapCctvFrame');
+  frameEl?.removeAttribute('data-gagal');
+  setLoadingSpinner(false);
+}
+
+/**
+ * Mengatur visibilitas dan teks indikator loading/buffer video.
+ * @param {boolean} visible
+ * @param {string} [teks]
+ */
+function setLoadingSpinner(visible, teks = 'Menghubungkan ke live stream...') {
+  const spinWrap = document.getElementById('mapCctvSpinner');
+  const spinTxt = document.getElementById('mapCctvSpinnerText');
+  if (spinWrap) spinWrap.hidden = !visible;
+  if (spinTxt && teks) spinTxt.textContent = teks;
+}
+
+/**
+ * Mengalihkan mode tampilan kamera antara 'video' (Live HLS) dan 'snapshot' (Foto realtime).
+ * @param {import('../api/cctvApi.js').Kamera} cam
+ * @param {'video'|'snapshot'} mode
+ */
+function tampilkanModeKamera(cam, mode) {
+  hentikanStreamKamera();
+  currentViewMode = mode;
+
+  const tabVid = document.getElementById('tabMapCctvVideo');
+  const tabSnap = document.getElementById('tabMapCctvSnapshot');
+  const videoEl = /** @type {HTMLVideoElement|null} */ (document.getElementById('mapCctvVideo'));
+  const imgEl = /** @type {HTMLImageElement|null} */ (document.getElementById('mapCctvImg'));
+  const liveBadge = document.getElementById('mapCctvLiveBadge');
+  const liveLabel = document.getElementById('mapCctvLiveLabel');
+  const qualityEl = document.getElementById('mapCctvQuality');
+  const frameEl = document.getElementById('mapCctvFrame');
+  const fallbackMsg = document.getElementById('mapCctvFallbackMsg');
+
+  // Perbarui status tombol tab
+  if (tabVid) tabVid.setAttribute('data-active', mode === 'video' ? '1' : '0');
+  if (tabSnap) tabSnap.setAttribute('data-active', mode === 'snapshot' ? '1' : '0');
+
+  // Update badge label
+  if (mode === 'video') {
+    if (liveBadge) liveBadge.style.display = 'inline-flex';
+    if (liveLabel) liveLabel.textContent = 'LIVE STREAM';
+    if (qualityEl) qualityEl.textContent = cam.hasLiveStream ? 'HLS 640p' : 'HLS N/A';
+  } else {
+    if (liveBadge) liveBadge.style.display = 'inline-flex';
+    if (liveLabel) liveLabel.textContent = 'FOTO REALTIME';
+    if (qualityEl) qualityEl.textContent = 'FOTO 720p';
+  }
+
+  if (mode === 'video') {
+    // Mode Live HLS Video
+    if (imgEl) imgEl.hidden = true;
+    if (videoEl) {
+      videoEl.hidden = false;
+      videoEl.muted = true;
+    }
+
+    if (!cam.hasLiveStream) {
+      // Kamera tidak memiliki stream HLS langsung, alihkan ke snapshot
+      tampilkanModeKamera(cam, 'snapshot');
+      return;
+    }
+
+    setLoadingSpinner(true, 'Menghubungkan ke live stream...');
+
+    const streamUrl = urlStreamKamera(cam.id);
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: 30,
+        maxBufferLength: 15,
+        liveSyncDurationCount: 3,
+      });
+      activeHls = hls;
+
+      hls.loadSource(streamUrl);
+      if (videoEl) hls.attachMedia(videoEl);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setLoadingSpinner(false);
+        videoEl?.play().catch(() => {});
+      });
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          console.warn('[JakSafe HLS] Fatal stream error, switching to snapshot:', data.type, data.details);
+          hentikanStreamKamera();
+          tampilkanModeKamera(cam, 'snapshot');
+          if (fallbackMsg) fallbackMsg.textContent = 'Live video offline, beralih ke Snapshot';
+        }
+      });
+
+      if (videoEl) {
+        videoEl.onplaying = () => setLoadingSpinner(false);
+        videoEl.onwaiting = () => setLoadingSpinner(true, 'Memuat segmen video...');
+        videoEl.onerror = () => {
+          hentikanStreamKamera();
+          tampilkanModeKamera(cam, 'snapshot');
+        };
+      }
+    } else if (videoEl && videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+      // Dukungan native HLS (Safari macOS / iOS)
+      videoEl.src = streamUrl;
+      videoEl.onloadedmetadata = () => {
+        setLoadingSpinner(false);
+        videoEl.play().catch(() => {});
+      };
+      videoEl.onerror = () => {
+        tampilkanModeKamera(cam, 'snapshot');
+      };
+    } else {
+      tampilkanModeKamera(cam, 'snapshot');
+    }
+  } else {
+    // Mode Snapshot (Foto)
+    if (videoEl) videoEl.hidden = true;
+    if (imgEl) {
+      imgEl.hidden = false;
+      frameEl?.removeAttribute('data-gagal');
+      imgEl.src = urlBingkaiKamera(cam.id, Date.now());
+    }
+    setLoadingSpinner(false);
+
+    // Pasang interval auto-refresh jika diaktifkan pengguna
+    if (autoRefreshEnabled) {
+      activeSnapTimer = window.setInterval(() => {
+        if (!selectedCameraId || currentViewMode !== 'snapshot') return;
+        const currentImg = /** @type {HTMLImageElement|null} */ (document.getElementById('mapCctvImg'));
+        if (currentImg && !currentImg.hidden) {
+          currentImg.src = urlBingkaiKamera(selectedCameraId, Date.now());
+        }
+      }, 3000);
+    }
+  }
+}
+
+/**
  * Menampilkan modal / kartu mengambang CCTV di atas panggung peta saat kamera diklik.
  * @param {import('../api/cctvApi.js').Kamera|null} cam
  */
@@ -256,6 +431,7 @@ export function bukaPopupKameraPeta(cam) {
   if (!popup) return;
 
   if (!cam) {
+    hentikanStreamKamera();
     selectedCameraId = null;
     popup.hidden = true;
     renderEntitasKamera();
@@ -267,20 +443,16 @@ export function bukaPopupKameraPeta(cam) {
   renderEntitasKamera();
   notifyListeners();
 
-  const imgEl = document.getElementById('mapCctvImg');
   const titleEl = document.getElementById('mapCctvTitle');
   const metaEl = document.getElementById('mapCctvMeta');
   const aiBoxEl = document.getElementById('mapCctvAiResult');
   const btnAnalyze = document.getElementById('btnMapCctvAnalyze');
+  const tabVid = document.getElementById('tabMapCctvVideo');
 
   if (titleEl) titleEl.textContent = cam.nama;
   if (metaEl) {
     const arah = Number.isFinite(cam.headingDeg) ? `Arah ${cam.headingDeg}°` : 'Arah 360°';
     metaEl.textContent = `${cam.provider || 'CCTV Jakarta'} · ${arah} · ${cam.lat.toFixed(4)}, ${cam.lon.toFixed(4)}`;
-  }
-  if (imgEl) {
-    imgEl.closest('.mapcctv__frame')?.removeAttribute('data-gagal');
-    imgEl.src = urlBingkaiKamera(cam.id, Date.now());
   }
   if (aiBoxEl) {
     aiBoxEl.hidden = true;
@@ -291,7 +463,16 @@ export function bukaPopupKameraPeta(cam) {
     btnAnalyze.textContent = 'Analisis AI Vision (Gemini)';
   }
 
+  if (tabVid) {
+    tabVid.style.opacity = cam.hasLiveStream ? '1' : '0.45';
+    tabVid.title = cam.hasLiveStream ? 'Tonton siaran langsung live video' : 'Kamera ini hanya menyediakan foto berkala';
+  }
+
   popup.hidden = false;
+
+  // Jalankan mode sesuai kapabilitas kamera
+  const targetMode = cam.hasLiveStream ? 'video' : 'snapshot';
+  tampilkanModeKamera(cam, targetMode);
 }
 
 /**
@@ -328,13 +509,50 @@ function pasangTombolPopupKamera() {
     bukaPopupKameraPeta(null);
   });
 
-  document.getElementById('btnMapCctvRefresh')?.addEventListener('click', () => {
-    if (!selectedCameraId) return;
-    const imgEl = document.getElementById('mapCctvImg');
-    if (imgEl) {
-      imgEl.closest('.mapcctv__frame')?.removeAttribute('data-gagal');
-      imgEl.src = urlBingkaiKamera(selectedCameraId, Date.now());
+  // Tab Live Video
+  document.getElementById('tabMapCctvVideo')?.addEventListener('click', () => {
+    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    if (!cam) return;
+    tampilkanModeKamera(cam, 'video');
+  });
+
+  // Tab Snapshot
+  document.getElementById('tabMapCctvSnapshot')?.addEventListener('click', () => {
+    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    if (!cam) return;
+    tampilkanModeKamera(cam, 'snapshot');
+  });
+
+  // Toggle Auto-Refresh
+  document.getElementById('btnMapCctvAutoRefresh')?.addEventListener('click', () => {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    const lbl = document.getElementById('lblMapCctvAutoRefresh');
+    if (lbl) {
+      lbl.textContent = autoRefreshEnabled ? 'ON' : 'OFF';
+      lbl.style.color = autoRefreshEnabled ? '#22C55E' : '#94A3B8';
     }
+    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    if (cam && currentViewMode === 'snapshot') {
+      tampilkanModeKamera(cam, 'snapshot');
+    }
+  });
+
+  // Layar Penuh (Fullscreen)
+  document.getElementById('btnMapCctvFullscreen')?.addEventListener('click', () => {
+    const frame = document.getElementById('mapCctvFrame');
+    if (!frame) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      frame.requestFullscreen?.().catch(() => {});
+    }
+  });
+
+  // Muat Ulang (Refresh)
+  document.getElementById('btnMapCctvRefresh')?.addEventListener('click', () => {
+    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    if (!cam) return;
+    tampilkanModeKamera(cam, currentViewMode);
   });
 
   document.getElementById('btnMapCctvFly')?.addEventListener('click', () => {
@@ -395,10 +613,7 @@ function pasangTombolPopupKamera() {
   });
 }
 
-/**
- * Menyalakan atau mematikan layer CCTV di peta (ON / OFF).
- * @param {boolean} enabled
- */
+
 export function setCctvLayerEnabled(enabled) {
   layerEnabled = Boolean(enabled);
   if (cctvDataSource) {

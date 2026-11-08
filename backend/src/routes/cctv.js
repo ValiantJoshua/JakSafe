@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { loadCatalog, getCameraById, findNearest, publicView } from '../services/cctvCatalog.js';
-import { fetchFrame, FrameError } from '../services/cctvFrame.js';
+import { fetchFrame, FrameError, assertPublicHttpUrl } from '../services/cctvFrame.js';
 import { parseCoords, RouteError } from '../services/osrm.js';
 import { analyzeRoadImage, VisionError } from '../services/geminiVision.js';
 
@@ -44,6 +44,152 @@ router.get('/frame/:id', async (req, res) => {
     if (e instanceof FrameError) return res.status(e.status).json({ ok: false, error: e.message });
     console.error('[cctv/frame]', e);
     res.status(500).json({ ok: false, error: 'internal error' });
+  }
+});
+
+/**
+ * Rewrites relative paths in an HLS m3u8 playlist to route through the backend proxy.
+ */
+function rewriteM3u8(m3u8Text, baseUrl, camId) {
+  const lines = m3u8Text.split(/\r?\n/);
+  return lines.map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return line;
+    try {
+      const resolved = new URL(trimmed, baseUrl).toString();
+      const b64 = Buffer.from(resolved, 'utf8').toString('base64url');
+      if (trimmed.includes('.m3u8')) {
+        return `/api/cctv/stream/${encodeURIComponent(camId)}/playlist.m3u8?u=${b64}`;
+      }
+      return `/api/cctv/stream/${encodeURIComponent(camId)}/segment.ts?u=${b64}`;
+    } catch {
+      return line;
+    }
+  }).join('\n');
+}
+
+// GET /api/cctv/stream/:id.m3u8 -> Master HLS Playlist proxy
+router.get('/stream/:id.m3u8', async (req, res) => {
+  const camera = getCameraById(req.params.id);
+  if (!camera) return res.status(404).json({ ok: false, error: 'camera not found' });
+  if (!camera.hlsUrl) return res.status(404).json({ ok: false, error: 'no live stream available for this camera' });
+
+  try {
+    await assertPublicHttpUrl(camera.hlsUrl);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const upstreamRes = await fetch(camera.hlsUrl, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'jaksafe-backend/dev (academic project)' },
+    });
+    clearTimeout(timer);
+
+    if (!upstreamRes.ok) {
+      return res.status(upstreamRes.status).json({ ok: false, error: `camera stream responded ${upstreamRes.status}` });
+    }
+
+    const text = await upstreamRes.text();
+    const rewritten = rewriteM3u8(text, camera.hlsUrl, camera.id);
+    res.set({
+      'Content-Type': 'application/vnd.apple.mpegurl',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.send(rewritten);
+  } catch (err) {
+    console.warn(`[cctv/stream/${req.params.id}.m3u8]`, err.message);
+    res.status(502).json({ ok: false, error: 'failed to fetch live stream' });
+  }
+});
+
+// GET /api/cctv/stream/:id/playlist.m3u8 -> Sub-Playlist HLS proxy
+router.get('/stream/:id/playlist.m3u8', async (req, res) => {
+  const camera = getCameraById(req.params.id);
+  if (!camera) return res.status(404).json({ ok: false, error: 'camera not found' });
+
+  const rawUrl = req.query.u;
+  if (!rawUrl) return res.status(400).json({ ok: false, error: 'missing u param' });
+
+  let targetUrl;
+  try {
+    targetUrl = Buffer.from(rawUrl, 'base64url').toString('utf8');
+    const u = await assertPublicHttpUrl(targetUrl);
+    const camHost = new URL(camera.hlsUrl || camera.url).hostname;
+    if (u.hostname !== camHost) {
+      return res.status(403).json({ ok: false, error: 'forbidden stream host' });
+    }
+  } catch {
+    return res.status(400).json({ ok: false, error: 'invalid stream url' });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const upstreamRes = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'jaksafe-backend/dev (academic project)' },
+    });
+    clearTimeout(timer);
+
+    if (!upstreamRes.ok) {
+      return res.status(upstreamRes.status).json({ ok: false, error: `sub-playlist responded ${upstreamRes.status}` });
+    }
+
+    const text = await upstreamRes.text();
+    const rewritten = rewriteM3u8(text, targetUrl, camera.id);
+    res.set({
+      'Content-Type': 'application/vnd.apple.mpegurl',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.send(rewritten);
+  } catch (err) {
+    res.status(502).json({ ok: false, error: 'failed to fetch sub-playlist' });
+  }
+});
+
+// GET /api/cctv/stream/:id/segment.ts -> Video chunk proxy
+router.get('/stream/:id/segment.ts', async (req, res) => {
+  const camera = getCameraById(req.params.id);
+  if (!camera) return res.status(404).json({ ok: false, error: 'camera not found' });
+
+  const rawUrl = req.query.u;
+  if (!rawUrl) return res.status(400).json({ ok: false, error: 'missing u param' });
+
+  let targetUrl;
+  try {
+    targetUrl = Buffer.from(rawUrl, 'base64url').toString('utf8');
+    const u = await assertPublicHttpUrl(targetUrl);
+    const camHost = new URL(camera.hlsUrl || camera.url).hostname;
+    if (u.hostname !== camHost) {
+      return res.status(403).json({ ok: false, error: 'forbidden stream host' });
+    }
+  } catch {
+    return res.status(400).json({ ok: false, error: 'invalid stream url' });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const upstreamRes = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'jaksafe-backend/dev (academic project)' },
+    });
+    clearTimeout(timer);
+
+    if (!upstreamRes.ok) {
+      return res.status(upstreamRes.status).send();
+    }
+
+    const buf = Buffer.from(await upstreamRes.arrayBuffer());
+    res.set({
+      'Content-Type': 'video/MP2T',
+      'Cache-Control': 'public, max-age=60',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.send(buf);
+  } catch (err) {
+    res.status(502).send();
   }
 });
 

@@ -268,7 +268,7 @@ export async function runNavigationAgent({
           let toolResult = null;
 
           if (call.name === 'get_route') {
-            toolResult = await getRoute({ ...call.args, alternatives: true });
+            toolResult = await getRoute({ ...call.args, profile: call.args?.profile || profile, alternatives: true });
             if (toolResult.ok && toolResult.routes?.length > 0) {
               primaryRoute = toolResult.routes[0];
               alternativeRoutes = toolResult.routes.slice(1);

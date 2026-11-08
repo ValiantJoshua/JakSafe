@@ -1,13 +1,10 @@
 /*
    Lapisan garis rute dan penanda titik Awal (A) / Tujuan (B) di atas peta CesiumJS.
-
-   Fitur:
-   - Menggambar rute terpilih dengan warna sesuai pita skor keamanan JakSafe:
-     Aman (#22C55E), Hati-hati (#F59E0B), Hindari (#EF4444), lengkap dengan
-     garis pendar (glow outline) agar kontras di atas peta 3D maupun 2D.
-   - Menggambar rute alternatif (jika ada) sebagai garis putus-putus transparan.
-   - Menampilkan pin Titik Awal (A) dan Tujuan (B) beserta label namanya.
-   - Mengarahkan kamera otomatis (flyTo) agar seluruh bentang rute terlihat jelas.
+   Desain skema warna diadopsi dari Waze / Google Maps:
+   - Rute Terpilih (Selected Route): Garis tebal ungu tua pekat (Deep Royal Purple, #581C87).
+   - Rute Alternatif (Other Options): Garis ramping pastel lavender terang (#C4B5FD),
+     kontras tinggi dan langsung dapat dibedakan seketika dari rute utama.
+   - Interaktif: Dapat diklik langsung di peta untuk berpindah pilihan rute.
 */
 
 import * as Cesium from 'cesium';
@@ -60,13 +57,6 @@ function buatPinLokasi(huruf, warnaBg, warnaTepi = '#FFFFFF') {
   return url;
 }
 
-/** Menentukan warna garis rute berdasarkan status keamanan ('aman'|'hati'|'hindari'). */
-function warnaStatusRute(kunciStatus) {
-  if (kunciStatus === 'hindari') return Cesium.Color.fromCssColorString('#EF4444');
-  if (kunciStatus === 'hati') return Cesium.Color.fromCssColorString('#F59E0B');
-  return Cesium.Color.fromCssColorString('#22C55E');
-}
-
 /** Mengonversi array geometri [[lon, lat], ...] menjadi Cartesian3[] dengan ketinggian sedikit di atas jalan. */
 function geometryToCartesianArray(geometry, heightM = 16) {
   if (!Array.isArray(geometry)) return [];
@@ -95,7 +85,7 @@ export function previewEndpointsOnMap(asal, tujuan) {
       id: 'route-pin-origin',
       position: Cesium.Cartesian3.fromDegrees(asal.lon, asal.lat, 24),
       billboard: {
-        image: buatPinLokasi('A', '#2A40D0'),
+        image: buatPinLokasi('A', '#2563EB'),
         width: 38,
         height: 38,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -104,7 +94,7 @@ export function previewEndpointsOnMap(asal, tujuan) {
         text: `Awal: ${asal.nama}`,
         font: '800 13px Manrope, sans-serif',
         fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.fromCssColorString('#0E1430'),
+        outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
         outlineWidth: 3.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
@@ -119,7 +109,7 @@ export function previewEndpointsOnMap(asal, tujuan) {
       id: 'route-pin-dest',
       position: Cesium.Cartesian3.fromDegrees(tujuan.lon, tujuan.lat, 24),
       billboard: {
-        image: buatPinLokasi('B', '#16A34A'),
+        image: buatPinLokasi('B', '#DC2626'),
         width: 38,
         height: 38,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -128,7 +118,7 @@ export function previewEndpointsOnMap(asal, tujuan) {
         text: `Tujuan: ${tujuan.nama}`,
         font: '800 13px Manrope, sans-serif',
         fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.fromCssColorString('#0E1430'),
+        outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
         outlineWidth: 3.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
@@ -174,6 +164,10 @@ export function flyToRouteBounds(geometry) {
 
 /**
  * Menggambar hasil rute navigasi lengkap (rute utama, alternatif interaktif, pin A & B) dan mengarahkan kamera.
+ * Skema warna ala Waze:
+ * - Rute Utama: Deep Royal Purple (#581C87) tebal & solid.
+ * - Rute Alternatif: Pastel Lavender (#C4B5FD) ramping & terang.
+ *
  * @param {object|null} hasil
  */
 export function renderRouteOnMap(hasil) {
@@ -188,12 +182,8 @@ export function renderRouteOnMap(hasil) {
   const semuaPilihan = susunDaftarPilihanRute(hasil);
   const indeksAktif = Number.isInteger(hasil.indeksRuteAktif) ? hasil.indeksRuteAktif : 0;
 
-  const kunci = kunciDariLabel(hasil.score?.label)
-    || pitaDariSkor(hasil.score?.totalScore ?? 20).key;
-  const warnaUtama = warnaStatusRute(kunci);
-
-  // 1. Gambar seluruh rute tidak terpilih (alternatif) dengan gaya ala Waze / Google Maps
-  //    dan dapat diklik langsung di peta untuk berganti rute aktif.
+  // 1. Gambar seluruh rute alternatif (opsi lain yang tidak aktif)
+  //    Gaya Waze: garis ramping, warna pastel lavender terang (#C4B5FD), outline lembut tanpa dark-blue.
   semuaPilihan.forEach((opt, idx) => {
     if (idx === indeksAktif) return;
     const geom = opt.route?.geometry;
@@ -201,27 +191,29 @@ export function renderRouteOnMap(hasil) {
 
     const altPositions = geometryToCartesianArray(geom, 14);
 
-    // Casing tepi gelap tipis agar garis alternatif kontras di atas jalan
+    // Casing tipis lavender-ungu lembut (bukan dark blue) agar batas garis tetap rapi
     routeDataSource.entities.add({
       id: `route-alt-casing-${idx}`,
       properties: { routeOptionIndex: idx },
       polyline: {
         positions: altPositions,
-        width: 9,
-        clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN,
-        material: Cesium.Color.fromCssColorString('#1E293B').withAlpha(0.65),
+        width: 8.5,
+        clampToGround: true,
+        classificationType: Cesium.ClassificationType.TERRAIN,
+        material: Cesium.Color.fromCssColorString('#A78BFA').withAlpha(0.45),
       },
     });
 
-    // Garis inti ungu-kebiruan (secondary route)
+    // Garis inti pastel lavender terang ala Waze (Other Options)
     routeDataSource.entities.add({
       id: `route-alt-line-${idx}`,
       properties: { routeOptionIndex: idx },
       polyline: {
         positions: altPositions,
         width: 5.5,
-        clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN,
-        material: Cesium.Color.fromCssColorString('#8B5CF6').withAlpha(0.82),
+        clampToGround: true,
+        classificationType: Cesium.ClassificationType.TERRAIN,
+        material: Cesium.Color.fromCssColorString('#C4B5FD').withAlpha(0.95),
       },
     });
 
@@ -236,13 +228,15 @@ export function renderRouteOnMap(hasil) {
         position: Cesium.Cartesian3.fromDegrees(midPair[0], midPair[1], 28),
         properties: { routeOptionIndex: idx },
         label: {
-          text: `Rute ${idx + 1} · ${effMin} mnt (Skor ${opt.score?.totalScore ?? '-'})`,
-          font: '700 12px Manrope, sans-serif',
+          text: `Rute ${idx + 1} · ${effMin} mnt`,
+          font: '800 12px Manrope, sans-serif',
           showBackground: true,
-          backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.94),
-          backgroundPadding: new Cesium.Cartesian2(10, 6),
-          fillColor: Cesium.Color.fromCssColorString('#1E293B'),
-          style: Cesium.LabelStyle.FILL,
+          backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
+          backgroundPadding: new Cesium.Cartesian2(11, 6),
+          fillColor: Cesium.Color.fromCssColorString('#581C87'),
+          outlineColor: Cesium.Color.fromCssColorString('#DDD6FE'),
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -10),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -251,33 +245,32 @@ export function renderRouteOnMap(hasil) {
     }
   });
 
-  // 2. Gambar rute aktif (terpilih) paling atas dengan efek pendar (PolylineGlow)
+  // 2. Gambar rute aktif (terpilih) paling atas ala Waze (Deep Royal Purple, tebal & kontras maksimal)
   const mainPositions = geometryToCartesianArray(hasil.route.geometry, 18);
   if (mainPositions.length >= 2) {
-    // Lapisan dasar gelap agar kontras di atas jalan terang
+    // Casing gelap senada ungu tua pekat (#2E1065) agar garis terlihat tegas dan terpisah dari basemap
     routeDataSource.entities.add({
       id: 'route-main-casing',
       properties: { routeOptionIndex: indeksAktif },
       polyline: {
         positions: mainPositions,
-        width: 14,
-        clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN,
-        material: Cesium.Color.fromCssColorString('#0E1430').withAlpha(0.88),
+        width: 14.5,
+        clampToGround: true,
+        classificationType: Cesium.ClassificationType.TERRAIN,
+        material: Cesium.Color.fromCssColorString('#2E1065').withAlpha(0.92),
       },
     });
 
-    // Garis inti berwarna status keamanan (Aman / Hati-hati / Hindari)
+    // Garis inti ungu tua tebal ala Waze (Selected Route)
     routeDataSource.entities.add({
       id: 'route-main-line',
       properties: { routeOptionIndex: indeksAktif },
       polyline: {
         positions: mainPositions,
-        width: 8.5,
-        clampToGround: true, classificationType: Cesium.ClassificationType.TERRAIN,
-        material: new Cesium.PolylineGlowMaterialProperty({
-          glowPower: 0.22,
-          color: warnaUtama,
-        }),
+        width: 10,
+        clampToGround: true,
+        classificationType: Cesium.ClassificationType.TERRAIN,
+        material: Cesium.Color.fromCssColorString('#581C87'),
       },
     });
   }
@@ -293,7 +286,7 @@ export function renderRouteOnMap(hasil) {
       id: 'route-pin-origin',
       position: Cesium.Cartesian3.fromDegrees(asal.lon, asal.lat, 26),
       billboard: {
-        image: buatPinLokasi('A', '#2A40D0'),
+        image: buatPinLokasi('A', '#2563EB'),
         width: 40,
         height: 40,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -302,7 +295,7 @@ export function renderRouteOnMap(hasil) {
         text: `${asal.nama}`,
         font: '800 13px Manrope, sans-serif',
         fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.fromCssColorString('#0E1430'),
+        outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
         outlineWidth: 3.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
@@ -317,16 +310,16 @@ export function renderRouteOnMap(hasil) {
       id: 'route-pin-dest',
       position: Cesium.Cartesian3.fromDegrees(tujuan.lon, tujuan.lat, 26),
       billboard: {
-        image: buatPinLokasi('B', warnaUtama.toCssColorString()),
+        image: buatPinLokasi('B', '#DC2626'),
         width: 40,
         height: 40,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `${tujuan.nama} (Rute ${indeksAktif + 1} · Skor ${hasil.score?.totalScore ?? '-'})`,
+        text: `${tujuan.nama} (Rute ${indeksAktif + 1})`,
         font: '800 13px Manrope, sans-serif',
         fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.fromCssColorString('#0E1430'),
+        outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
         outlineWidth: 3.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
