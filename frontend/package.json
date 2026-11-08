@@ -17,5 +17,8 @@
     "cesium": "^1.146.0",
     "pbf": "^5.1.2",
     "vite-plugin-cesium": "^1.2.23"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
   }
 }
