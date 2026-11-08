@@ -259,7 +259,7 @@ flowchart LR
 | **Requirements** | Kriteria risiko navigasi Jakarta | Sangat Baik | Menetapkan batas partisi ekivalensi untuk keselamatan komuter. |
 | **Design** | Modularitas berorientasi objek | Baik | Memisahkan `app.js` dan `server.js` untuk uji HTTP non-intrusif. |
 | **Implementation** | Skoring risiko, katalog 526 CCTV | Baik | Menerapkan guardrail keyakinan visi mesin $< 0.4$ degradasi waspada. |
-| **Integration** | 3 Builds, 12 Ragam Uji Sistem | Sangat Baik | Mengotomatiskan 54 kasus uji dalam skrip `npm test` ($< 1$ detik). |
+| **Integration** | 3 Builds, 12 Ragam Uji Sistem | Sangat Baik | Mengotomatiskan 57 kasus uji dalam skrip `npm test` ($< 1$ detik). |
 
 * **Penilaian Level CMM (*Capability Maturity Model*)**:
   - JakSafe berada pada **CMM Level 3 (Defined) menuju Level 4 (Managed)** dengan metrik kuantitatif presisi tinggi (latensi, memori, cakupan kode).
@@ -272,23 +272,23 @@ flowchart LR
 ---
 
 # 11. Ringkasan Eksekutif Hasil Uji Terpadu
-## *Hasil Eksekusi Otomatis (54 Kasus Uji, 100% Lulus)*
+## *Hasil Eksekusi Otomatis (57 Kasus Uji, 100% Lulus)*
 
 | Parameter Metrik | Target Kriteria Kelulusan | Realisasi Pengujian JakSafe | Status |
 | :--- | :---: | :---: | :---: |
-| **Total Test Suites** | $\ge 15\text{ suites}$ | **30 suites** (dalam 8 berkas uji) | <span class="badge-pass">TERPENUHI</span> |
-| **Total Test Cases** | $\ge 30\text{ kasus uji}$ | **54 kasus uji** | <span class="badge-pass">TERPENUHI</span> |
-| **Test Cases Passed** | $100\%$ | **54 (100%)** | <span class="badge-pass">LULUS</span> |
-| **Total Waktu Eksekusi** | $< 2.000\text{ ms}$ | **950.09 ms (< 1 detik)** | <span class="badge-pass">SANGAT CEPAT</span> |
+| **Total Test Suites** | $\ge 15\text{ suites}$ | **31 suites** (dalam 8 berkas uji) | <span class="badge-pass">TERPENUHI</span> |
+| **Total Test Cases** | $\ge 30\text{ kasus uji}$ | **57 kasus uji** | <span class="badge-pass">TERPENUHI</span> |
+| **Test Cases Passed** | $100\%$ | **57 (100%)** | <span class="badge-pass">LULUS</span> |
+| **Total Waktu Eksekusi** | $< 2.000\text{ ms}$ | **971.62 ms (< 1 detik)** | <span class="badge-pass">SANGAT CEPAT</span> |
 | **Line Coverage (`routeScorer.js`)** | $\ge 90\%$ | **100.00%** | <span class="badge-pass">SEMPURNA</span> |
-| **Branch Coverage (`routeScorer.js`)** | $\ge 85\%$ | **93.41%** | <span class="badge-pass">TERPENUHI</span> |
+| **Branch Coverage (`routeScorer.js`)** | $\ge 85\%$ | **91.84%** | <span class="badge-pass">TERPENUHI</span> |
 | **Line Coverage (`app.js`)** | $\ge 95\%$ | **100.00%** | <span class="badge-pass">SEMPURNA</span> |
 | **12 Ragam Uji Sistem Kit [Ki]** | $12 / 12$ | **12 / 12 (100%)** | <span class="badge-pass">LENGKAP</span> |
 
 ---
 
 > 🗣️ **Catatan Presenter (Speaker Notes)**:
-> *"Tabel ini menyajikan ringkasan eksekutif hasil eksekusi pengujian. Dari 54 kasus uji pada 30 suites, seluruhnya lulus 100% dalam waktu hanya 950 milidetik. Modul inti skoring routeScorer.js dan modul aplikasi app.js bahkan mencapai cakupan baris 100%."*
+> *"Tabel ini menyajikan ringkasan eksekutif hasil eksekusi pengujian. Dari 57 kasus uji pada 31 suites, seluruhnya lulus 100% dalam waktu hanya 971 milidetik. Modul inti skoring routeScorer.js dan modul aplikasi app.js bahkan mencapai cakupan baris 100%."*
 
 ---
 

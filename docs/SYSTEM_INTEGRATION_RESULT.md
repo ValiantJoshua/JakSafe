@@ -38,8 +38,8 @@ Catatan kronologis pelaksanaan pengujian otomatis terpadu (*Unit + Integration +
 | 19:32:38.230 | Unit Test: `cctvCatalog.unit.test.js` | Pemuatan 526 CCTV Jakarta, kueri jarak Haversine, invarian privasi | 13.91 ms | **LULUS (5/5)** |
 | 19:32:38.250 | Unit Test: `routeScorer.unit.test.js` | Pengujian partisi ekivalensi BVA, Myers decision, invariant bobot = 1.0 | 4.96 ms | **LULUS (6/6)** |
 | 19:32:38.260 | System Test: `systemTests.system.test.js` | 12 Ragam Uji Sistem (Volume, Usability, Performance, Security, dsb.) | 137.59 ms | **LULUS (17/17)** |
-| 19:32:38.400 | Unit Test: `tomtomBudget.unit.test.js` | Pengujian batas kuota tile TomTom dan reset tanggal harian | 4.81 ms | **LULUS (4/4)** |
-| **TOTAL** | **8 Test Suites Terkonsolidasi** | **Rangkaian Uji Terpadu (Unit, Build 1-3, System)** | **950.09 ms** | **100% LULUS** |
+| 19:32:38.400 | Unit Test: `tomtomBudget.unit.test.js` | Batas kuota TomTom, reset tanggal harian & multi-segment sampling | 6.02 ms | **LULUS (7/7)** |
+| **TOTAL** | **31 Test Suites Terkonsolidasi** | **Rangkaian Uji Terpadu (Unit, Build 1-3, System)** | **971.62 ms** | **100% LULUS** |
 
 ---
 
@@ -69,13 +69,13 @@ pie title Klasifikasi Cacat Integrasi yang Teridentifikasi & Terselesaikan
 ### 4.1 Ringkasan Metrik Pengujian
 | Parameter Metrik | Nilai Realisasi | Target Kriteria Kelulusan | Status Evaluasi |
 | :--- | :---: | :---: | :---: |
-| **Total Test Suites** | **30 suites** (dalam 8 berkas uji) | $\ge 15$ | **TERPENUHI TINGGI** |
-| **Total Test Cases** | **54 kasus uji** | $\ge 30$ | **TERPENUHI TINGGI** |
-| **Test Cases Passed** | **54 (100%)** | 100% | **LULUS MUTLAK** |
+| **Total Test Suites** | **31 suites** (dalam 8 berkas uji) | $\ge 15$ | **TERPENUHI TINGGI** |
+| **Total Test Cases** | **57 kasus uji** | $\ge 30$ | **TERPENUHI TINGGI** |
+| **Test Cases Passed** | **57 (100%)** | 100% | **LULUS MUTLAK** |
 | **Test Cases Failed** | **0 (0%)** | 0% | **LULUS MUTLAK** |
-| **Total Waktu Eksekusi** | **950.09 ms** | $< 2.000\text{ ms}$ | **SANGAT CEPAT (< 1 detik)** |
+| **Total Waktu Eksekusi** | **971.62 ms** | $< 2.000\text{ ms}$ | **SANGAT CEPAT (< 1 detik)** |
 | **Line Coverage (`routeScorer.js`)** | **100.00%** | $\ge 90\%$ | **SEMPURNA** |
-| **Branch Coverage (`routeScorer.js`)** | **93.41%** | $\ge 85\%$ | **TERPENUHI** |
+| **Branch Coverage (`routeScorer.js`)** | **91.84%** | $\ge 85\%$ | **TERPENUHI** |
 | **Line Coverage (`app.js`)** | **100.00%** | $\ge 95\%$ | **SEMPURNA** |
 | **Kepatuhan 12 Ragam Uji Sistem** | **12 / 12 (100%)** | 12 / 12 | **LENGKAP** |
 
