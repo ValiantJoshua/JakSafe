@@ -35,15 +35,24 @@
  * @property {object[]} ruteTersimpan
  */
 
+let savedUser = null;
+let savedToken = null;
+try {
+  savedToken = localStorage.getItem('jaksafe_token');
+  savedUser = JSON.parse(localStorage.getItem('jaksafe_user') || 'null');
+} catch {}
+
 /** @type {Keadaan} */
 const keadaan = {
   tampilan: 'siap',
   backend: { hidup: false, diperiksa: false },
   laluLintas: { adaKunci: false, tersedia: false, terpakai: 0, kuota: 0 },
-  masuk: false,
-  sensitifKesehatan: false,
-  idAsal: 'sudirman',
-  idTujuan: 'monas',
+  masuk: Boolean(savedToken && savedUser),
+  token: savedToken,
+  pengguna: savedUser,
+  sensitifKesehatan: Boolean(savedUser?.healthProfile?.isSensitive),
+  idAsal: null,
+  idTujuan: null,
   profil: 'car',
   tahapAktif: null,
   hasil: null,

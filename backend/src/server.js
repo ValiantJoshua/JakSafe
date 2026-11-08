@@ -11,6 +11,8 @@ import cctvRouter from './routes/cctv.js';
 import tomtomRouter from './routes/tomtom.js';
 import navigateRouter from './routes/navigate.js';
 import geocodeRouter from './routes/geocode.js';
+import authRouter from './routes/auth.js';
+import savedRoutesRouter from './routes/savedRoutes.js';
 import { connectDb } from './db/mongoClient.js';
 
 const app = express();
@@ -33,6 +35,8 @@ app.use('/api/cctv', cctvRouter);
 app.use('/api/tomtom', tomtomRouter);
 app.use('/api/navigate', navigateRouter);
 app.use('/api/geocode', geocodeRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/routes/saved', savedRoutesRouter);
 
 app.listen(PORT, () => {
   console.log(`jakSafe backend running on http://localhost:${PORT}`);

@@ -22,6 +22,7 @@ import { pitaDariSkor, kunciDariLabel, kalimatArti, susunAlasan } from '../../do
 import { calculateRouteScore } from '../../domain/previewScorer.js';
 import { PM25_BANDS, SUMBER_HASIL, DEFAULT_WEIGHTS, PROFILES } from '../../config/constants.js';
 import { urlBingkaiKamera } from '../../api/cctvApi.js';
+import { simpanRute } from '../../api/authApi.js';
 import { ikon } from '../icons.js';
 import { getState, setState } from '../../state/appState.js';
 import { toast } from '../toast.js';
@@ -623,11 +624,11 @@ export function pasangPengendaliHasil() {
     show($('#logPanel'), !terbuka);
   });
 
-  $('#btnSaveRoute')?.addEventListener('click', () => {
-    const { masuk, hasil, ruteTersimpan } = getState();
+  $('#btnSaveRoute')?.addEventListener('click', async () => {
+    const { masuk, token, hasil, ruteTersimpan } = getState();
 
     if (!masuk) {
-      toast('Masuk dulu untuk menyimpan rute.');
+      toast('Masuk atau daftar dulu untuk menyimpan rute.');
       $('#loginModal') && show($('#loginModal'), true);
       return;
     }
@@ -639,18 +640,55 @@ export function pasangPengendaliHasil() {
       return;
     }
 
-    setState({
-      ruteTersimpan: [...ruteTersimpan, {
-        asal: hasil.asal?.nama || 'Titik awal',
-        tujuan: hasil.tujuan?.nama || 'Tujuan',
-        skor: hasil.score.totalScore,
+    const payload = {
+      title: `${hasil.asal?.nama || 'Titik awal'} -> ${hasil.tujuan?.nama || 'Tujuan'}`,
+      origin: {
+        id: hasil.asal?.id || null,
+        name: hasil.asal?.nama || 'Titik awal',
+        area: hasil.asal?.area || '',
+        lat: Number(hasil.asal?.lat) || 0,
+        lon: Number(hasil.asal?.lon) || 0,
+      },
+      destination: {
+        id: hasil.tujuan?.id || null,
+        name: hasil.tujuan?.nama || 'Tujuan',
+        area: hasil.tujuan?.area || '',
+        lat: Number(hasil.tujuan?.lat) || 0,
+        lon: Number(hasil.tujuan?.lon) || 0,
+      },
+      score: {
+        totalScore: hasil.score.totalScore,
         label: hasil.score.label,
-        kunciStatus: kunciDariLabel(hasil.score.label),
-      }],
-    });
+        color: hasil.score.color,
+      },
+      distanceM: hasil.distanceM || 0,
+      durationS: hasil.durationS || 0,
+      profile: hasil.profile || 'car',
+    };
 
-    if (tombol) tombol.dataset.tersimpan = '1';
-    setText($('#saveLabel'), 'Tersimpan');
-    toast('Rute disimpan untuk sesi ini.');
+    if (tombol) tombol.style.opacity = '0.6';
+
+    try {
+      let savedObj = payload;
+      if (token) {
+        const res = await simpanRute(token, payload);
+        if (res.route) savedObj = res.route;
+      }
+
+      setState({
+        ruteTersimpan: [savedObj, ...ruteTersimpan],
+      });
+
+      if (tombol) {
+        tombol.dataset.tersimpan = '1';
+        tombol.style.opacity = '1';
+      }
+      setText($('#saveLabel'), 'Tersimpan');
+      toast('Rute berhasil disimpan permanen ke database!');
+    } catch (err) {
+      console.error('[saveRoute]', err);
+      if (tombol) tombol.style.opacity = '1';
+      toast('Gagal menyimpan rute ke database.');
+    }
   });
 }

@@ -127,6 +127,7 @@ export async function minta(jalur, {
   metode = 'GET',
   kueri,
   badan,
+  headers: headerKustom = {},
   timeoutMs = 10_000,
   signal,
   bentuk = 'json',
@@ -162,10 +163,14 @@ export async function minta(jalur, {
 
   let tanggapan;
   try {
+    const reqHeaders = { ...headerKustom };
+    if (badan && !reqHeaders['Content-Type']) {
+      reqHeaders['Content-Type'] = 'application/json';
+    }
     tanggapan = await fetch(url, {
       method: metode,
       signal: sinyalGabungan,
-      headers: badan ? { 'Content-Type': 'application/json' } : undefined,
+      headers: Object.keys(reqHeaders).length > 0 ? reqHeaders : undefined,
       body: badan ? JSON.stringify(badan) : undefined,
     });
   } catch (e) {
