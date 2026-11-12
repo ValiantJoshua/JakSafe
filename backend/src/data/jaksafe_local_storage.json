@@ -42,6 +42,21 @@
       },
       "createdAt": "2026-11-08T21:55:16.096Z",
       "updatedAt": "2026-11-08T21:55:46.716Z"
+    },
+    {
+      "id": "b4fa46fa-7bff-499c-ba88-8c354596cc4e",
+      "_id": "0ec1a45f-ec92-43b6-a4d2-f4cdbed35054",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794458257340@jaksafe.id",
+      "password": "$2b$10$5zt5bsB7PHWh12S.IXT9WusIudJSH/YjacsT3gftu9Mr5xX.rICWC",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "createdAt": "2026-11-12T04:37:37.616Z",
+      "updatedAt": "2026-11-12T04:37:38.093Z"
     }
   ],
   "savedRoutes": []
