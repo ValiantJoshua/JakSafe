@@ -24,10 +24,14 @@ export function templateSearchView() {
   <div class="fieldgroup" style="margin-bottom:var(--s4)">
     <div class="field">
       <span class="field__label">Titik Awal</span>
+      <button type="button" class="field__gps press" id="btnDetectOrigin"
+              title="Deteksi lokasi saya saat ini melalui GPS" aria-label="Deteksi lokasi saat ini">
+        ${ikon('i-locate', 12)} <span id="lblDetectOrigin">Lokasi Saya</span>
+      </button>
       <span class="field__pin field__pin--origin"></span>
       <input class="field__input" id="inpOrigin" type="text" role="combobox"
              aria-expanded="false" aria-controls="saranOrigin"
-             placeholder="Pilih lokasi awal" autocomplete="off">
+             placeholder="Jalan, perumahan, blok/no, atau gedung..." autocomplete="off">
       <div class="saran" id="saranOrigin" role="listbox" hidden></div>
     </div>
 
@@ -41,7 +45,7 @@ export function templateSearchView() {
       <span class="field__pin field__pin--dest"></span>
       <input class="field__input" id="inpDest" type="text" role="combobox"
              aria-expanded="false" aria-controls="saranDest"
-             placeholder="Mau ke mana?" autocomplete="off">
+             placeholder="Ketik tujuan (jalan, perumahan, blok/no)..." autocomplete="off">
       <div class="saran" id="saranDest" role="listbox" hidden></div>
     </div>
   </div>

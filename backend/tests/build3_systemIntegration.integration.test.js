@@ -10,6 +10,11 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { createApp } from '../src/app.js';
+import {
+  deconstructIndonesianAddress,
+  resolveAccurateProvince,
+  composeDetailedIndonesianLocation,
+} from '../src/services/addressParser.js';
 
 describe('Build 3 Integration: Express HTTP Application & Endpoints Assembly', () => {
   let server;
@@ -112,6 +117,43 @@ describe('Build 3 Integration: Express HTTP Application & Endpoints Assembly', (
       const data = await res.json();
       assert.equal(data.ok, false);
       assert.ok(data.error.includes('Query q diperlukan'));
+    });
+
+    it('deconstructs granular Indonesian address (Perumahan, Blok/No, Kecamatan) and re-composes micro-units', () => {
+      const parsed = deconstructIndonesianAddress('Perumahan Green Permata, Blok Olive 9, Pesanggrahan');
+      assert.equal(parsed.estateOrComplex, 'Perumahan Green Permata');
+      assert.equal(parsed.microUnit, 'Blok Olive 9');
+      assert.ok(parsed.searchCandidates.some((c) => c.includes('Green Permata')));
+      assert.ok(!parsed.searchCandidates[0].includes('Blok Olive 9'));
+
+      const composed = composeDetailedIndonesianLocation(
+        {
+          name: 'Green Permata',
+          road: 'Jl. Swadarma Raya',
+          kelurahan: 'Ulujami',
+          kecamatan: 'Pesanggrahan',
+          city: 'Kota Jakarta Selatan',
+          province: 'Banten', // Intentional OSM border error to verify province override
+          lat: -6.2301,
+          lon: 106.7602,
+          sourceId: 'osm-test-1',
+        },
+        parsed
+      );
+
+      assert.equal(composed.province, 'DKI Jakarta');
+      assert.ok(composed.nama.includes('Blok Olive 9'));
+      assert.ok(composed.nama.includes('Jl. Swadarma Raya'));
+      assert.ok(composed.area.includes('Ulujami'));
+      assert.ok(composed.area.includes('Kec. Pesanggrahan'));
+      assert.equal(resolveAccurateProvince('Banten', 'Jakarta Selatan', 'Pesanggrahan'), 'DKI Jakarta');
+    });
+
+    it('GET /api/geocode/reverse rejects out-of-bounds coordinates with HTTP 422', async () => {
+      const res = await fetch(`${baseUrl}/api/geocode/reverse?lat=48.8566&lon=2.3522`);
+      assert.equal(res.status, 422);
+      const data = await res.json();
+      assert.equal(data.ok, false);
     });
   });
 
