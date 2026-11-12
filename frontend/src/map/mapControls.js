@@ -143,7 +143,7 @@ function arahkanKeLokasiPengguna() {
       flyToCoordinates({
         lon: longitude,
         lat: latitude,
-        height: 1200,
+        height: 2400,
         pitchDeg: -40,
         duration: 1.4,
       });

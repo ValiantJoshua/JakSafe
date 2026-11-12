@@ -6,13 +6,11 @@ import {
   deconstructIndonesianAddress,
   composeDetailedIndonesianLocation,
 } from '../services/addressParser.js';
+import { geocodeCache } from '../services/cacheService.js';
 
 const router = Router();
 
-const CACHE_TTL_MS = 15 * 60 * 1000;
-const CACHE_MAX = 500;
 const FETCH_TIMEOUT_MS = 2800;
-const geocodeCache = new Map();
 
 /**
  * Katalog terkurasi lokasi populer, pusat perbelanjaan, stasiun, rumah sakit,
@@ -380,8 +378,8 @@ router.get('/reverse', async (req, res) => {
 
   const cacheKey = `rev:${lat.toFixed(4)},${lon.toFixed(4)}`;
   const cached = geocodeCache.get(cacheKey);
-  if (cached && Date.now() - cached.at <= CACHE_TTL_MS) {
-    return res.json(cached.payload);
+  if (cached) {
+    return res.json(cached);
   }
 
   const deconstructed = { estateOrComplex: '', microUnit: '' };
@@ -482,7 +480,7 @@ router.get('/reverse', async (req, res) => {
     place: resolved,
     ...resolved,
   };
-  geocodeCache.set(cacheKey, { payload, at: Date.now() });
+  geocodeCache.set(cacheKey, payload);
   return res.json(payload);
 });
 
@@ -523,8 +521,8 @@ router.get('/', async (req, res) => {
 
   const cacheKey = `v2:${query.toLowerCase()}`;
   const cached = geocodeCache.get(cacheKey);
-  if (cached && Date.now() - cached.at <= CACHE_TTL_MS) {
-    return res.json(cached.payload);
+  if (cached) {
+    return res.json(cached);
   }
 
   // 2. Dekonstruksi alamat Indonesia sesuai spesifikasi Kalceria
@@ -543,7 +541,7 @@ router.get('/', async (req, res) => {
   // dan tidak mengandung detail jalan/perumahan/blok
   if (query.length < 3 && !hasGranularDetail && localMatches.length > 0) {
     const payload = { ok: true, source: 'jakarta-gazetteer', places: localMatches };
-    geocodeCache.set(cacheKey, { payload, at: Date.now() });
+    geocodeCache.set(cacheKey, payload);
     return res.json(payload);
   }
 
@@ -600,10 +598,7 @@ router.get('/', async (req, res) => {
   };
 
   if (finalPlaces.length > 0) {
-    geocodeCache.set(cacheKey, { payload, at: Date.now() });
-    if (geocodeCache.size > CACHE_MAX) {
-      geocodeCache.delete(geocodeCache.keys().next().value);
-    }
+    geocodeCache.set(cacheKey, payload);
   }
 
   return res.json(payload);

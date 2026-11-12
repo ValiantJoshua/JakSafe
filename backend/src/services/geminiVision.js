@@ -3,6 +3,7 @@
 // Output is forced to a JSON schema so the scoring engine can consume it safely.
 
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { cctvVisionCache, hashKey } from './cacheService.js';
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-latest'];
@@ -93,17 +94,29 @@ export function normalizeAnalysis(raw) {
 }
 
 /**
- * Analyse one image with automatic model fallback on 503 / 429 / 404.
+ * Analyse one image with automatic model fallback on 503 / 429 / 404,
+ * and high-performance in-memory caching (TTL 90s).
  * @param {object} opts
  * @param {string} opts.base64    image bytes, base64 (no data: prefix)
  * @param {string} [opts.mimeType]
  * @param {string} [opts.context] e.g. camera name / location
+ * @param {string} [opts.cacheKey] optional explicit key (e.g. cctv:id)
+ * @param {boolean} [opts.skipCache=false]
  */
-export async function analyzeRoadImage({ base64, mimeType = 'image/jpeg', context = '' }) {
+export async function analyzeRoadImage({ base64, mimeType = 'image/jpeg', context = '', cacheKey = null, skipCache = false }) {
   if (typeof base64 !== 'string' || !base64.length) throw new VisionError('image base64 is required', 400);
   const mime = String(mimeType).toLowerCase();
   if (!ALLOWED_MIME.has(mime)) throw new VisionError(`unsupported image type: ${mime}`, 400);
   if (Buffer.byteLength(base64, 'base64') > MAX_IMAGE_BYTES) throw new VisionError('image too large', 413);
+
+  const effectiveKey = cacheKey || `img:${hashKey(base64.slice(0, 1024) + '_' + base64.length + '_' + context)}`;
+
+  if (!skipCache) {
+    const cached = cctvVisionCache.get(effectiveKey);
+    if (cached) {
+      return { ...cached, fromCache: true };
+    }
+  }
 
   const primaryModel = process.env.GEMINI_VISION_MODEL || DEFAULT_MODEL;
   const candidateModels = [...new Set([primaryModel, ...FALLBACK_MODELS])];
@@ -151,5 +164,7 @@ export async function analyzeRoadImage({ base64, mimeType = 'image/jpeg', contex
   } catch {
     throw new VisionError('Gemini returned invalid JSON');
   }
-  return normalizeAnalysis(parsed);
+  const normalized = normalizeAnalysis(parsed);
+  cctvVisionCache.set(effectiveKey, normalized);
+  return normalized;
 }

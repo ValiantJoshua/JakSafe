@@ -213,9 +213,11 @@ export function previewEndpointsOnMap(asal, tujuan, { fly = false } = {}) {
     if (hasAsal && hasTujuan) {
       flyToRouteBounds([[asal.lon, asal.lat], [tujuan.lon, tujuan.lat]]);
     } else if (hasAsal) {
-      flyToCoordinates({ lon: asal.lon, lat: asal.lat, height: 1600, duration: 1.2 });
+      // Zoom out ke ketinggian 2800m agar titik awal tidak terpotong dock layer bawah / navbar atas
+      flyToCoordinates({ lon: asal.lon, lat: asal.lat, height: 2800, duration: 1.2 });
     } else if (hasTujuan) {
-      flyToCoordinates({ lon: tujuan.lon, lat: tujuan.lat, height: 1600, duration: 1.2 });
+      // Zoom out ke ketinggian 2800m agar titik tujuan tidak terpotong dock layer bawah / navbar atas
+      flyToCoordinates({ lon: tujuan.lon, lat: tujuan.lat, height: 2800, duration: 1.2 });
     }
   }
 
@@ -235,12 +237,15 @@ export function flyToRouteBounds(geometry) {
 
   const centerLon = (b.minLon + b.maxLon) / 2;
   const centerLat = (b.minLat + b.maxLat) / 2;
-  const spanDeg = Math.max(b.maxLon - b.minLon, b.maxLat - b.minLat, 0.015);
+  // Span minimum dan faktor zoom-out dinaikkan agar titik awal dan tujuan tidak tertutup
+  // oleh navbar di bagian atas maupun dock layer (traffic, cctv, dll) di bagian bawah
+  const spanDeg = Math.max(b.maxLon - b.minLon, b.maxLat - b.minLat, 0.028);
   const is3D = getMapViewMode() === '3d';
 
-  const height = Math.max(1200, Math.min(24000, spanDeg * 145000));
-  const pitchDeg = is3D ? -42 : -89.9;
-  const latOffset = is3D ? (height / 111320) * 0.62 : 0;
+  const heightMultiplier = is3D ? 230000 : 210000;
+  const height = Math.max(2800, Math.min(36000, spanDeg * heightMultiplier));
+  const pitchDeg = is3D ? -38 : -89.9;
+  const latOffset = is3D ? (height / 111320) * 0.70 : 0;
 
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat - latOffset, height),

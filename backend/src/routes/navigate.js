@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { runNavigationAgent } from '../agent/reactAgent.js';
+import { navigationCache } from '../services/cacheService.js';
 
 const router = Router();
 
@@ -23,18 +24,39 @@ router.post('/', async (req, res) => {
 
   const validProfiles = ['car', 'bike', 'foot'];
   const sanitizedProfile = validProfiles.includes(profile) ? profile : 'car';
+  const isHealthSensitive = Boolean(preferences.healthSensitive);
+
+  const originLat = Number(origin.lat);
+  const originLon = Number(origin.lon);
+  const destLat = Number(destination.lat);
+  const destLon = Number(destination.lon);
+
+  const cacheKey = `nav:${sanitizedProfile}:${originLat.toFixed(4)},${originLon.toFixed(4)}->${destLat.toFixed(4)},${destLon.toFixed(4)}:hs=${isHealthSensitive}`;
+
+  // Check short-lived navigation cache (90s TTL) unless explicitly forced to refresh
+  const bypassCache = Boolean(req.query.refresh || req.body.refresh);
+  if (!bypassCache) {
+    const cached = navigationCache.get(cacheKey);
+    if (cached) {
+      return res.json({ ...cached, cached: true });
+    }
+  }
 
   try {
     const result = await runNavigationAgent({
-      origin: { lat: Number(origin.lat), lon: Number(origin.lon) },
-      destination: { lat: Number(destination.lat), lon: Number(destination.lon) },
+      origin: { lat: originLat, lon: originLon },
+      destination: { lat: destLat, lon: destLon },
       profile: sanitizedProfile,
       preferences: {
-        healthSensitive: Boolean(preferences.healthSensitive),
+        healthSensitive: isHealthSensitive,
       },
     });
 
-    res.json(result);
+    if (result && result.ok) {
+      navigationCache.set(cacheKey, result);
+    }
+
+    res.json({ ...result, cached: false });
   } catch (err) {
     console.error('[navigate] Agent execution error:', err);
     res.status(500).json({
