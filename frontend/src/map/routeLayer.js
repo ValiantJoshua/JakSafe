@@ -162,12 +162,13 @@ export function previewEndpointsOnMap(asal, tujuan, { fly = false } = {}) {
   if (hasAsal) {
     routeDataSource.entities.add({
       id: 'route-pin-origin',
-      position: Cesium.Cartesian3.fromDegrees(asal.lon, asal.lat, 24),
+      position: Cesium.Cartesian3.fromDegrees(asal.lon, asal.lat, 0),
       billboard: {
         image: buatPinTitikAwal(),
         width: 32,
         height: 32,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
@@ -178,6 +179,7 @@ export function previewEndpointsOnMap(asal, tujuan, { fly = false } = {}) {
         outlineWidth: 3.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         pixelOffset: new Cesium.Cartesian2(0, -20),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
@@ -187,12 +189,13 @@ export function previewEndpointsOnMap(asal, tujuan, { fly = false } = {}) {
   if (hasTujuan) {
     routeDataSource.entities.add({
       id: 'route-pin-dest',
-      position: Cesium.Cartesian3.fromDegrees(tujuan.lon, tujuan.lat, 24),
+      position: Cesium.Cartesian3.fromDegrees(tujuan.lon, tujuan.lat, 0),
       billboard: {
         image: buatPinTitikTujuan(),
         width: 34,
         height: 42,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
@@ -203,6 +206,7 @@ export function previewEndpointsOnMap(asal, tujuan, { fly = false } = {}) {
         outlineWidth: 3.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         pixelOffset: new Cesium.Cartesian2(0, -46),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
@@ -380,12 +384,13 @@ export function renderRouteOnMap(hasil) {
   if (asal) {
     routeDataSource.entities.add({
       id: 'route-pin-origin',
-      position: Cesium.Cartesian3.fromDegrees(asal.lon, asal.lat, 26),
+      position: Cesium.Cartesian3.fromDegrees(asal.lon, asal.lat, 0),
       billboard: {
         image: buatPinTitikAwal(),
         width: 32,
         height: 32,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
@@ -396,6 +401,7 @@ export function renderRouteOnMap(hasil) {
         outlineWidth: 3.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         pixelOffset: new Cesium.Cartesian2(0, -20),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
@@ -405,12 +411,13 @@ export function renderRouteOnMap(hasil) {
   if (tujuan) {
     routeDataSource.entities.add({
       id: 'route-pin-dest',
-      position: Cesium.Cartesian3.fromDegrees(tujuan.lon, tujuan.lat, 26),
+      position: Cesium.Cartesian3.fromDegrees(tujuan.lon, tujuan.lat, 0),
       billboard: {
         image: buatPinTitikTujuan(),
         width: 34,
         height: 42,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
@@ -421,6 +428,7 @@ export function renderRouteOnMap(hasil) {
         outlineWidth: 3.5,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         pixelOffset: new Cesium.Cartesian2(0, -46),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },

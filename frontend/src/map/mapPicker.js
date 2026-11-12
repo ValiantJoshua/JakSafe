@@ -17,7 +17,7 @@ import { reverseGeocodeLive, registerCustomPlace, findPlaceById } from '../confi
 import { getState, setState } from '../state/appState.js';
 import { toast } from '../ui/toast.js';
 import { previewEndpointsOnMap } from './routeLayer.js';
-import { bukaPopupKameraPeta, getAllLoadedCameras, isCctvLayerEnabled } from './cctvLayer.js';
+import { bukaPopupKameraPeta, getAllLoadedCameras, isCctvLayerEnabled, findNearbyCctvCamera } from './cctvLayer.js';
 import { pilihRuteByIndex } from '../ui/controllers/resultController.js';
 import { toggleSidebar } from './mapControls.js';
 
@@ -34,43 +34,68 @@ let currentCoords = null;
 
 /**
  * Membuat ikon billboard penanda titik peta terpilih (drop-pin locator).
+ * Menggunakan bentuk teardrop map-pin dengan ujung runcing di bagian bawah (cx, tipY)
+ * sehingga menancap tepat di koordinat tanah tanpa efek melayang/floating.
  */
 function buatPinTitikTerpilih() {
   if (pinDataUrl) return pinDataUrl;
 
-  const size = 52;
+  const width = 46;
+  const height = 56;
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d');
-  const cx = size / 2;
-  const cy = size / 2;
+  const cx = width / 2;
+  const headCy = 19;
+  const headR = 14;
+  const tipY = 50;
 
-  // 1. Halo pendaran luar
+  // 1. Bayangan kontak tanah di bawah ujung jarum pin
   ctx.beginPath();
-  ctx.arc(cx, cy, 21, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(2, 132, 255, 0.28)';
+  ctx.ellipse(cx, tipY + 2, 7, 2.5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(10, 46, 107, 0.32)';
   ctx.fill();
 
-  // 2. Lingkaran putih penegas dengan bayangan
+  // 2. Halo pendaran lembut di sekitar kepala pin
   ctx.beginPath();
-  ctx.arc(cx, cy, 14, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.shadowColor = 'rgba(10, 46, 107, 0.45)';
-  ctx.shadowBlur = 8;
+  ctx.arc(cx, headCy, headR + 4, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(2, 132, 255, 0.22)';
+  ctx.fill();
+
+  // 3. Badan pin tetes (teardrop pin) meruncing ke bawah tepat di (cx, tipY)
+  ctx.beginPath();
+  ctx.moveTo(cx, tipY);
+  ctx.bezierCurveTo(cx - headR, tipY - 14, cx - headR, headCy, cx - headR, headCy);
+  ctx.arc(cx, headCy, headR, Math.PI, 0, false);
+  ctx.bezierCurveTo(cx + headR, headCy, cx + headR, tipY - 14, cx, tipY);
+  ctx.closePath();
+
+  // Gradien biru khas JakSafe (#0284FF ke #0A2E6B)
+  const grad = ctx.createLinearGradient(0, headCy - headR, 0, tipY);
+  grad.addColorStop(0, '#0284FF');
+  grad.addColorStop(1, '#0A2E6B');
+  ctx.fillStyle = grad;
+  ctx.shadowColor = 'rgba(10, 46, 107, 0.40)';
+  ctx.shadowBlur = 6;
   ctx.shadowOffsetY = 2;
   ctx.fill();
   ctx.shadowColor = 'transparent';
 
-  // 3. Inti biru terang
+  // Garis tepi putih tegas penegas kontras
+  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.stroke();
+
+  // 4. Lingkaran putih di kepala pin
   ctx.beginPath();
-  ctx.arc(cx, cy, 9.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#0284FF';
+  ctx.arc(cx, headCy, 5.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFFFFF';
   ctx.fill();
 
-  // 4. Titik pusat lime (JakSafe identity)
+  // 5. Inti lime green (#A3E635) penegas posisi
   ctx.beginPath();
-  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.arc(cx, headCy, 2.8, 0, Math.PI * 2);
   ctx.fillStyle = '#A3E635';
   ctx.fill();
 
@@ -80,7 +105,8 @@ function buatPinTitikTerpilih() {
 
 /**
  * Mengambil koordinat WGS84 [lat, lon] dari posisi piksel di layar kanvas Cesium.
- * Mendukung permukaan tanah rata, permukaan 3D Tiles (gedung), dan raycasting globe.
+ * Mendahulukan raycasting globe & ellipsoid bumi agar koordinat tanah/jalan akurat,
+ * kemudian fallback ke pickPosition jika mengklik objek 3D.
  * @param {Cesium.Viewer} viewer
  * @param {Cesium.Cartesian2} windowPosition
  * @returns {{lat: number, lon: number, cartesian: Cesium.Cartesian3}|null}
@@ -90,8 +116,15 @@ export function pickCoordinatesFromPixel(viewer, windowPosition) {
   const scene = viewer.scene;
   let cartesian = null;
 
-  // 1. Presisi pada gedung 3D Tiles / permukaan arsitektural
-  if (scene.pickPositionSupported) {
+  // 1. Ray picking pada ellipsoid bumi (paling akurat & konsisten untuk basemap 2D & 3D)
+  try {
+    cartesian = viewer.camera.pickEllipsoid(windowPosition, scene.globe.ellipsoid);
+  } catch {
+    cartesian = null;
+  }
+
+  // 2. Jika di atas gedung 3D Tiles dan pickPosition didukung
+  if ((!cartesian || !Cesium.defined(cartesian)) && scene.pickPositionSupported) {
     try {
       cartesian = scene.pickPosition(windowPosition);
     } catch {
@@ -99,17 +132,16 @@ export function pickCoordinatesFromPixel(viewer, windowPosition) {
     }
   }
 
-  // 2. Ray picking pada globe dasar
+  // 3. Fallback ray picking globe terrain
   if (!cartesian || !Cesium.defined(cartesian)) {
-    const ray = viewer.camera.getPickRay(windowPosition);
-    if (ray) {
-      cartesian = scene.globe.pick(ray, scene);
+    try {
+      const ray = viewer.camera.getPickRay(windowPosition);
+      if (ray) {
+        cartesian = scene.globe.pick(ray, scene);
+      }
+    } catch {
+      cartesian = null;
     }
-  }
-
-  // 3. Fallback ke ellipsoid
-  if (!cartesian || !Cesium.defined(cartesian)) {
-    cartesian = viewer.camera.pickEllipsoid(windowPosition, scene.globe.ellipsoid);
   }
 
   if (!cartesian || !Cesium.defined(cartesian)) return null;
@@ -150,6 +182,8 @@ export function tutupMapPickMenu() {
 
 /**
  * Menampilkan pin sementara di posisi koordinat yang diklik.
+ * Terkunci di tanah (CLAMP_TO_GROUND) dengan ujung jarum menancap di permukaan (BOTTOM).
+ * Bersih tanpa label teks melayang di atas pin.
  */
 function renderPinSementara(lon, lat) {
   if (!pickerDataSource) return;
@@ -157,28 +191,61 @@ function renderPinSementara(lon, lat) {
 
   pickerDataSource.entities.add({
     id: 'map-picked-temp-pin',
-    position: Cesium.Cartesian3.fromDegrees(lon, lat, 26),
+    position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
     billboard: {
       image: buatPinTitikTerpilih(),
-      width: 40,
-      height: 40,
-      verticalOrigin: Cesium.VerticalOrigin.CENTER,
-      disableDepthTestDistance: Number.POSITIVE_INFINITY,
-    },
-    label: {
-      text: 'Titik Terpilih',
-      font: '800 11px Manrope, sans-serif',
-      fillColor: Cesium.Color.WHITE,
-      outlineColor: Cesium.Color.fromCssColorString('#0A2E6B'),
-      outlineWidth: 3.5,
-      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      width: 44,
+      height: 54,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-      pixelOffset: new Cesium.Cartesian2(0, -22),
+      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
     },
   });
 
   viewerRef?.scene.requestRender();
+}
+
+/**
+ * Memposisikan menu mengambang pada layar dengan batas aman yang ketat terhadap wadah .mapstage.
+ * Menjamin menu 100% masuk ke dalam frame layar tanpa terpotong di tepi mana pun.
+ * @param {Cesium.Cartesian2} screenPos
+ */
+export function posisikanMenuPick(screenPos) {
+  const menu = document.getElementById('mapPickMenu');
+  if (!menu || !screenPos) return;
+
+  const stage = document.querySelector('.mapstage');
+  const stageWidth = stage ? stage.clientWidth : window.innerWidth;
+  const stageHeight = stage ? stage.clientHeight : window.innerHeight;
+
+  // Ukur dimensi kartu (fall back ke 320x170 jika belum ter-render)
+  const menuW = menu.offsetWidth || 320;
+  const menuH = menu.offsetHeight || 170;
+
+  const pad = 16;
+  const topPad = 74;    // jarak aman dari bar mode 3D/2D di kiri atas & tombol zoom di kanan atas
+  const bottomPad = 86; // jarak aman dari bar dock layer di bawah
+
+  // 1. Sumbu X: coba tampil di kanan kursor (+16px)
+  let x = screenPos.x + 16;
+  // Jika menabrak tepi kanan frame peta, posisikan di sebelah kiri kursor
+  if (x + menuW > stageWidth - pad) {
+    x = screenPos.x - menuW - 16;
+  }
+  // Kunci (clamp) X agar absolut aman di dalam frame layar
+  x = Math.max(pad, Math.min(x, stageWidth - menuW - pad));
+
+  // 2. Sumbu Y: coba tampil sejajar atau sedikit di atas kursor (-24px)
+  let y = screenPos.y - 24;
+  // Jika menabrak tepi bawah frame peta, posisikan di atas kursor
+  if (y + menuH > stageHeight - bottomPad) {
+    y = screenPos.y - menuH - 16;
+  }
+  // Kunci (clamp) Y agar absolut aman di dalam frame layar
+  y = Math.max(topPad, Math.min(y, stageHeight - menuH - bottomPad));
+
+  menu.style.left = `${Math.round(x)}px`;
+  menu.style.top = `${Math.round(y)}px`;
 }
 
 /**
@@ -197,41 +264,24 @@ async function handleMapClick(screenPos) {
   // Tutup popup CCTV lain yang mungkin sedang terbuka
   bukaPopupKameraPeta(null);
 
-  // Pasang pin visual di peta
+  // Pasang pin visual di peta (tanpa label teks di atas pin)
   renderPinSementara(lon, lat);
 
   const menu = document.getElementById('mapPickMenu');
   const titleEl = document.getElementById('mapPickTitle');
-  const metaEl = document.getElementById('mapPickMeta');
+  const areaEl = document.getElementById('mapPickArea');
+  const coordsEl = document.getElementById('mapPickCoords');
 
   if (!menu) return;
 
-  // Posisikan menu pada layar dengan batasan agar tidak terpotong tepi layar
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const menuWidth = 310;
-  const menuHeight = 175;
-
-  let x = screenPos.x + 14;
-  let y = screenPos.y - 40;
-
-  // Jika terlalu ke kanan, buka ke kiri kursor
-  if (x + menuWidth > viewportWidth - 16) {
-    x = Math.max(16, screenPos.x - menuWidth - 14);
-  }
-  // Jika terlalu ke bawah, buka ke atas kursor
-  if (y + menuHeight > viewportHeight - 80) {
-    y = Math.max(76, viewportHeight - menuHeight - 80);
-  }
-  if (y < 76) y = 76;
-
-  menu.style.left = `${Math.round(x)}px`;
-  menu.style.top = `${Math.round(y)}px`;
+  // Tampilkan menu dan hitung posisinya agar presisi di dalam viewport layar
   menu.hidden = false;
+  posisikanMenuPick(screenPos);
 
   // Indikator memuat alamat
-  if (titleEl) titleEl.textContent = 'Mendeteksi alamat presisi...';
-  if (metaEl) metaEl.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  if (titleEl) titleEl.textContent = 'Mendeteksi alamat...';
+  if (areaEl) areaEl.textContent = 'Mengidentifikasi area wilayah...';
+  if (coordsEl) coordsEl.textContent = `[${lat.toFixed(4)}, ${lon.toFixed(4)}]`;
 
   // Buat objek tempat sementara berbasis koordinat
   currentPlace = {
@@ -255,7 +305,11 @@ async function handleMapClick(screenPos) {
       const subtitle = resolved.subtitle || resolved.area || 'Jakarta & Sekitarnya';
 
       if (titleEl) titleEl.textContent = headline;
-      if (metaEl) metaEl.textContent = `${subtitle} · [${lat.toFixed(4)}, ${lon.toFixed(4)}]`;
+      if (areaEl) areaEl.textContent = subtitle;
+      if (coordsEl) coordsEl.textContent = `[${lat.toFixed(4)}, ${lon.toFixed(4)}]`;
+
+      // Perbarui posisi kartu jika tinggi kartu berubah karena teks alamat
+      posisikanMenuPick(screenPos);
     }
   } catch (err) {
     console.warn('[mapPicker] Reverse geocode error:', err);
@@ -366,44 +420,134 @@ export async function initMapPicker(viewer) {
 
   // 1. Tangani Klik Kiri (Left Click)
   pickerHandler.setInputAction((movement) => {
-    const picked = viewer.scene.pick(movement.position);
-
-    // Jika pengguna mengklik entitas interaktif (Kamera CCTV atau Rute):
-    if (Cesium.defined(picked) && picked.id) {
-      const entity = picked.id;
-
-      // a. Klik pada CCTV Marker
-      const camId = entity?.properties?.cameraId?.getValue?.();
-      if (camId) {
+    try {
+      // a. Cek apakah pengguna mengklik kamera CCTV atau area sekitarnya (radius toleran 28px)
+      const nearbyCam = findNearbyCctvCamera(viewer, movement.position, 28);
+      if (nearbyCam) {
         tutupMapPickMenu();
-        const allCameras = getAllLoadedCameras();
-        const cam = allCameras.find((c) => c.id === camId);
-        if (cam) bukaPopupKameraPeta(cam);
+        bukaPopupKameraPeta(nearbyCam);
         return;
       }
 
-      // b. Klik pada Polyline Rute Alternatif
-      const routeIdx = entity?.properties?.routeOptionIndex?.getValue?.();
-      if (Number.isInteger(routeIdx)) {
-        tutupMapPickMenu();
-        pilihRuteByIndex(routeIdx);
-        return;
-      }
+      const picked = viewer.scene.pick(movement.position);
 
-      // c. Klik pada Pin Sementara sendiri
-      if (entity.id === 'map-picked-temp-pin') {
-        return;
+      // Jika pengguna mengklik entitas interaktif (Kamera CCTV langsung, Rute, atau Pin):
+      if (Cesium.defined(picked) && picked.id) {
+        const entity = picked.id;
+
+        // Klik pada CCTV Marker (jika lolos dari proximity)
+        const camId = entity?.properties?.cameraId?.getValue?.();
+        if (camId) {
+          tutupMapPickMenu();
+          const allCameras = getAllLoadedCameras();
+          const cam = allCameras.find((c) => c.id === camId);
+          if (cam) bukaPopupKameraPeta(cam);
+          return;
+        }
+
+        // b. Klik pada Polyline Rute Alternatif
+        const routeIdx = entity?.properties?.routeOptionIndex?.getValue?.();
+        if (Number.isInteger(routeIdx)) {
+          tutupMapPickMenu();
+          pilihRuteByIndex(routeIdx);
+          return;
+        }
+
+        // c. Klik pada Pin Sementara sendiri
+        if (entity.id === 'map-picked-temp-pin') {
+          return;
+        }
       }
+    } catch (err) {
+      console.warn('[mapPicker] Left click check error:', err);
     }
 
-    // Klik pada area kosong peta (tanah, jalan, atau gedung)
+    // Klik pada area peta (tanah, jalan, atau gedung)
     handleMapClick(movement.position);
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
   // 2. Tangani Klik Kanan (Right Click) — Langsung memicu menu konteks
   pickerHandler.setInputAction((movement) => {
+    try {
+      const nearbyCam = findNearbyCctvCamera(viewer, movement.position, 28);
+      if (nearbyCam) {
+        tutupMapPickMenu();
+        bukaPopupKameraPeta(nearbyCam);
+        return;
+      }
+    } catch (err) {
+      console.warn('[mapPicker] Right click check error:', err);
+    }
     handleMapClick(movement.position);
   }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+
+  // 3. Tangani Dobel Klik (Double Click) — Tutup menu pick agar tidak menghalangi zoom
+  pickerHandler.setInputAction(() => {
+    tutupMapPickMenu();
+  }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+  // 4. Tangani Gerakan Kursor (Mouse Move) — Indikator kursor 'pointer' interaktif
+  pickerHandler.setInputAction((movement) => {
+    if (!movement.endPosition) return;
+
+    try {
+      // Hover di atas / dekat kamera CCTV
+      const hoveredCam = findNearbyCctvCamera(viewer, movement.endPosition, 24);
+      if (hoveredCam) {
+        viewer.scene.canvas.style.cursor = 'pointer';
+        return;
+      }
+
+      // Hover di atas polyline rute
+      const picked = viewer.scene.pick(movement.endPosition);
+      if (Cesium.defined(picked) && picked.id) {
+        const routeIdx = picked.id?.properties?.routeOptionIndex?.getValue?.();
+        if (Number.isInteger(routeIdx)) {
+          viewer.scene.canvas.style.cursor = 'pointer';
+          return;
+        }
+      }
+    } catch {
+      /* abaikan galat hover */
+    }
+
+    viewer.scene.canvas.style.cursor = '';
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+  // Perbarui posisi popup agar selalu menempel dengan titik pin di peta saat kamera digeser/di-zoom
+  viewer.scene.postRender.addEventListener(() => {
+    const menu = document.getElementById('mapPickMenu');
+    if (!menu || menu.hidden || !currentCoords) return;
+
+    const pinCartesian = Cesium.Cartesian3.fromDegrees(currentCoords.lon, currentCoords.lat, 0);
+    const transformFn = Cesium.SceneTransforms.worldToWindowCoordinates
+      || Cesium.SceneTransforms.wgs84ToWindowCoordinates;
+
+    if (typeof transformFn !== 'function') return;
+
+    try {
+      const winPos = transformFn(viewer.scene, pinCartesian);
+      if (winPos) {
+        const stage = document.querySelector('.mapstage');
+        const stageWidth = stage ? stage.clientWidth : window.innerWidth;
+        const stageHeight = stage ? stage.clientHeight : window.innerHeight;
+
+        // Jika pin digeser sangat jauh ke luar layar (> 200px), tutup menu
+        if (
+          winPos.x < -200 ||
+          winPos.x > stageWidth + 200 ||
+          winPos.y < -200 ||
+          winPos.y > stageHeight + 200
+        ) {
+          tutupMapPickMenu();
+        } else {
+          posisikanMenuPick(winPos);
+        }
+      }
+    } catch {
+      /* abaikan galat render */
+    }
+  });
 
   // Pasang aksi tombol menu konteks
   document.getElementById('btnPickAsOrigin')?.addEventListener('click', (e) => {

@@ -151,12 +151,12 @@ export function templateStage() {
     <div class="mapcctv__aibox" id="mapCctvAiResult" hidden></div>
   </aside>
 
-  <!-- Menu Titik Peta Terpilih (Click-to-Pick Coordinate ala Google Maps) -->
-  <aside class="mappick-menu" id="mapPickMenu" aria-label="Menu Titik Peta Terpilih" hidden>
+  <!-- Menu Titik Peta Terpilih (Click-to-Pick Coordinate) -->
+  <aside class="mappick-menu" id="mapPickMenu" aria-label="Detail Titik Lokasi Peta" hidden>
     <div class="mappick__head">
-      <div class="mappick__badge">
-        <span class="mappick__pin">${ikon('i-pin', 13)}</span>
-        <span class="mappick__badgetext">Titik Peta Terpilih</span>
+      <div class="mappick__locname">
+        <span class="mappick__pin" aria-hidden="true">${ikon('i-pin', 15)}</span>
+        <h4 class="mappick__title" id="mapPickTitle">Mendeteksi alamat...</h4>
       </div>
       <button type="button" class="mappick__close" id="btnMapPickClose" aria-label="Tutup menu titik peta" title="Tutup">
         ${ikon('i-x', 13)}
@@ -164,8 +164,8 @@ export function templateStage() {
     </div>
 
     <div class="mappick__body">
-      <h4 class="mappick__title" id="mapPickTitle">Mendeteksi alamat...</h4>
-      <p class="mappick__meta" id="mapPickMeta">-6.2088, 106.8456</p>
+      <p class="mappick__area" id="mapPickArea">Jakarta &amp; Sekitarnya</p>
+      <p class="mappick__coords" id="mapPickCoords">[-6.2088, 106.8456]</p>
     </div>
 
     <div class="mappick__actions">

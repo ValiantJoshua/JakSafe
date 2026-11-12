@@ -525,11 +525,19 @@ export async function setMapViewMode(mode, { fly = true } = {}) {
       statusMessage = '3D Globe Standar';
     }
   } else if (mode === '2d-sat') {
+    // Mode 2D Satelit: Kunci kemiringan kamera (kamera murni tegak lurus dari atas / top-down)
+    controller.enableTilt = false;
+    controller.enableLook = false;
+
     if (osmBuildingsTileset) osmBuildingsTileset.show = false;
     viewerInstance.scene.globe.show = true;
     await applyGlobeImagery('hybrid');
     statusMessage = '2D Satelit';
   } else {
+    // Mode 2D Peta Normal: Kunci kemiringan kamera (kamera murni tegak lurus dari atas / top-down)
+    controller.enableTilt = false;
+    controller.enableLook = false;
+
     if (osmBuildingsTileset) osmBuildingsTileset.show = false;
     viewerInstance.scene.globe.show = true;
     await applyGlobeImagery('road');
@@ -631,13 +639,14 @@ export function zoomMap(direction = 1) {
     new Cesium.Cartesian3(),
   );
 
-  // Transisi animasi mulus & responsif
+  // Transisi animasi mulus & responsif dengan orientasi terkunci per mode
+  const is3D = currentMode === '3d';
   camera.flyTo({
     destination: targetDestination,
     orientation: {
-      heading: camera.heading,
-      pitch: camera.pitch,
-      roll: camera.roll,
+      heading: is3D ? camera.heading : 0,
+      pitch: is3D ? camera.pitch : Cesium.Math.toRadians(-89.9),
+      roll: 0,
     },
     duration: 0.35,
     easingFunction: Cesium.EasingFunction.QUADRATIC_OUT,
@@ -754,6 +763,30 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
   const ctrl = viewer.scene.screenSpaceCameraController;
   ctrl.minimumZoomDistance = 45;
   ctrl.maximumZoomDistance = 4500000;
+
+  // Hapus aksi LEFT_DOUBLE_CLICK bawaan Cesium yang menyebabkan kamera tilting ke cakrawala.
+  // Gantikan dengan zoomMap(1) yang aman dan menjaga orientasi kamera 2D tetap tegak lurus.
+  viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+  viewer.screenSpaceEventHandler.setInputAction(() => {
+    zoomMap(1);
+  }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+  // Penjaga konsistensi mode 2D: jika ada pergerakan kamera di mode 2D yang mengubah pitch,
+  // kembalikan segera ke posisi tegak lurus top-down (-89.9 derajat).
+  viewer.camera.moveEnd.addEventListener(() => {
+    if (currentMode !== '3d') {
+      const pitchDeg = Cesium.Math.toDegrees(viewer.camera.pitch);
+      if (pitchDeg > -85) {
+        viewer.camera.setView({
+          orientation: {
+            heading: 0,
+            pitch: Cesium.Math.toRadians(-89.9),
+            roll: 0,
+          },
+        });
+      }
+    }
+  });
 
   enforceIndonesiaBounds(viewer);
 

@@ -277,7 +277,7 @@ function renderEntitasKamera() {
     const markerSize = isSelected ? 40 : isRouteCam ? 36 : isDimmedOutside ? 18 : 28;
     const entityDef = {
       id: `cctv-node-${cam.id}`,
-      position: Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat, 18),
+      position: Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat, 0),
       properties: {
         isCctvMarker: true,
         cameraId: cam.id,
@@ -288,7 +288,7 @@ function renderEntitasKamera() {
         height: markerSize,
         color: isDimmedOutside ? Cesium.Color.WHITE.withAlpha(0.20) : Cesium.Color.WHITE,
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scaleByDistance: new Cesium.NearFarScalar(800, 1.15, 35000, 0.55),
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isSelected || isRouteCam ? 65000 : 45000),
@@ -304,7 +304,7 @@ function renderEntitasKamera() {
         outlineWidth: 3,
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         pixelOffset: new Cesium.Cartesian2(0, -22),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, isSelected || isRouteCam ? 25000 : 1200),
@@ -537,6 +537,87 @@ export function bukaPopupKameraPeta(cam) {
 }
 
 /**
+ * Mencari kamera CCTV yang berada di sekitar posisi kursor (screen space)
+ * dengan toleransi radius toleran (default 28px) atau hasil hardware picking langsung.
+ * Menghindari keharusan pengguna mengklik persis di 1 piksel ikon CCTV.
+ * @param {Cesium.Viewer} viewer
+ * @param {Cesium.Cartesian2} screenPos
+ * @param {number} [radiusPx]
+ * @returns {import('../api/cctvApi.js').Kamera|null}
+ */
+export function findNearbyCctvCamera(viewer, screenPos, radiusPx = 28) {
+  if (!viewer || !screenPos || !layerEnabled) return null;
+  if (!Array.isArray(daftarKamera) || daftarKamera.length === 0) return null;
+
+  // 1. Cek hardware pick langsung terlebih dahulu
+  try {
+    const picked = viewer.scene.pick(screenPos);
+    if (Cesium.defined(picked) && picked.id) {
+      const camId = picked.id?.properties?.cameraId?.getValue?.();
+      if (camId) {
+        const cam = daftarKamera.find((c) => c.id === camId);
+        if (cam) return cam;
+      }
+    }
+  } catch {
+    /* abaikan galat pick */
+  }
+
+  // 2. Fuzzy hit-testing: Cari kamera dengan jarak layar terdekat dalam radiusPx
+  try {
+    const scene = viewer.scene;
+    const canvas = scene.canvas;
+    const canvasWidth = canvas.clientWidth;
+    const canvasHeight = canvas.clientHeight;
+    let closestCam = null;
+    let minDistanceSq = radiusPx * radiusPx;
+
+    const transformFn = Cesium.SceneTransforms.worldToWindowCoordinates
+      || Cesium.SceneTransforms.wgs84ToWindowCoordinates;
+
+    if (typeof transformFn !== 'function') return null;
+
+    const scratchWinPos = new Cesium.Cartesian2();
+
+    for (let i = 0; i < daftarKamera.length; i++) {
+      const cam = daftarKamera[i];
+      if (!Number.isFinite(cam.lat) || !Number.isFinite(cam.lon)) continue;
+
+      if (!cam._cartesian) {
+        cam._cartesian = Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat, 0);
+      }
+
+      const winPos = transformFn(scene, cam._cartesian, scratchWinPos);
+      if (!winPos) continue;
+
+      // Filter jika posisi kamera berada jauh di luar viewport layar
+      if (
+        winPos.x < -radiusPx ||
+        winPos.x > canvasWidth + radiusPx ||
+        winPos.y < -radiusPx ||
+        winPos.y > canvasHeight + radiusPx
+      ) {
+        continue;
+      }
+
+      const dx = winPos.x - screenPos.x;
+      const dy = winPos.y - screenPos.y;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq <= minDistanceSq) {
+        minDistanceSq = distSq;
+        closestCam = cam;
+      }
+    }
+
+    return closestCam;
+  } catch (err) {
+    console.warn('[findNearbyCctvCamera] Error:', err);
+    return null;
+  }
+}
+
+/**
  * Memasang event klik pada kanvas Cesium untuk memilih kamera CCTV.
  */
 function pasangEventKlikKamera(viewer) {
@@ -548,14 +629,7 @@ function pasangEventKlikKamera(viewer) {
   clickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
   clickHandler.setInputAction((movement) => {
     if (!layerEnabled) return;
-    const picked = viewer.scene.pick(movement.position);
-    if (!Cesium.defined(picked) || !picked.id) return;
-
-    const entity = picked.id;
-    const camId = entity?.properties?.cameraId?.getValue?.();
-    if (!camId) return;
-
-    const cam = daftarKamera.find((c) => c.id === camId);
+    const cam = findNearbyCctvCamera(viewer, movement.position, 28);
     if (cam) {
       bukaPopupKameraPeta(cam);
     }
@@ -722,6 +796,13 @@ export async function initCctvLayer() {
 
   try {
     daftarKamera = await ambilSemuaKamera();
+    // Precompute Cartesian3 untuk optimasi hit-testing dan rendering instan
+    for (let i = 0; i < daftarKamera.length; i++) {
+      const c = daftarKamera[i];
+      if (Number.isFinite(c.lat) && Number.isFinite(c.lon)) {
+        c._cartesian = Cesium.Cartesian3.fromDegrees(c.lon, c.lat, 0);
+      }
+    }
     renderEntitasKamera();
     notifyListeners();
   } catch (err) {
