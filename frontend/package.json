@@ -18,5 +18,8 @@
     "hls.js": "^1.7.4",
     "pbf": "^5.1.2",
     "vite-plugin-cesium": "^1.2.23"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
   }
 }
