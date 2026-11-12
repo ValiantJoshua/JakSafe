@@ -3,6 +3,7 @@ import { loadCatalog, getCameraById, findNearest, publicView } from '../services
 import { fetchFrame, FrameError, assertPublicHttpUrl } from '../services/cctvFrame.js';
 import { parseCoords, RouteError } from '../services/osrm.js';
 import { analyzeRoadImage, VisionError } from '../services/geminiVision.js';
+import { cctvVisionCache } from '../services/cacheService.js';
 
 const router = Router();
 
@@ -194,17 +195,15 @@ router.get('/stream/:id/segment.ts', async (req, res) => {
 });
 
 // GET /api/cctv/analyze/:id -> fetch the camera's current frame and run Gemini Vision on it.
-// Cached 60s per camera so repeated testing does not burn Gemini quota.
-const analysisCache = new Map();
-const ANALYSIS_TTL_MS = 60_000;
-
+// Uses shared cctvVisionCache (TTL 90s) so frontend interactions and ReAct agent share results.
 router.get('/analyze/:id', async (req, res) => {
   const camera = getCameraById(req.params.id);
   if (!camera) return res.status(404).json({ ok: false, error: 'camera not found' });
 
-  const hit = analysisCache.get(camera.id);
-  if (hit && Date.now() - hit.at <= ANALYSIS_TTL_MS) {
-    return res.json({ ok: true, cached: true, ...hit.payload });
+  const cacheKey = `cctv:${camera.id}`;
+  const hit = cctvVisionCache.get(cacheKey);
+  if (hit) {
+    return res.json({ ok: true, cached: true, ...hit });
   }
 
   try {
@@ -213,10 +212,10 @@ router.get('/analyze/:id', async (req, res) => {
       base64: buffer.toString('base64'),
       mimeType: contentType,
       context: camera.name,
+      cacheKey: `img:${camera.id}`,
     });
     const payload = { camera: publicView(camera), fetchedAt, analysis };
-    analysisCache.set(camera.id, { at: Date.now(), payload });
-    if (analysisCache.size > 100) analysisCache.delete(analysisCache.keys().next().value);
+    cctvVisionCache.set(cacheKey, payload);
     res.json({ ok: true, cached: false, ...payload });
   } catch (e) {
     if (e instanceof FrameError || e instanceof VisionError) {

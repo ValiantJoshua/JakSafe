@@ -9,6 +9,7 @@ import navigateRouter from './routes/navigate.js';
 import geocodeRouter from './routes/geocode.js';
 import authRouter from './routes/auth.js';
 import savedRoutesRouter from './routes/savedRoutes.js';
+import { getAllCacheStats } from './services/cacheService.js';
 
 // Utamakan IPv4 untuk mencegah galat "fetch failed" / ETIMEDOUT pada jaringan ISP Indonesia
 dns.setDefaultResultOrder('ipv4first');
@@ -30,6 +31,17 @@ export function createApp() {
       status: 'ok',
       service: 'jaksafe-backend',
       time: new Date().toISOString(),
+      cache: getAllCacheStats(),
+    });
+  });
+
+  // Dedicated Cache Inspection Endpoint
+  app.get('/api/cache/stats', (_req, res) => {
+    res.json({
+      ok: true,
+      service: 'jaksafe-backend',
+      time: new Date().toISOString(),
+      cache: getAllCacheStats(),
     });
   });
 

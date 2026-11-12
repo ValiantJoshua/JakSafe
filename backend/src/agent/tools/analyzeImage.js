@@ -16,15 +16,22 @@ export const analyzeImageDeclaration = {
       image_base64: { type: 'STRING', description: 'Base64 image from get_cctv_snapshot (image.base64)' },
       mime_type: { type: 'STRING', description: 'image/jpeg (default), image/png or image/webp' },
       context: { type: 'STRING', description: 'Camera name / location for context' },
+      camera_id: { type: 'STRING', description: 'ID of the CCTV camera if known (for cache reuse)' },
     },
     required: ['image_base64'],
   },
 };
 
 /** Execute Tool 4. Never throws — returns { ok:false, error } so the agent can reason about it. */
-export async function analyzeImage({ image_base64: imageBase64, mime_type: mimeType, context } = {}) {
+export async function analyzeImage({ image_base64: imageBase64, mime_type: mimeType, context, camera_id: cameraId } = {}) {
   try {
-    const analysis = await analyzeRoadImage({ base64: imageBase64, mimeType: mimeType || 'image/jpeg', context });
+    const cacheKey = cameraId ? `img:${cameraId}` : null;
+    const analysis = await analyzeRoadImage({
+      base64: imageBase64,
+      mimeType: mimeType || 'image/jpeg',
+      context,
+      cacheKey,
+    });
     return { ok: true, analysis };
   } catch (e) {
     return { ok: false, error: e.message || 'vision analysis failed' };

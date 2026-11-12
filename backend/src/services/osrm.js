@@ -3,6 +3,8 @@
 // Request/validation approach adapted from God's Eye View (MIT) — vite.config.js `/api/route`.
 // See THIRD_PARTY_NOTICES.md.
 
+import { routeGeometryCache } from './cacheService.js';
+
 const OSRM_DE_BASE = 'https://routing.openstreetmap.de';
 const OSRM_PROJECT_BASE = 'https://router.project-osrm.org';
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -38,8 +40,6 @@ const JAKARTA_CORRIDORS = [
   { name: 'Jl. Gunung Sahari, Jl. Kramat Raya', lat: -6.1720, lon: 106.8420 },
   { name: 'Jl. Boulevard Raya, Jl. Yos Sudarso', lat: -6.1550, lon: 106.8980 },
 ];
-
-const cache = new Map();
 
 export class RouteError extends Error {
   constructor(message, status = 400) {
@@ -250,8 +250,8 @@ export async function getRoutes({ profile = 'car', coords, alternatives = false 
 
   const coordStr = coords.map(([lon, lat]) => `${lon},${lat}`).join(';');
   const key = `${p}|${alternatives}|${coordStr}`;
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at <= CACHE_TTL_MS) return hit.payload;
+  const hit = routeGeometryCache.get(key);
+  if (hit) return hit;
 
   let data = null;
   try {
@@ -324,7 +324,6 @@ export async function getRoutes({ profile = 'car', coords, alternatives = false 
     })),
   };
 
-  cache.set(key, { payload, at: Date.now() });
-  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+  routeGeometryCache.set(key, payload);
   return payload;
 }

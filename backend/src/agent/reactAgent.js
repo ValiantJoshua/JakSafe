@@ -319,8 +319,15 @@ export async function runNavigationAgent({
               context = lastCctvSnapshot.camera?.name || context;
             }
 
+            const cameraId = call.args?.camera_id || lastCctvSnapshot?.camera?.id || null;
+
             if (imageBase64) {
-              toolResult = await analyzeImage({ image_base64: imageBase64, mime_type: mimeType, context });
+              toolResult = await analyzeImage({
+                image_base64: imageBase64,
+                mime_type: mimeType,
+                context,
+                camera_id: cameraId,
+              });
               if (toolResult.ok && visualResult) {
                 visualResult.analysis = toolResult.analysis;
                 visualResult.analisis = toolResult.analysis;
