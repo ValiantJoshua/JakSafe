@@ -17,6 +17,7 @@ import Hls from 'hls.js';
 import { ambilSemuaKamera, urlBingkaiKamera, urlStreamKamera, analisisKamera } from '../api/cctvApi.js';
 import { getViewer, flyToCoordinates } from './cesiumViewer.js';
 import { labelKondisiJalan, labelGenangan } from '../utils/format.js';
+import { ikon } from '../ui/icons.js';
 
 /** @type {Cesium.CustomDataSource|null} */
 let cctvDataSource = null;
@@ -519,7 +520,7 @@ export function bukaPopupKameraPeta(cam) {
   }
   if (btnAnalyze) {
     btnAnalyze.disabled = false;
-    btnAnalyze.textContent = 'Analisis AI Vision (Gemini)';
+    btnAnalyze.innerHTML = `${ikon('i-spark', 13)} Analisis AI`;
   }
 
   if (tabVid) {
@@ -662,7 +663,7 @@ function pasangTombolPopupKamera() {
     const lbl = document.getElementById('lblMapCctvAutoRefresh');
     if (lbl) {
       lbl.textContent = autoRefreshEnabled ? 'ON' : 'OFF';
-      lbl.style.color = autoRefreshEnabled ? '#22C55E' : '#94A3B8';
+      lbl.style.color = autoRefreshEnabled ? '' : 'var(--text-3)';
     }
     const cam = daftarKamera.find((c) => c.id === selectedCameraId);
     if (cam && currentViewMode === 'snapshot') {
@@ -740,7 +741,7 @@ function pasangTombolPopupKamera() {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = 'Analisis Ulang AI Vision';
+        btn.innerHTML = `${ikon('i-spark', 13)} Analisis Ulang AI`;
       }
     }
   });
