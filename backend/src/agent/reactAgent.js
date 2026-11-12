@@ -19,7 +19,7 @@ import { findNearest, publicView } from '../services/cctvCatalog.js';
 import { saveExecutionLog } from '../db/mongoClient.js';
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
-const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-latest'];
+const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-flash-latest'];
 const MAX_STEPS = 6;
 
 const SYSTEM_INSTRUCTION = [
@@ -86,8 +86,25 @@ function getMidpoint(geometry) {
   return { lon: mid[0], lat: mid[1] };
 }
 
-/** Clean up large image data before storing in reasoning trace */
+/** Clean up large image/geometry data before storing in reasoning trace */
 function sanitizeObservation(action, data) {
+  if (action === 'get_route' && data?.ok && Array.isArray(data.routes)) {
+    const first = data.routes[0] || {};
+    return {
+      ok: true,
+      profile: data.profile,
+      distanceM: first.distanceM,
+      durationS: first.durationS,
+      summary: first.summary,
+      routes: data.routes.map((r) => ({
+        distanceM: r.distanceM,
+        durationS: r.durationS,
+        summary: r.summary,
+        stepCount: Array.isArray(r.steps) ? r.steps.length : 0,
+        sampledPoints: samplePoints(r.geometry, 3),
+      })),
+    };
+  }
   if (action === 'get_cctv_snapshot' && data?.image?.base64) {
     return {
       ok: data.ok,
@@ -542,15 +559,16 @@ export async function runNavigationAgent({
         durationS: alt.durationS,
         summary: alt.summary || `Jalur Alternatif ${idx + 2}`,
         geometry: alt.geometry,
+        steps: Array.isArray(alt.steps) ? alt.steps : [],
         totalScore: altScore.totalScore,
         label: altScore.label,
         color: altScore.color,
         score: altScore,
         air: altAir
           ? {
-              ...altAir,
-              titikTerburuk: { time: altAir.time },
-            }
+            ...altAir,
+            titikTerburuk: { time: altAir.time },
+          }
           : null,
         visual: altVisual,
       };
@@ -577,13 +595,14 @@ export async function runNavigationAgent({
       durationS: primaryRoute.durationS,
       summary: primaryRoute.summary || 'Jalur Utama',
       geometry: primaryRoute.geometry,
+      steps: Array.isArray(primaryRoute.steps) ? primaryRoute.steps : [],
     },
     score: primaryScore,
     air: airSummary
       ? {
-          ...airSummary,
-          titikTerburuk: { time: airSummary.time },
-        }
+        ...airSummary,
+        titikTerburuk: { time: airSummary.time },
+      }
       : null,
     visual: visualResult,
     reason: agentFinalThought || null,

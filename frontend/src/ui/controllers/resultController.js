@@ -26,6 +26,7 @@ import { simpanRute } from '../../api/authApi.js';
 import { ikon } from '../icons.js';
 import { getState, setState } from '../../state/appState.js';
 import { toast } from '../toast.js';
+import { focusStepOnMap } from '../../map/routeLayer.js';
 
 /** Menuliskan lencana sumber hasil di kartu skor. */
 function gambarSumber(sumber) {
@@ -372,6 +373,7 @@ export function susunDaftarPilihanRute(hasil) {
       durationS: hasil.route?.durationS ?? 0,
       summary: hasil.route?.summary || 'Jalur Utama Rekomendasi',
       geometry: hasil.route?.geometry || [],
+      steps: Array.isArray(hasil.route?.steps) ? hasil.route.steps : [],
     },
     score: hasil.score,
     air: hasil.air || null,
@@ -400,6 +402,7 @@ export function susunDaftarPilihanRute(hasil) {
         durationS: alt.durationS ?? 0,
         summary: alt.summary || `Jalur Alternatif ${i + 2}`,
         geometry: alt.geometry || [],
+        steps: Array.isArray(alt.steps) ? alt.steps : [],
       },
       score: fallbackScore,
       air: alt.air || hasil.air || null,
@@ -491,6 +494,149 @@ function gambarPilihanRute(daftarPilihan, indeksAktif = 0) {
 }
 
 /**
+ * Meloloskan (escape) karakter khusus HTML untuk mencegah injeksi teks mentah.
+ * @param {unknown} teks
+ * @returns {string}
+ */
+function pelarian(teks) {
+  if (teks === null || teks === undefined) return '';
+  return String(teks)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Memilih ikon SVG yang sesuai dengan kunci arah manuver OSRM.
+ * @param {string} directionKey
+ * @returns {string}
+ */
+function ikonUntukArahLangkah(directionKey) {
+  switch (directionKey) {
+    case 'depart':
+      return ikon('i-pin', 15);
+    case 'arrive':
+      return ikon('i-flag', 15);
+    case 'left':
+    case 'sharp-left':
+      return ikon('i-turn-left', 16);
+    case 'right':
+    case 'sharp-right':
+      return ikon('i-turn-right', 16);
+    case 'slight-left':
+      return ikon('i-turn-slight-l', 16);
+    case 'slight-right':
+      return ikon('i-turn-slight-r', 16);
+    case 'uturn':
+      return ikon('i-uturn', 16);
+    case 'roundabout':
+      return ikon('i-roundabout', 16);
+    default:
+      return ikon('i-straight', 16);
+  }
+}
+
+/**
+ * Menyusun langkah rute sintetis minimal jika payload rute dari cache lama belum memuat steps[].
+ */
+function susunLangkahFallback(route, asal, tujuan) {
+  const geom = Array.isArray(route?.geometry) ? route.geometry : [];
+  const startCoord = geom[0] || (asal ? [asal.lon, asal.lat] : null);
+  const midCoord = geom[Math.floor(geom.length / 2)] || startCoord;
+  const endCoord = geom[geom.length - 1] || (tujuan ? [tujuan.lon, tujuan.lat] : null);
+  const koridor = route?.summary || 'Jalur Utama';
+  const distM = Number(route?.distanceM) || 0;
+  const durS = Number(route?.durationS) || 0;
+
+  return [
+    {
+      index: 1,
+      instruction: `Mulai perjalanan dari ${asal?.nama || 'Titik Awal'}`,
+      roadName: koridor,
+      directionKey: 'depart',
+      distanceM: Math.round(distM * 0.2),
+      durationS: Math.round(durS * 0.2),
+      location: startCoord,
+    },
+    {
+      index: 2,
+      instruction: `Ikuti koridor ${koridor}`,
+      roadName: koridor,
+      directionKey: 'straight',
+      distanceM: Math.max(0, distM - Math.round(distM * 0.2)),
+      durationS: Math.max(0, durS - Math.round(durS * 0.2)),
+      location: midCoord,
+    },
+    {
+      index: 3,
+      instruction: `Tiba di ${tujuan?.nama || 'Tujuan'}`,
+      roadName: tujuan?.nama || 'Titik Tujuan',
+      directionKey: 'arrive',
+      distanceM: 0,
+      durationS: 0,
+      location: endCoord,
+    },
+  ];
+}
+
+/** Menyimpan daftar langkah aktif saat ini untuk interaksi klik fokus peta */
+let langkahAktifSekarang = [];
+
+/**
+ * Menggambar daftar langkah manuver rute (Turn-by-Turn Steps) di sidebar hasil.
+ * @param {object} route
+ * @param {object|null} asal
+ * @param {object|null} tujuan
+ */
+function gambarLangkahRute(route, asal = null, tujuan = null) {
+  const wadah = $('#stepsList');
+  const lencanaJumlah = $('#stepsCountBadge');
+  if (!wadah) return;
+
+  const steps = Array.isArray(route?.steps) && route.steps.length > 0
+    ? route.steps
+    : susunLangkahFallback(route, asal, tujuan);
+
+  langkahAktifSekarang = steps;
+
+  if (lencanaJumlah) {
+    lencanaJumlah.textContent = `${steps.length} langkah`;
+  }
+
+  wadah.innerHTML = steps.map((step, idx) => {
+    const dirKey = step.directionKey || 'straight';
+    const isTerminal = dirKey === 'depart' || dirKey === 'arrive';
+    const jarakTeks = step.distanceM > 0 ? formatJarak(step.distanceM) : (dirKey === 'arrive' ? 'Tujuan' : '0 m');
+    const durTeks = step.durationS > 0 ? formatDurasi(step.durationS) : '';
+    const namaJalan = step.roadName || '';
+    const adaKoordinat = Array.isArray(step.location) && step.location.length >= 2;
+
+    return `
+      <li class="stepitem" data-step-index="${idx}" data-dir="${pelarian(dirKey)}" ${adaKoordinat ? 'tabindex="0" role="button" title="Klik untuk melihat titik manuver di peta"' : ''}>
+        <div class="stepitem__rail" aria-hidden="true">
+          <span class="stepitem__icon stepitem__icon--${pelarian(dirKey)}">
+            ${ikonUntukArahLangkah(dirKey)}
+          </span>
+          ${idx < steps.length - 1 ? '<span class="stepitem__line"></span>' : ''}
+        </div>
+        <div class="stepitem__body">
+          <div class="stepitem__top">
+            <span class="stepitem__instruction">${pelarian(step.instruction || 'Lanjut mengikuti rute')}</span>
+            <span class="stepitem__dist">${pelarian(jarakTeks)}</span>
+          </div>
+          <div class="stepitem__meta">
+            <span class="stepitem__num">Langkah ${step.index || idx + 1}</span>
+            ${namaJalan && !isTerminal ? `<span class="stepitem__sep">·</span><span class="stepitem__road">${pelarian(namaJalan)}</span>` : ''}
+            ${durTeks ? `<span class="stepitem__sep">·</span><span class="stepitem__dur">${pelarian(durTeks)}</span>` : ''}
+          </div>
+        </div>
+      </li>`;
+  }).join('');
+}
+
+/**
  * Memilih salah satu rute kandidat berdasarkan indeks (0, 1, 2...),
  * memperbarui kartu skor/detail di sidebar serta menyorot rute terpilih di peta 3D.
  *
@@ -573,6 +719,7 @@ export function gambarHasil(hasil) {
   }
 
   gambarRincian(aktifOpt.score);
+  gambarLangkahRute(aktifOpt.route, hasil.asal, hasil.tujuan);
   gambarUdara(aktifOpt.air, aktifOpt.score);
   gambarKamera(aktifOpt.visual);
   gambarJejak(hasil);
@@ -594,6 +741,28 @@ export function pasangPengendaliHasil() {
     if (Number.isInteger(idx)) {
       pilihRuteByIndex(idx);
     }
+  });
+
+  // Klik pada salah satu baris manuver di Panduan Langkah Rute (#stepsList)
+  $('#stepsList')?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-step-index]');
+    if (!item) return;
+    const idx = Number(item.dataset.stepIndex);
+    const step = langkahAktifSekarang[idx];
+    if (!step) return;
+
+    $('#stepsList')?.querySelectorAll('.stepitem').forEach((el) => {
+      el.dataset.active = el === item ? '1' : '0';
+    });
+    focusStepOnMap(step);
+  });
+
+  // Tombol ciutkan / bentangkan daftar langkah manuver rute (#btnToggleSteps)
+  const tombolSteps = $('#btnToggleSteps');
+  tombolSteps?.addEventListener('click', () => {
+    const terbuka = tombolSteps.getAttribute('aria-expanded') === 'true';
+    tombolSteps.setAttribute('aria-expanded', String(!terbuka));
+    show($('#stepsListWrap'), !terbuka);
   });
 
   // Tombol kembali / ubah titik awal atau tujuan di header Petunjuk Arah

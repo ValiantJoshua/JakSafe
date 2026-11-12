@@ -8,7 +8,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCoords, RouteError } from '../src/services/osrm.js';
+import { parseCoords, extractRouteSteps, RouteError } from '../src/services/osrm.js';
 import { calculateRouteScore, getScoreCategory } from '../src/scoring/routeScorer.js';
 
 describe('Build 1 Integration: OSRM Routing & RouteScorer Subassembly', () => {
@@ -163,6 +163,71 @@ describe('Build 1 Integration: OSRM Routing & RouteScorer Subassembly', () => {
         assert.equal(res.label, tc.expectedLabel);
         assert.equal(res.label, getScoreCategory(res.totalScore).label);
       }
+    });
+  });
+
+  describe('5. Turn-by-Turn Maneuver Step Extraction (extractRouteSteps)', () => {
+    it('translates OSRM legs.steps into Indonesian instructions and merges consecutive straight steps on the same street', () => {
+      const mockOsrmRoute = {
+        legs: [
+          {
+            steps: [
+              {
+                name: 'Jl. Medan Merdeka Selatan',
+                distance: 350,
+                duration: 45,
+                maneuver: { type: 'depart', modifier: 'right', location: [106.8272, -6.1805] },
+              },
+              {
+                name: 'Jl. M.H. Thamrin',
+                distance: 600,
+                duration: 75,
+                maneuver: { type: 'turn', modifier: 'left', location: [106.8230, -6.1812] },
+              },
+              {
+                name: 'Jl. Jenderal Sudirman',
+                distance: 400,
+                duration: 50,
+                maneuver: { type: 'new name', modifier: 'straight', location: [106.8229, -6.1920] },
+              },
+              {
+                name: 'Jl. Jenderal Sudirman',
+                distance: 850,
+                duration: 95,
+                maneuver: { type: 'continue', modifier: 'straight', location: [106.8225, -6.1960] },
+              },
+              {
+                name: 'Jl. Jenderal Sudirman',
+                distance: 180,
+                duration: 28,
+                maneuver: { type: 'roundabout', modifier: 'right', exit: 2, location: [106.8230, -6.1950] },
+              },
+              {
+                name: 'Bundaran HI',
+                distance: 0,
+                duration: 0,
+                maneuver: { type: 'arrive', modifier: 'left', location: [106.8230, -6.1950] },
+              },
+            ],
+          },
+        ],
+      };
+
+      const steps = extractRouteSteps(mockOsrmRoute);
+
+      // Step 3 and Step 4 (both straight on Jl. Jenderal Sudirman) should be merged into 1 step (400 + 850 = 1250m)
+      assert.equal(steps.length, 5);
+      assert.equal(steps[0].directionKey, 'depart');
+      assert.match(steps[0].instruction, /Mulai perjalanan di Jl\. Medan Merdeka Selatan/);
+      assert.equal(steps[1].directionKey, 'left');
+      assert.match(steps[1].instruction, /Belok kiri ke Jl\. M\.H\. Thamrin/);
+      assert.equal(steps[2].directionKey, 'straight');
+      assert.equal(steps[2].distanceM, 1250);
+      assert.equal(steps[2].durationS, 145);
+      assert.equal(steps[3].directionKey, 'roundabout');
+      assert.match(steps[3].instruction, /jalan keluar ke-2/);
+      assert.equal(steps[4].directionKey, 'arrive');
+      assert.match(steps[4].instruction, /Tiba di tujuan/);
     });
   });
 });

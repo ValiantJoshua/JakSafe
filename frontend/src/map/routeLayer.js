@@ -447,6 +447,100 @@ export function clearRouteOnMap() {
   getViewer()?.scene.requestRender();
 }
 
+let pinStepFocusDataUrl = null;
+
+/**
+ * Membuat ikon titik manuver (Turn-by-Turn step focus) dengan kontras tinggi.
+ */
+function buatPinFokusLangkah() {
+  if (pinStepFocusDataUrl) return pinStepFocusDataUrl;
+
+  const size = 40;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 17, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(163, 230, 53, 0.30)';
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 11.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#0A2E6B';
+  ctx.shadowColor = 'rgba(10, 46, 107, 0.38)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#A3E635';
+  ctx.fill();
+
+  pinStepFocusDataUrl = canvas.toDataURL('image/png');
+  return pinStepFocusDataUrl;
+}
+
+/**
+ * Mengarahkan kamera ke titik manuver langkah rute (Turn-by-Turn) yang diklik di sidebar,
+ * sekaligus menampilkan penanda fokus pada lokasi belokan tersebut.
+ * @param {object} step
+ */
+export function focusStepOnMap(step) {
+  if (!routeDataSource || !step || !Array.isArray(step.location) || step.location.length < 2) return;
+  const [lon, lat] = step.location;
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+
+  const existing = routeDataSource.entities.getById('route-step-focus');
+  if (existing) {
+    routeDataSource.entities.remove(existing);
+  }
+
+  const labelText = step.index
+    ? `Langkah ${step.index}: ${step.instruction || step.roadName || 'Titik Manuver'}`
+    : step.instruction || 'Titik Manuver';
+
+  routeDataSource.entities.add({
+    id: 'route-step-focus',
+    position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+    billboard: {
+      image: buatPinFokusLangkah(),
+      width: 32,
+      height: 32,
+      verticalOrigin: Cesium.VerticalOrigin.CENTER,
+      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+    label: {
+      text: labelText.length > 48 ? `${labelText.slice(0, 46)}…` : labelText,
+      font: '700 11.5px Manrope, sans-serif',
+      showBackground: true,
+      backgroundColor: Cesium.Color.fromCssColorString('#0A2E6B').withAlpha(0.94),
+      backgroundPadding: new Cesium.Cartesian2(10, 5),
+      fillColor: Cesium.Color.WHITE,
+      outlineColor: Cesium.Color.fromCssColorString('#A3E635'),
+      outlineWidth: 1,
+      style: Cesium.LabelStyle.FILL,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      pixelOffset: new Cesium.Cartesian2(0, -20),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    },
+  });
+
+  flyToCoordinates({ lon, lat, height: 1150, duration: 1.0 });
+  getViewer()?.scene.requestRender();
+}
+
 let pinUserLocationDataUrl = null;
 
 /**

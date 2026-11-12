@@ -1405,3 +1405,276 @@
 .routeopt__sep {
   opacity: 0.6;
 }
+
+/* =====================================================================
+   PANDUAN LANGKAH RUTE (TURN-BY-TURN STEPS)
+   ===================================================================== */
+
+.card--steps {
+  padding: 0;
+  overflow: hidden;
+}
+
+.steps__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px var(--s4);
+  margin-bottom: 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.steps__headtext {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.steps__sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  line-height: 1.25;
+}
+
+.steps__badge {
+  background: var(--jk-navy);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+[data-theme="gelap"] .steps__badge {
+  background: var(--jk-blue-1);
+}
+
+.steps__toggle {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease);
+}
+
+.steps__toggle:hover {
+  background: var(--surface-3);
+  color: var(--jk-blue-1);
+  border-color: var(--jk-blue-1);
+}
+
+.steps__chev {
+  transition: transform var(--dur-2) var(--ease);
+}
+
+.steps__toggle[aria-expanded="true"] .steps__chev {
+  transform: rotate(180deg);
+}
+
+.steps__wrap {
+  max-height: 340px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.steps__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stepitem {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 10px var(--s4);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+
+.stepitem:last-child {
+  border-bottom: 0;
+}
+
+.stepitem:hover {
+  background: var(--surface-2);
+}
+
+.stepitem[data-active="1"] {
+  background: var(--jk-blue-pale);
+}
+
+.stepitem[data-active="1"]::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--jk-blue-1);
+}
+
+[data-theme="gelap"] .stepitem[data-active="1"] {
+  background: rgba(2, 132, 255, 0.14);
+}
+
+.stepitem__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 30px;
+  padding-top: 1px;
+}
+
+.stepitem__icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--jk-navy);
+  flex-shrink: 0;
+  transition: all var(--dur-1) var(--ease);
+}
+
+[data-theme="gelap"] .stepitem__icon {
+  color: #93C5FD;
+}
+
+.stepitem__icon--depart {
+  background: rgba(2, 132, 255, 0.14);
+  border-color: rgba(2, 132, 255, 0.35);
+  color: var(--jk-blue-1);
+}
+
+.stepitem__icon--arrive {
+  background: var(--jk-navy);
+  border-color: var(--jk-navy);
+  color: var(--jk-lime);
+}
+
+.stepitem__icon--left,
+.stepitem__icon--right,
+.stepitem__icon--sharp-left,
+.stepitem__icon--sharp-right,
+.stepitem__icon--uturn,
+.stepitem__icon--roundabout {
+  background: var(--jk-blue-pale);
+  border-color: rgba(2, 132, 255, 0.28);
+  color: var(--jk-navy);
+}
+
+[data-theme="gelap"] .stepitem__icon--left,
+[data-theme="gelap"] .stepitem__icon--right,
+[data-theme="gelap"] .stepitem__icon--sharp-left,
+[data-theme="gelap"] .stepitem__icon--sharp-right,
+[data-theme="gelap"] .stepitem__icon--uturn,
+[data-theme="gelap"] .stepitem__icon--roundabout {
+  background: rgba(2, 132, 255, 0.18);
+  color: #E0F2FE;
+}
+
+.stepitem[data-active="1"] .stepitem__icon {
+  background: var(--jk-navy);
+  border-color: var(--jk-navy);
+  color: var(--jk-lime);
+}
+
+.stepitem__line {
+  flex: 1;
+  width: 0;
+  min-height: 10px;
+  border-left: 1.5px dashed var(--border-strong);
+  margin-top: 4px;
+}
+
+.stepitem__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stepitem__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stepitem__instruction {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.35;
+}
+
+.stepitem__dist {
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--jk-blue-1);
+  background: var(--jk-blue-pale);
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+[data-theme="gelap"] .stepitem__dist {
+  background: rgba(2, 132, 255, 0.16);
+  color: #93C5FD;
+}
+
+.stepitem[data-dir="arrive"] .stepitem__dist {
+  background: var(--jk-lime);
+  color: var(--jk-navy);
+}
+
+.stepitem__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.3;
+}
+
+.stepitem__num {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+.stepitem__road {
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.stepitem__dur {
+  font-variant-numeric: tabular-nums;
+}
+
+.stepitem__sep {
+  opacity: 0.6;
+}
