@@ -1,0 +1,48 @@
+{
+  "users": [
+    {
+      "id": "bad80233-2125-4bec-8aab-a2a62e3ece17",
+      "_id": "8ae4f033-cd96-4412-9954-9028e17c34df",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794174229464@jaksafe.id",
+      "password": "$2b$10$l7B8MN2Y4N5zs0giFzTjdeJDQQ6CWmwbC938J/rSsaDkJH9tIrdtG",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "createdAt": "2026-11-08T21:43:49.713Z",
+      "updatedAt": "2026-11-08T21:43:50.121Z"
+    },
+    {
+      "id": "fd32921b-5309-49c7-9add-4d9a41d29731",
+      "_id": "df82bbad-f2c3-4c31-bcf5-175788ac376b",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794174456535@jaksafe.id",
+      "password": "$2b$10$srp3UpUVMSnhw4zX0sJZCuqOXS2TiHX9a573J8AhwasY4taonLhzK",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "createdAt": "2026-11-08T21:47:36.758Z",
+      "updatedAt": "2026-11-08T21:47:37.151Z"
+    },
+    {
+      "id": "2c473e8d-9be3-4a13-bbbf-2a0450d74345",
+      "_id": "774f62f7-258d-4270-8058-fae7f877c98e",
+      "name": "Valiant.joshua5",
+      "email": "valiant.joshua5@gmail.com",
+      "password": "$2b$10$TwZr8FAm4xpr8/vxlx4JMedYJ12LFGghaYmwUMQTgeRk0Gb.5tUaC",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": []
+      },
+      "createdAt": "2026-11-08T21:55:16.096Z",
+      "updatedAt": "2026-11-08T21:55:46.716Z"
+    }
+  ],
+  "savedRoutes": []
+}

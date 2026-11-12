@@ -57,9 +57,9 @@ export function templateLoginModal() {
             <p class="compare__head"><span class="compare__tag compare__tag--member">Sudah Masuk</span></p>
             <ul class="compare__list">
               ${baris('Semua fitur tanpa masuk')}
-              ${baris('Profil kesehatan, bobot polusi dinaikkan saat rute dinilai', { sorot: true, ikonNama: 'i-wind' })}
-              ${baris('Simpan rute favorit selama sesi ini', { sorot: true, ikonNama: 'i-star' })}
-              ${baris('Riwayat perjalanan, menyusul setelah backend punya basis data', { sorot: true, ikonNama: 'i-clock' })}
+              ${baris('Profil kesehatan, tersimpan permanen di database', { sorot: true, ikonNama: 'i-wind' })}
+              ${baris('Simpan rute favorit permanen ke database', { sorot: true, ikonNama: 'i-star' })}
+              ${baris('Akses rute tersimpan kapan saja', { sorot: true, ikonNama: 'i-clock' })}
               ${baris('Peringatan dini area rawan banjir, menyusul', { sorot: true, ikonNama: 'i-bell' })}
             </ul>
           </div>
@@ -103,8 +103,7 @@ export function templateLoginModal() {
         </button>
 
         <p class="modal__fine">
-          Backend belum punya sistem akun, jadi tombol ini hanya mengubah
-          tampilan dan bobot penilaian di peramban. Tidak ada data yang dikirim.
+          Akun dan rute tersimpan diamankan dengan otentikasi JWT dan enkripsi kata sandi di backend JakSafe.
         </p>
       </div>
     </div>

@@ -278,6 +278,14 @@
 .saveditem__t { flex: 1; min-width: 0; }
 .saveditem__name { font-size: var(--fs-sm); font-weight: 800; color: var(--text-1); }
 .saveditem__sub  { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
+.saveditem__body { flex: 1; min-width: 0; cursor: pointer; }
+.saveditem__del {
+  width: 26px; height: 26px; flex: 0 0 26px; border-radius: 6px;
+  border: none; background: transparent; color: var(--text-3);
+  display: grid; place-items: center; cursor: pointer; opacity: 0.6;
+  transition: all 0.15s ease;
+}
+.saveditem__del:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; opacity: 1; }
 
 /* AJAKAN MASUK */
 .promo {

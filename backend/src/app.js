@@ -7,6 +7,8 @@ import cctvRouter from './routes/cctv.js';
 import tomtomRouter from './routes/tomtom.js';
 import navigateRouter from './routes/navigate.js';
 import geocodeRouter from './routes/geocode.js';
+import authRouter from './routes/auth.js';
+import savedRoutesRouter from './routes/savedRoutes.js';
 
 // Utamakan IPv4 untuk mencegah galat "fetch failed" / ETIMEDOUT pada jaringan ISP Indonesia
 dns.setDefaultResultOrder('ipv4first');
@@ -37,6 +39,8 @@ export function createApp() {
   app.use('/api/tomtom', tomtomRouter);
   app.use('/api/navigate', navigateRouter);
   app.use('/api/geocode', geocodeRouter);
+  app.use('/api/auth', authRouter);
+  app.use('/api/routes/saved', savedRoutesRouter);
 
   return app;
 }
