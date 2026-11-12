@@ -42,6 +42,36 @@
       },
       "createdAt": "2026-11-08T21:55:16.096Z",
       "updatedAt": "2026-11-08T21:55:46.716Z"
+    },
+    {
+      "id": "b4fa46fa-7bff-499c-ba88-8c354596cc4e",
+      "_id": "0ec1a45f-ec92-43b6-a4d2-f4cdbed35054",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794458257340@jaksafe.id",
+      "password": "$2b$10$5zt5bsB7PHWh12S.IXT9WusIudJSH/YjacsT3gftu9Mr5xX.rICWC",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "createdAt": "2026-11-12T04:37:37.616Z",
+      "updatedAt": "2026-11-12T04:37:38.093Z"
+    },
+    {
+      "id": "6dd3023d-84a1-4c31-bf60-37814f6cccab",
+      "_id": "b32ea994-74ac-445d-8819-3df96f97392f",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794462133495@jaksafe.id",
+      "password": "$2b$10$TwwOWWjpYsLP2yXBXaAULuEvZJm4DT9g5a6YufAcaB8b6RlQtnpjy",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "createdAt": "2026-11-12T05:42:13.792Z",
+      "updatedAt": "2026-11-12T05:42:14.278Z"
     }
   ],
   "savedRoutes": []

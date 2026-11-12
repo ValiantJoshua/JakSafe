@@ -1,13 +1,20 @@
 /*
    Pengendali layar pencarian.
 
-   Menyambungkan input pengguna ke Geocoding dinamis (Google Maps & OSM)
-   dan alur navigasi di domain/navigationService.js.
+   Menyambungkan input pengguna ke Geocoding & Address Parser presisi ala Kalceria
+   (mendukung perumahan, blok/nomor, RT/RW, gang, jalan spesifik, dan deteksi GPS)
+   serta alur navigasi di domain/navigationService.js.
 */
 
 import { $, $$, show, setPressed, setText } from '../../utils/dom.js';
 import { getState, setState } from '../../state/appState.js';
-import { findPlaceById, searchPlacesLive, registerCustomPlace, DEFAULT_TRIP } from '../../config/jakartaPlaces.js';
+import {
+  findPlaceById,
+  searchPlacesLive,
+  reverseGeocodeLive,
+  registerCustomPlace,
+  DEFAULT_TRIP,
+} from '../../config/jakartaPlaces.js';
 import { cariRute } from '../../domain/navigationService.js';
 import { SEBAB } from '../../api/httpClient.js';
 import { SUMBER_HASIL } from '../../config/constants.js';
@@ -22,7 +29,7 @@ let pengendaliAktif = null;
 function isiKotak(idInput, idTempat) {
   const tempat = findPlaceById(idTempat);
   const kotak = $(idInput);
-  if (kotak && tempat) kotak.value = tempat.nama;
+  if (kotak && tempat) kotak.value = tempat.headline || tempat.nama;
 }
 
 /** Menutup seluruh daftar saran yang sedang terbuka. */
@@ -34,8 +41,8 @@ function tutupSemuaSaran() {
 }
 
 /**
- * Memasang perilaku kotak isian dengan pencarian geocoding dinamis (live).
- * Mendukung pencarian alamat spesifik apa pun di Jakarta/Indonesia atau koordinat angka.
+ * Memasang perilaku kotak isian dengan pencarian geocoding dinamis (live)
+ * dan dekonstruksi alamat presisi ala Kalceria.
  *
  * @param {string} idInput
  * @param {string} idSaran
@@ -51,23 +58,34 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
 
   const gambarSaran = async () => {
     const val = kotak.value.trim();
-    daftar.innerHTML = '<p class="saran__kosong" style="color:var(--text-3, #94a3b8)">Mencari lokasi...</p>';
+    daftar.innerHTML = '<p class="saran__kosong" style="color:var(--text-3, #94a3b8)">Mencari alamat presisi...</p>';
     daftar.hidden = false;
     kotak.setAttribute('aria-expanded', 'true');
 
     pengendaliSaran?.abort();
     const ctrl = new AbortController();
     pengendaliSaran = ctrl;
-    const hasil = await searchPlacesLive(val, 6, ctrl.signal);
+    const hasil = await searchPlacesLive(val, 7, ctrl.signal);
     if (ctrl.signal.aborted) return;
+
     if (hasil.length === 0) {
-      daftar.innerHTML = '<p class="saran__kosong">Lokasi tidak ditemukan. Coba ketik nama jalan, gedung, atau koordinat.</p>';
+      daftar.innerHTML = '<p class="saran__kosong">Lokasi tidak ditemukan. Coba ketik nama jalan, perumahan, blok/nomor, atau koordinat.</p>';
     } else {
-      daftar.innerHTML = hasil.map((p) => `
-        <button class="saran__item" role="option" data-tempat="${p.id}">
-          <span class="saran__nama">${p.nama}</span>
-          <span class="saran__area">${p.area || ''}</span>
-        </button>`).join('');
+      daftar.innerHTML = hasil.map((p) => {
+        const headline = p.headline || p.nama || '';
+        const subtitle = p.subtitle || p.area || '';
+        const unitTag = p.unit
+          ? `<span class="saran__unit">${p.unit}</span>`
+          : '';
+        return `
+        <button type="button" class="saran__item" role="option" data-tempat="${p.id}">
+          <span class="saran__top">
+            <span class="saran__nama">${headline}</span>
+            ${unitTag}
+          </span>
+          <span class="saran__area">${subtitle}</span>
+        </button>`;
+      }).join('');
     }
     daftar.hidden = false;
     kotak.setAttribute('aria-expanded', 'true');
@@ -81,8 +99,8 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
       setState({ [kunciKeadaan]: null });
     }
     pengendaliSaran?.abort();
-    // Debounce optimal 380ms agar ketukan kata tidak membombardir geocoding API
-    timerDebounce = setTimeout(gambarSaran, 380);
+    // Debounce 220ms sesuai spesifikasi Kalceria LocationAutocomplete
+    timerDebounce = setTimeout(gambarSaran, 220);
   });
 
   // Pemilihan ditangkap di tingkat daftar saran
@@ -92,7 +110,7 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
     e.preventDefault();
     const tempat = findPlaceById(item.dataset.tempat);
     if (!tempat) return;
-    kotak.value = tempat.nama;
+    kotak.value = tempat.headline || tempat.nama;
     setState({ [kunciKeadaan]: tempat.id });
     daftar.hidden = true;
     kotak.setAttribute('aria-expanded', 'false');
@@ -106,7 +124,7 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
         const hits = await searchPlacesLive(val, 1);
         if (hits.length > 0) {
           registerCustomPlace(hits[0]);
-          kotak.value = hits[0].nama;
+          kotak.value = hits[0].headline || hits[0].nama;
           setState({ [kunciKeadaan]: hits[0].id });
           daftar.hidden = true;
           kotak.setAttribute('aria-expanded', 'false');
@@ -125,17 +143,66 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
         return;
       }
       const sekarang = findPlaceById(getState()[kunciKeadaan]);
-      if (!sekarang || sekarang.nama !== val) {
+      const namaSekarang = sekarang ? (sekarang.headline || sekarang.nama) : '';
+      if (!sekarang || namaSekarang !== val) {
         const hits = await searchPlacesLive(val, 1);
         if (hits.length > 0) {
           registerCustomPlace(hits[0]);
-          kotak.value = hits[0].nama;
+          kotak.value = hits[0].headline || hits[0].nama;
           setState({ [kunciKeadaan]: hits[0].id });
           return;
         }
-        if (sekarang) kotak.value = sekarang.nama;
+        if (sekarang) kotak.value = namaSekarang;
       }
     }, 220);
+  });
+}
+
+/**
+ * Deteksi lokasi saat ini menggunakan GPS perangkat lalu reverse-geocode
+ * menjadi alamat jalan/kelurahan/kecamatan Indonesia.
+ */
+function pasangDeteksiGpsAsal() {
+  const btn = $('#btnDetectOrigin');
+  const lbl = $('#lblDetectOrigin');
+  const inp = $('#inpOrigin');
+  if (!btn || !inp) return;
+
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      toast('Peramban Anda tidak mendukung deteksi lokasi GPS.');
+      return;
+    }
+
+    btn.disabled = true;
+    if (lbl) lbl.textContent = 'Mendeteksi...';
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const place = await reverseGeocodeLive(latitude, longitude);
+          inp.value = place.headline || place.nama;
+          setState({ idAsal: place.id });
+          tutupSemuaSaran();
+          toast(`Titik awal diatur ke: ${place.headline || place.nama}`);
+        } catch {
+          toast('Gagal menerjemahkan koordinat GPS.');
+        } finally {
+          btn.disabled = false;
+          if (lbl) lbl.textContent = 'Lokasi Saya';
+        }
+      },
+      () => {
+        btn.disabled = false;
+        if (lbl) lbl.textContent = 'Lokasi Saya';
+        toast('Izin lokasi ditolak atau sinyal GPS tidak tersedia.');
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
   });
 }
 
@@ -246,6 +313,7 @@ export function pasangPengendaliPencarian() {
 
   pasangKotakIsian('#inpOrigin', '#saranOrigin', 'idAsal');
   pasangKotakIsian('#inpDest', '#saranDest', 'idTujuan');
+  pasangDeteksiGpsAsal();
 
   $('#btnSwap')?.addEventListener('click', () => {
     const { idAsal, idTujuan } = getState();

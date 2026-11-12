@@ -1,63 +1,73 @@
 /*
-   JakSafe, Bagian Tambahan
-
-   Berkas ini memuat gaya untuk bagian bagian yang lahir bersamaan dengan
-   penyambungan ke backend, yaitu penanda sambungan di bilah atas, daftar
-   saran lokasi, lencana sumber hasil, kartu kamera beserta keadaan
-   gagalnya, dan panel jejak proses.
-
-   Dipisah dari components.css supaya jelas mana gaya tampilan dasar yang
-   sudah stabil dan mana yang menyertai penyambungan data. Diimpor paling
-   akhir sebelum responsive.css.
+   JakSafe, Bagian Tambahan — Refined Civic-Tech Navigation UI
 */
 
-/* Penanda sambungan backend pada bilah atas.
-   Warnanya ditentukan atribut data-status, bukan kelas, supaya
-   backendController cukup menulis satu atribut tanpa mengatur kelas. */
+/* Penanda sambungan backend pada bilah atas. */
 .konstat {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
   height: var(--control-h-sm);
   padding: 0 var(--s3);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
   font-size: var(--fs-xs);
-  font-weight: 700;
+  font-weight: 500;
   color: var(--text-2);
   white-space: nowrap;
   cursor: help;
 }
 .konstat__titik {
-  width: 9px; height: 9px;
+  width: 7px; height: 7px;
   border-radius: 50%;
-  flex: 0 0 9px;
+  flex: 0 0 7px;
   background: var(--text-3);
 }
 .konstat[data-status="hidup"] .konstat__titik {
   background: var(--st-aman);
-  animation: denyutTitik 2.4s var(--ease-io) infinite;
 }
 .konstat[data-status="sebagian"] .konstat__titik { background: var(--st-hati); }
 .konstat[data-status="mati"] .konstat__titik { background: var(--st-hindari); }
 .konstat[data-status="mati"] { border-color: var(--st-hindari); color: var(--st-hindari); }
 
-@keyframes denyutTitik {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(144,184,62,.55); }
-  50%      { box-shadow: 0 0 0 5px rgba(144,184,62,0); }
-}
-
-/* Daftar saran lokasi di bawah kotak isian. */
+/* Daftar saran lokasi presisi & tombol deteksi GPS di bawah/atas kotak isian. */
 .field { position: relative; }
+
+.field__gps {
+  position: absolute;
+  top: -9px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--jk-blue-1);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.field__gps:hover:not(:disabled) {
+  background: var(--jk-blue-pale);
+  border-color: var(--jk-blue-1);
+}
+.field__gps:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
 
 .saran {
   position: absolute;
   z-index: 40;
-  left: 0; right: 0; top: calc(100% + 6px);
-  max-height: 258px;
+  left: 0; right: 0; top: calc(100% + 4px);
+  max-height: 264px;
   overflow-y: auto;
-  padding: var(--s2);
+  padding: var(--s1);
   border-radius: var(--r-md);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -68,67 +78,73 @@
   flex-direction: column;
   gap: 2px;
   width: 100%;
-  padding: var(--s3);
-  border-radius: var(--r-sm);
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-xs);
   text-align: left;
   transition: background var(--dur-1) var(--ease);
 }
 .saran__item:hover,
 .saran__item:focus-visible { background: var(--jk-blue-pale); }
-.saran__nama { font-size: var(--fs-sm); font-weight: 700; color: var(--text-1); }
-.saran__area { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
+.saran__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  width: 100%;
+}
+.saran__nama { font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); line-height: 1.3; }
+.saran__unit {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--jk-lime);
+  color: var(--jk-navy);
+  font-size: 10px;
+  font-weight: 600;
+}
+.saran__area { font-size: var(--fs-xs); color: var(--text-3); font-weight: 400; line-height: 1.3; }
 .saran__kosong { padding: var(--s3); font-size: var(--fs-sm); color: var(--text-3); }
 
-/* Lencana sumber hasil pada kartu skor.
-   Dua keadaan, agen untuk hasil dari backend dan pratinjau untuk hasil
-   yang dirangkai frontend. Perbedaan warnanya dibuat tegas supaya tidak
-   mungkin terlewat saat demo. */
+/* Lencana sumber hasil pada kartu skor. */
 .sumberbadge {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
   margin-bottom: var(--s3);
-  padding: 5px var(--s3);
-  border-radius: var(--r-pill);
+  padding: 4px var(--s3);
+  border-radius: var(--r-xs);
   font-size: var(--fs-xs);
-  font-weight: 800;
-  letter-spacing: .01em;
+  font-weight: 600;
 }
-.sumberbadge__titik { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 7px; }
+.sumberbadge__titik { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 6px; }
 .sumberbadge[data-sumber="agen"] {
-  background: rgba(42,64,208,.12);
+  background: var(--jk-blue-pale);
   color: var(--jk-blue-1);
 }
 .sumberbadge[data-sumber="agen"] .sumberbadge__titik { background: var(--jk-blue-1); }
 .sumberbadge[data-sumber="pratinjau"] {
-  background: rgba(224,161,38,.16);
-  color: #8A6212;
+  background: var(--st-hati-bg);
+  color: var(--st-hati);
 }
 .sumberbadge[data-sumber="pratinjau"] .sumberbadge__titik { background: var(--st-hati); }
-[data-theme="gelap"] .sumberbadge[data-sumber="pratinjau"] { color: #F0C878; }
-[data-theme="gelap"] .sumberbadge[data-sumber="agen"] { color: #AFBDFF; }
+[data-theme="gelap"] .sumberbadge[data-sumber="pratinjau"] { color: #FBBF24; }
+[data-theme="gelap"] .sumberbadge[data-sumber="agen"] { color: #60A5FA; }
 
 /* Kalimat arti skor di bawah label. */
 .scorecard__arti {
   margin-top: var(--s2);
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-2);
   text-align: center;
 }
 
-/* Isian bar rincian penilaian.
-   Warnanya mengikuti atribut data-status yang diisi resultController dari
-   pita nilai tiap kriteria, bukan dari warna tetap. Jadi satu kriteria
-   yang buruk langsung terlihat merah walaupun skor akhirnya masih hijau,
-   dan pengguna bisa melihat faktor mana yang sebenarnya menyeret nilai. */
+/* Isian bar rincian penilaian. */
 .bar__fill { background: var(--st-aman-grad); }
 .bar__fill[data-status="aman"] { background: var(--st-aman-grad); }
 .bar__fill[data-status="hati"] { background: var(--st-hati-grad); }
 .bar__fill[data-status="hindari"] { background: var(--st-hindari-grad); }
 
-/* Pada tema kontras gradien diganti warna rata supaya batas tepinya
-   tetap tegas dan tidak ada bagian yang memudar. */
 [data-theme="kontras"] .bar__fill[data-status="aman"] { background: var(--st-aman); }
 [data-theme="kontras"] .bar__fill[data-status="hati"] { background: var(--st-hati); }
 [data-theme="kontras"] .bar__fill[data-status="hindari"] { background: var(--st-hindari); }
@@ -137,7 +153,7 @@
 .note--sumber {
   margin-top: var(--s3);
   padding-top: var(--s3);
-  border-top: 1px dashed var(--border);
+  border-top: 1px solid var(--border);
   display: block;
   font-size: var(--fs-xs);
   line-height: var(--lh-base);
@@ -151,7 +167,7 @@
   display: block;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   background: var(--surface-3);
 }
 .cctv__gagal {
@@ -160,17 +176,15 @@
   justify-content: center;
   gap: var(--s2);
   aspect-ratio: 16 / 9;
-  border-radius: var(--r-md);
-  background: var(--surface-3);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   color: var(--text-3);
   font-size: var(--fs-sm);
-  font-weight: 700;
+  font-weight: 500;
   text-align: center;
   padding: var(--s4);
 }
-/* Saat atribut gagal dipasang oleh onerror, gambar disembunyikan dan
-   keterangan yang tampil. Dikerjakan lewat CSS supaya tidak perlu
-   menyusun ulang isi kartu dari JavaScript. */
 .cctv[data-gagal="1"] .cctv__img { display: none; }
 .cctv[data-gagal="1"] .cctv__gagal { display: flex; }
 
@@ -178,26 +192,27 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: var(--s3);
+  margin-top: var(--s2);
 }
-.cctv__name { font-size: var(--fs-sm); font-weight: 800; color: var(--text-1); }
-.cctv__meta { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
-.cctv__lisensi { font-size: var(--fs-xs); color: var(--text-3); font-style: italic; }
+.cctv__name { font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); }
+.cctv__meta { font-size: var(--fs-xs); color: var(--text-3); font-weight: 500; }
+.cctv__lisensi { font-size: var(--fs-xs); color: var(--text-3); }
 
 /* Keadaan tidak ada kamera. */
 .nocam { text-align: center; padding: var(--s5) var(--s3); }
 .nocam__icon {
   display: inline-grid;
   place-items: center;
-  width: 54px; height: 54px;
-  margin-bottom: var(--s3);
-  border-radius: 50%;
-  background: var(--surface-3);
+  width: 44px; height: 44px;
+  margin-bottom: var(--s2);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   color: var(--text-3);
 }
-.nocam__title { font-size: var(--fs-base); font-weight: 800; color: var(--text-1); }
+.nocam__title { font-size: var(--fs-base); font-weight: 600; color: var(--text-1); }
 .nocam__text {
-  margin-top: var(--s2);
+  margin-top: var(--s1);
   font-size: var(--fs-sm);
   line-height: var(--lh-base);
   color: var(--text-2);
@@ -205,19 +220,19 @@
 
 /* Ringkasan pembacaan gambar oleh model penglihatan. */
 .analisis {
-  margin-top: var(--s4);
-  padding: var(--s4);
-  border-radius: var(--r-md);
+  margin-top: var(--s3);
+  padding: var(--s3);
+  border-radius: var(--r-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
 .analisis__judul {
   display: flex; align-items: center; gap: var(--s2);
-  font-size: var(--fs-sm); font-weight: 800; color: var(--text-1);
+  font-size: var(--fs-sm); font-weight: 600; color: var(--text-1);
 }
 .analisis__list {
   margin: var(--s2) 0 0;
-  padding-left: var(--s5);
+  padding-left: var(--s4);
   font-size: var(--fs-sm);
   line-height: var(--lh-base);
   color: var(--text-2);
@@ -226,11 +241,9 @@
 /* Panel jejak proses. */
 .logjudul {
   font-size: var(--fs-xs);
-  font-weight: 800;
-  letter-spacing: .07em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--text-3);
-  margin: var(--s4) 0 var(--s2);
+  margin: var(--s3) 0 var(--s2);
 }
 .logjudul:first-child { margin-top: 0; }
 
@@ -242,41 +255,41 @@
   gap: var(--s3);
   padding: var(--s3);
   border-radius: var(--r-sm);
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border);
 }
 .logitem__no {
   flex: 0 0 22px;
   width: 22px; height: 22px;
   display: grid; place-items: center;
-  border-radius: 50%;
+  border-radius: var(--r-xs);
   background: var(--jk-blue-pale);
   color: var(--jk-blue-1);
-  font-size: 11px; font-weight: 800;
+  font-size: 11px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .logitem__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .logitem__judul {
   font-size: var(--fs-xs);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-1);
-  /* Jalur API bisa panjang, dipotong supaya tidak merusak tata letak. */
   overflow-wrap: anywhere;
 }
-.logitem__teks { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
-.logitem__lama { font-size: var(--fs-xs); color: var(--text-3); font-weight: 700; white-space: nowrap; }
+.logitem__teks { font-size: var(--fs-xs); color: var(--text-3); font-weight: 400; }
+.logitem__lama { font-size: var(--fs-xs); color: var(--text-3); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .logitem[data-gagal="1"] { border-color: var(--st-hindari); }
 .logitem[data-gagal="1"] .logitem__no { background: var(--st-hindari-bg); color: var(--st-hindari); }
 
 /* Petunjuk teknis pada layar galat. */
 .errorbox__hint {
   margin: var(--s4) 0;
-  padding: var(--s4);
+  padding: var(--s3) var(--s4);
   border-radius: var(--r-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--fs-xs);
-  line-height: 1.7;
+  line-height: 1.6;
   color: var(--text-2);
   text-align: left;
   white-space: pre-wrap;
@@ -288,21 +301,21 @@
   display: flex;
   align-items: flex-start;
   gap: var(--s3);
-  margin-top: var(--s4);
+  margin-top: var(--s3);
   padding: var(--s3);
   border-radius: var(--r-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
   cursor: pointer;
 }
-.switchrow input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--jk-blue-1); }
+.switchrow input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--jk-blue-1); }
 .switchrow__teks { font-size: var(--fs-xs); color: var(--text-2); line-height: var(--lh-base); }
-.switchrow__teks strong { display: block; font-size: var(--fs-sm); color: var(--text-1); }
+.switchrow__teks strong { display: block; font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); }
 
 /* Kartu pintasan rute. */
 .routecards { align-items: stretch; }
 .routecard { display: flex; flex-direction: column; }
-.routecard__thumb { flex: 0 0 86px; }
+.routecard__thumb { flex: 0 0 84px; }
 .routecard__body { flex: 1; display: block; }
 .routecard__name { display: block; }
 
@@ -313,7 +326,7 @@
   margin-top: 3px;
   font-size: var(--fs-xs);
   color: var(--text-3);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 /* Baris rute tersimpan. */
@@ -329,9 +342,9 @@
 /* Pemberitahuan singkat dipindah ke bawah layar. */
 .toast {
   top: auto;
-  bottom: var(--s8);
-  transform: translateX(-50%) translateY(18px);
-  max-width: min(520px, calc(100vw - 32px));
+  bottom: var(--s6);
+  transform: translateX(-50%) translateY(12px);
+  max-width: min(480px, calc(100vw - 32px));
   text-align: center;
 }
 .toast.is-on { transform: translateX(-50%) translateY(0); }
@@ -377,22 +390,22 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--s2);
 }
 
-/* Grup pemilih 3D / 2D Peta / Satelit ala Google Maps */
+/* Grup pemilih 3D / 2D Peta / Satelit */
 .mapmode-group,
 .mappreset-group {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 4px;
-  border-radius: var(--r-pill);
+  padding: 3px;
+  border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
-  box-shadow: 0 4px 16px rgba(14, 20, 48, 0.12);
+  box-shadow: var(--sh-2);
 }
 
 .mapmode-btn,
@@ -400,10 +413,10 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 12px;
-  border-radius: var(--r-pill);
+  padding: 6px 10px;
+  border-radius: var(--r-xs);
   font-size: var(--fs-xs);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-2);
   white-space: nowrap;
   transition: all var(--dur-1) var(--ease);
@@ -416,9 +429,8 @@
 }
 
 .mapmode-btn[aria-pressed="true"] {
-  background: var(--grad-blue);
+  background: var(--jk-blue-1);
   color: #FFFFFF;
-  box-shadow: var(--sh-1);
 }
 
 .mappreset-btn:active {
@@ -426,32 +438,32 @@
   color: var(--jk-blue-1);
 }
 
-/* Dock Sakelar Layer ON / OFF (Traffic, CCTV, Gedung 3D, Udara) — Clean Pill Style */
+/* Dock Sakelar Layer ON / OFF (Traffic, CCTV, Gedung 3D, Udara) */
 .maplayer-dock {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 5px;
-  border-radius: var(--r-pill);
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-md);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border);
-  box-shadow: 0 6px 20px rgba(14, 20, 48, 0.14);
+  box-shadow: var(--sh-2);
 }
 
 .maplayer-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 11px;
-  border-radius: var(--r-pill);
+  padding: 6px 10px;
+  border-radius: var(--r-xs);
   background: var(--surface-2);
   border: 1px solid transparent;
   color: var(--text-2);
   font-size: var(--fs-xs);
-  font-weight: 800;
+  font-weight: 600;
   transition: all var(--dur-1) var(--ease);
 }
 
@@ -468,48 +480,45 @@
 }
 
 [data-theme="gelap"] .maplayer-chip[aria-pressed="true"] {
-  background: var(--grad-blue);
+  background: var(--jk-blue-1);
 }
 
 .maplayer-chip__dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--text-3);
   transition: all var(--dur-1) var(--ease);
 }
 
 .maplayer-chip[aria-pressed="true"] .maplayer-chip__dot--traffic {
-  background: #22C55E;
-  box-shadow: 0 0 6px #22C55E;
+  background: var(--jk-lime);
 }
 
 .maplayer-chip[aria-pressed="true"] .maplayer-chip__dot--cctv {
   background: #38BDF8;
-  box-shadow: 0 0 6px #38BDF8;
 }
 
 .maplayer-chip[aria-pressed="true"] .maplayer-chip__dot--buildings {
-  background: #A78BFA;
-  box-shadow: 0 0 6px #A78BFA;
+  background: #93C5FD;
 }
 
 .maplayer-chip[aria-pressed="true"] .maplayer-chip__dot--aqi {
-  background: #F59E0B;
-  box-shadow: 0 0 6px #F59E0B;
+  background: #FBBF24;
 }
 
 .maplayer-chip__badge {
   padding: 1px 6px;
-  border-radius: var(--r-pill);
+  border-radius: 4px;
   background: rgba(0, 0, 0, 0.06);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .maplayer-chip[aria-pressed="true"] .maplayer-chip__badge {
-  background: var(--grad-lime);
-  color: #16224A;
+  background: var(--jk-lime);
+  color: var(--jk-navy);
 }
 
 /* Kartu Mengambang Pratinjau Kamera CCTV di atas Peta (#mapCctvPopup) */
@@ -518,13 +527,13 @@
   z-index: calc(var(--z-mapctrl) + 5);
   top: 76px;
   left: var(--s4);
-  width: min(370px, calc(100% - 32px));
+  width: min(368px, calc(100% - 32px));
   padding: var(--s4);
   border-radius: var(--r-lg);
-  background: rgba(14, 20, 48, 0.94);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 46, 107, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: var(--sh-4);
   color: #F8FAFC;
   animation: fadein var(--dur-2) var(--ease) both;
@@ -549,9 +558,8 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--jk-lime);
 }
 
@@ -561,10 +569,9 @@
   padding: 1px 6px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.12);
-  color: #94A3B8;
+  color: #CBD5E1;
   font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-weight: 600;
 }
 
 .mapcctv__tabs {
@@ -578,13 +585,13 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 11px;
-  border-radius: var(--r-pill, 9999px);
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #94A3B8;
+  color: #CBD5E1;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: all var(--dur-1) var(--ease);
 }
@@ -595,18 +602,16 @@
 }
 
 .mapcctv__tab[data-active="1"] {
-  background: #581C87;
-  border-color: #A78BFA;
+  background: var(--jk-blue-1);
+  border-color: var(--jk-blue-1);
   color: #FFFFFF;
-  box-shadow: 0 2px 10px rgba(88, 28, 135, 0.45);
 }
 
 .mapcctv__tabdot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #EF4444;
-  animation: blink 1.2s infinite;
+  background: var(--jk-lime);
 }
 
 .mapcctv__tabbtn {
@@ -615,21 +620,21 @@
   align-items: center;
   padding: 3px 8px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #94A3B8;
-  font-size: 10.5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #CBD5E1;
+  font-size: 11px;
   cursor: pointer;
   transition: all var(--dur-1) var(--ease);
 }
 
 .mapcctv__tabbtn strong {
-  color: #22C55E;
+  color: var(--jk-lime);
   margin-left: 3px;
 }
 
 .mapcctv__tabbtn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
   color: #FFFFFF;
 }
 
@@ -649,20 +654,20 @@
   align-items: center;
   justify-content: center;
   gap: var(--s2);
-  background: rgba(9, 13, 30, 0.82);
+  background: rgba(9, 16, 30, 0.84);
   backdrop-filter: blur(4px);
   color: #E2E8F0;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   z-index: 3;
 }
 
 .mapcctv__spinner {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #38BDF8;
+  border: 2.5px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--jk-blue-1);
   animation: spin 0.8s linear infinite;
 }
 
@@ -672,23 +677,22 @@
 }
 
 .mapcctv__livedot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: #EF4444;
-  animation: blink 1.4s infinite;
+  background: var(--jk-lime);
 }
 
 .mapcctv__title {
   font-size: var(--fs-sm);
-  font-weight: 800;
+  font-weight: 600;
   color: #FFFFFF;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .mapcctv__meta {
   font-size: 11px;
-  color: #94A3B8;
+  color: #CBD5E1;
   margin-top: 2px;
 }
 
@@ -696,7 +700,7 @@
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
-  border-radius: 50%;
+  border-radius: var(--r-xs);
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.1);
@@ -705,16 +709,16 @@
 }
 
 .mapcctv__close:hover {
-  background: #EF4444;
+  background: rgba(255, 255, 255, 0.2);
   color: #FFFFFF;
 }
 
 .mapcctv__frame {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   overflow: hidden;
-  background: #090D1E;
+  background: #09101E;
   border: 1px solid rgba(255, 255, 255, 0.14);
   margin-bottom: var(--s3);
 }
@@ -736,7 +740,7 @@
   gap: var(--s2);
   color: #94A3B8;
   font-size: var(--fs-xs);
-  font-weight: 700;
+  font-weight: 500;
   text-align: center;
   padding: var(--s3);
 }
@@ -754,31 +758,31 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 11px;
-  border-radius: var(--r-pill);
+  padding: 6px 10px;
+  border-radius: var(--r-xs);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: #E2E8F0;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   transition: all var(--dur-1) var(--ease);
 }
 
 .mapcctv__btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.18);
   color: #FFFFFF;
 }
 
 .mapcctv__btn--primary {
-  background: var(--grad-lime);
+  background: var(--jk-lime);
   border-color: transparent;
-  color: #16224A;
-  font-weight: 800;
+  color: var(--jk-navy);
+  font-weight: 600;
 }
 
 .mapcctv__btn--primary:hover:not(:disabled) {
-  background: #E5F57E;
-  color: #0E1430;
+  background: var(--jk-lime-deep);
+  color: var(--jk-navy);
 }
 
 .mapcctv__btn:disabled {
@@ -789,14 +793,14 @@
 .mapcctv__aibox {
   margin-top: var(--s3);
   padding: var(--s3);
-  border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(217, 237, 102, 0.28);
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(163, 230, 53, 0.28);
   font-size: 12px;
 }
 
-.mapcctv__loading { color: #CBD5E1; font-style: italic; }
-.mapcctv__err { color: #FCA5A5; font-weight: 700; }
+.mapcctv__loading { color: #CBD5E1; }
+.mapcctv__err { color: #FCA5A5; font-weight: 600; }
 
 .mapcctv__ai {
   display: flex;
@@ -811,14 +815,13 @@
   color: #CBD5E1;
 }
 
-.mapcctv__airow strong { color: #FFFFFF; }
+.mapcctv__airow strong { color: #FFFFFF; font-weight: 600; }
 
 .mapcctv__aireason {
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
   color: #E2E8F0;
-  font-style: italic;
   line-height: 1.45;
 }
 
@@ -833,14 +836,14 @@
 /* Pemformatan Hasil Markdown Rekomendasi AI */
 .reason__paragraph { margin-bottom: var(--s2, 8px); }
 .reason__paragraph:last-child { margin-bottom: 0; }
-.reason__subheading { font-size: var(--fs-sm, 13px); font-weight: 700; color: #fff; margin: var(--s3, 12px) 0 var(--s2, 8px); }
+.reason__subheading { font-size: var(--fs-sm, 13px); font-weight: 600; color: #fff; margin: var(--s3, 12px) 0 var(--s2, 8px); }
 .reason__subheading:first-child { margin-top: 0; }
-.reason__divider { border: 0; border-top: 1px solid rgba(255,255,255,.15); margin: var(--s3, 12px) 0; }
+.reason__divider { border: 0; border-top: 1px solid rgba(255,255,255,.14); margin: var(--s3, 12px) 0; }
 .reason__list { margin: var(--s2, 8px) 0 var(--s3, 12px); padding-left: var(--s4, 16px); display: flex; flex-direction: column; gap: 4px; }
 .reason__item { list-style: disc; }
 
 /* =====================================================================
-   HEADER PETUNJUK ARAH & PEMILIH RUTE ALTERNATIF INTERAKTIF (WAZE/GMAPS)
+   HEADER PETUNJUK ARAH & PEMILIH RUTE ALTERNATIF INTERAKTIF
    ===================================================================== */
 
 .dirhead {
@@ -867,11 +870,11 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px 4px 8px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-xs);
   background: var(--surface-2);
   border: 1px solid var(--border);
   font-size: var(--fs-xs);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-2);
   transition: all var(--dur-1) var(--ease);
 }
@@ -888,24 +891,24 @@
 
 .dirhead__title {
   font-family: var(--font-display);
-  font-size: var(--fs-md);
-  font-weight: 800;
+  font-size: var(--fs-base);
+  font-weight: 600;
   color: var(--text-1);
   letter-spacing: -0.01em;
 }
 
 .dirhead__mode {
-  padding: 3px 10px;
-  border-radius: var(--r-pill);
-  background: rgba(42, 64, 208, 0.10);
+  padding: 3px 8px;
+  border-radius: var(--r-xs);
+  background: var(--jk-blue-pale);
   color: var(--jk-blue-1);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .dirhead__endpoints {
   display: grid;
-  grid-template-columns: 18px 1fr 34px;
+  grid-template-columns: 16px 1fr 32px;
   align-items: center;
   gap: var(--s2);
 }
@@ -915,33 +918,31 @@
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  height: 58px;
+  height: 56px;
   padding: 6px 0;
 }
 
 .dirhead__dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .dirhead__dot--origin {
-  border: 3px solid #0EA5E9;
-  background: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.16);
+  border: 2.5px solid var(--jk-blue-1);
+  background: var(--surface);
 }
 
 .dirhead__dot--dest {
-  border: 3px solid #EF4444;
-  background: #EF4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.16);
+  border: 2.5px solid var(--jk-navy);
+  background: var(--jk-lime);
 }
 
 .dirhead__line {
   flex: 1;
   width: 0;
-  border-left: 2px dotted var(--border-strong);
+  border-left: 1.5px dashed var(--border-strong);
   margin: 3px 0;
 }
 
@@ -957,8 +958,8 @@
   align-items: baseline;
   gap: 6px;
   width: 100%;
-  padding: 8px 12px;
-  border-radius: var(--r-md);
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
   background: var(--surface-2);
   border: 1px solid transparent;
   text-align: left;
@@ -975,7 +976,7 @@
 
 .dirhead__pillname {
   font-size: var(--fs-sm);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -983,16 +984,16 @@
 
 .dirhead__pillsub {
   font-size: var(--fs-xs);
-  font-weight: 600;
+  font-weight: 400;
   color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .dirhead__swap {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
   display: grid;
   place-items: center;
   background: var(--surface-2);
@@ -1002,20 +1003,19 @@
 }
 
 .dirhead__swap:hover {
-  background: var(--grad-blue);
+  background: var(--jk-blue-1);
   color: #FFFFFF;
   border-color: transparent;
-  transform: rotate(180deg);
 }
 
-/* Daftar Pemilih Rute (Routes 1, 2, 3...) */
+/* Daftar Pemilih Rute (Routes 1, 2, 3...) — Brand Navy/Blue/Lime */
 .routeselect {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   overflow: hidden;
-  margin-bottom: var(--s4);
-  box-shadow: var(--sh-2);
+  margin-bottom: var(--s3);
+  box-shadow: var(--sh-1);
 }
 
 .routeselect__head {
@@ -1029,15 +1029,13 @@
 
 .routeselect__title {
   font-size: var(--fs-xs);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-weight: 600;
   color: var(--text-2);
 }
 
 .routeselect__sub {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--text-3);
 }
 
@@ -1052,7 +1050,7 @@
   align-items: flex-start;
   gap: 12px;
   width: 100%;
-  padding: 14px var(--s4) 14px 18px;
+  padding: 12px var(--s4) 12px 16px;
   background: var(--surface);
   border: 0;
   border-bottom: 1px solid var(--border);
@@ -1071,7 +1069,7 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 4px;
+  width: 3px;
   background: transparent;
   transition: background var(--dur-1) var(--ease);
 }
@@ -1081,38 +1079,43 @@
 }
 
 .routeopt[data-active="1"] {
-  background: rgba(88, 28, 135, 0.07);
+  background: var(--jk-blue-pale);
 }
 
 .routeopt[data-active="1"]::before {
-  background: #581C87;
+  background: var(--jk-blue-1);
 }
 
 [data-theme="gelap"] .routeopt[data-active="1"] {
-  background: rgba(139, 92, 246, 0.16);
+  background: rgba(2, 132, 255, 0.12);
 }
 
 .routeopt__num {
-  width: 25px;
-  height: 25px;
-  border-radius: 50%;
-  flex: 0 0 25px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-xs);
+  flex: 0 0 24px;
   margin-top: 2px;
   display: grid;
   place-items: center;
-  background: #EDE9FE;
-  color: #6D28D9;
-  border: 1.5px solid #DDD6FE;
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--border);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   transition: all var(--dur-1) var(--ease);
 }
 
 .routeopt[data-active="1"] .routeopt__num {
-  background: #581C87;
+  background: var(--jk-navy);
   color: #FFFFFF;
-  border-color: #581C87;
-  box-shadow: 0 3px 12px rgba(88, 28, 135, 0.38);
+  border-color: var(--jk-navy);
+}
+
+[data-theme="gelap"] .routeopt[data-active="1"] .routeopt__num {
+  background: var(--jk-blue-1);
+  border-color: var(--jk-blue-1);
 }
 
 .routeopt__body {
@@ -1120,7 +1123,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .routeopt__top {
@@ -1132,16 +1135,18 @@
 
 .routeopt__dur {
   font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--text-1);
-  line-height: 1.15;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
 .routeopt__eta {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   color: var(--text-2);
 }
 
@@ -1149,29 +1154,28 @@
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 
 .routeopt__best {
   display: inline-flex;
   align-items: center;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 4px;
-  background: #0EA5E9;
-  color: #FFFFFF;
+  background: var(--jk-lime);
+  color: var(--jk-navy);
   font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-weight: 600;
 }
 
 .routeopt__score {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--r-pill);
-  font-size: 10.5px;
-  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .routeopt__score[data-status="aman"] {
@@ -1190,8 +1194,8 @@
 }
 
 .routeopt__via {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--text-2);
   line-height: 1.35;
   overflow: hidden;
@@ -1207,13 +1211,13 @@
   flex-wrap: wrap;
   gap: 5px;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   color: var(--text-3);
 }
 
 .routeopt__dist {
-  text-transform: uppercase;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-2);
 }
 

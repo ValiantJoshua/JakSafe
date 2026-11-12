@@ -50,7 +50,7 @@
 
 @media (max-width: 420px) {
   .search__title { font-size: var(--fs-lg); }
-  .gauge { width: 162px; height: 162px; }
+  .gauge { width: 136px; height: 136px; }
   .statrow { grid-template-columns: 1fr; }
 }
 

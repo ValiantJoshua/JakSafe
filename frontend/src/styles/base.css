@@ -1,5 +1,5 @@
 /*
-   JakSafe, Base & Reset
+   JakSafe — Base & Reset
 */
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -12,19 +12,19 @@ body {
   font-size: var(--fs-base);
   line-height: var(--lh-base);
   color: var(--text-2);
-  background: var(--jk-white);
+  background: var(--jk-bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  overflow: hidden;              /* layout aplikasi, bukan halaman gulir */
+  overflow: hidden;
 }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
   color: var(--text-1);
   line-height: var(--lh-tight);
-  letter-spacing: -.01em;
+  letter-spacing: -0.015em;
   margin: 0;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 p { margin: 0; }
@@ -43,10 +43,9 @@ img, svg { display: block; max-width: 100%; }
 
 [hidden] { display: none !important; }
 
-/* Fokus keyboard yang jelas
-   Wajib ada supaya aplikasi bisa dipakai tanpa mouse. */
+/* Fokus keyboard yang presisi */
 :focus-visible {
-  outline: 3px solid var(--jk-cobalt);
+  outline: 2px solid var(--jk-blue-1);
   outline-offset: 2px;
   border-radius: var(--r-xs);
 }
@@ -62,17 +61,16 @@ img, svg { display: block; max-width: 100%; }
   border: 0;
 }
 
-/* Scrollbar halus */
+/* Scrollbar ramping & bersih */
 .scroll-y {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
-.scroll-y::-webkit-scrollbar { width: 8px; }
+.scroll-y::-webkit-scrollbar { width: 6px; }
 .scroll-y::-webkit-scrollbar-track { background: transparent; }
 .scroll-y::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: var(--r-pill);
-  border: 2px solid var(--jk-white);
 }
 .scroll-y::-webkit-scrollbar-thumb:hover { background: var(--text-3); }

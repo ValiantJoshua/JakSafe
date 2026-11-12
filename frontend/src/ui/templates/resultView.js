@@ -93,8 +93,8 @@ export function templateResultView() {
 
   <div class="reason rise rise-3">
     <div class="reason__head">
-      <span class="reason__badge">${ikon('i-spark', 17)}</span>
-      <span class="reason__title">Ringkasan Rekomendasi AI</span>
+      <span class="reason__badge">${ikon('i-shield', 17)}</span>
+      <span class="reason__title">Ringkasan Rekomendasi Rute</span>
     </div>
     <div class="reason__text" id="sReason"></div>
   </div>
@@ -146,7 +146,7 @@ export function templateResultView() {
       <span class="aqi__unit">µg/m³ · PM2.5</span>
     </div>
     <div class="aqi__scale"><span class="aqi__marker" id="aqiMarker" style="left:0%"></span></div>
-    <div class="aqi__ticks"><span>BAIK</span><span>SEDANG</span><span>SENSITIF</span><span>BURUK</span></div>
+    <div class="aqi__ticks"><span>Baik</span><span>Sedang</span><span>Sensitif</span><span>Buruk</span></div>
     <p class="note" style="margin-top:var(--s3)" id="aqiNote"></p>
   </div>
 
@@ -154,14 +154,14 @@ export function templateResultView() {
     <div class="card__head">
       <span class="card__icon">${ikon('i-camera', 18)}</span>
       <span class="card__title">Pantauan Kamera CCTV</span>
-      <span class="badge badge--lime" style="margin-left:auto">LIVE</span>
+      <span class="badge badge--lime" style="margin-left:auto">Langsung</span>
     </div>
     <div id="cctvBody"></div>
   </div>
 
   <div class="disclosure card--log rise rise-6">
     <button type="button" class="disclosure__btn" id="btnLog" aria-expanded="false" aria-controls="logPanel">
-      <span class="card__icon" style="width:32px;height:32px;flex:0 0 32px">${ikon('i-spark', 16)}</span>
+      <span class="card__icon" style="width:32px;height:32px;flex:0 0 32px">${ikon('i-layers', 16)}</span>
       <span class="disclosure__title">Jejak Penalaran Agen</span>
       <span class="disclosure__meta" id="logTotal"></span>
       ${ikon('i-chev', 16, 'disclosure__chev')}

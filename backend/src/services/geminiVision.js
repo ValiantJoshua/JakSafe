@@ -4,8 +4,8 @@
 
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
-const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-latest'];
 const TIMEOUT_MS = 20_000;
 const CONFIDENCE_FLOOR = 0.4; // guide §13: below this -> downgrade to "hati_hati"
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
