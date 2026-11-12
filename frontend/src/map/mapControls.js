@@ -47,6 +47,7 @@ import {
   onAqiLayerChange,
   updateRouteAqiOnMap,
 } from './aqiLayer.js';
+import { initMapPicker } from './mapPicker.js';
 
 /** Memperbarui tampilan tombol pemilih mode 3D / 2D Peta / Satelit. */
 function sinkronkanTombolMode(mode, buildingsEnabled) {
@@ -103,7 +104,7 @@ function sinkronkanTombolLayer() {
 }
 
 /** Menutup atau membuka panel samping (Sidebar Toggle ala Google Maps). */
-function toggleSidebar(forceOpen) {
+export function toggleSidebar(forceOpen) {
   const ws = document.getElementById('workspace');
   if (!ws) return;
   const sedangTerbuka = ws.getAttribute('data-sidebar') !== 'collapsed';
@@ -278,6 +279,7 @@ export async function pasangPengendaliPeta() {
     initTrafficLayer(),
     initCctvLayer(),
     initAqiLayer(),
+    initMapPicker(viewer),
   ]);
 
   const awal = getState();

@@ -151,6 +151,39 @@ export function templateStage() {
     <div class="mapcctv__aibox" id="mapCctvAiResult" hidden></div>
   </aside>
 
+  <!-- Menu Titik Peta Terpilih (Click-to-Pick Coordinate ala Google Maps) -->
+  <aside class="mappick-menu" id="mapPickMenu" aria-label="Menu Titik Peta Terpilih" hidden>
+    <div class="mappick__head">
+      <div class="mappick__badge">
+        <span class="mappick__pin">${ikon('i-pin', 13)}</span>
+        <span class="mappick__badgetext">Titik Peta Terpilih</span>
+      </div>
+      <button type="button" class="mappick__close" id="btnMapPickClose" aria-label="Tutup menu titik peta" title="Tutup">
+        ${ikon('i-x', 13)}
+      </button>
+    </div>
+
+    <div class="mappick__body">
+      <h4 class="mappick__title" id="mapPickTitle">Mendeteksi alamat...</h4>
+      <p class="mappick__meta" id="mapPickMeta">-6.2088, 106.8456</p>
+    </div>
+
+    <div class="mappick__actions">
+      <button type="button" class="mappick__btn mappick__btn--origin press" id="btnPickAsOrigin" title="Jadikan titik ini sebagai titik awal perjalanan">
+        <span class="mappick__dot mappick__dot--origin"></span>
+        <span>Titik Awal</span>
+      </button>
+      <button type="button" class="mappick__btn mappick__btn--dest press" id="btnPickAsDest" title="Jadikan titik ini sebagai tujuan perjalanan">
+        <span class="mappick__dot mappick__dot--dest"></span>
+        <span>Tujuan</span>
+      </button>
+      <button type="button" class="mappick__btn mappick__btn--copy press" id="btnPickCopy" title="Salin koordinat">
+        ${ikon('i-copy', 13)}
+        <span>Salin</span>
+      </button>
+    </div>
+  </aside>
+
   <!-- Kanan Bawah: Legenda Ringkas -->
   <div class="mapstage__float mapstage__float--br" id="legendWrap">
     <div class="legend">
