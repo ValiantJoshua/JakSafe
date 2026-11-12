@@ -63,10 +63,10 @@ function gambarKeadaanMasuk(keadaan) {
   const sapaan = $('#greetBox');
   if (sapaan) {
     sapaan.innerHTML = masuk
-      ? `<h1 class="search__title">Halo, <em>${namaUser.split(' ')[0]}</em></h1>
-         <p class="search__sub">Profil kesehatan ${sensitifKesehatan ? 'aktif, bobot polusi dinaikkan saat rute dinilai' : 'nonaktif, bobot penilaian memakai nilai bawaan'}.</p>`
-      : `<h1 class="search__title">Mau ke mana <em>hari ini?</em></h1>
-         <p class="search__sub">Kami carikan rute yang aman dan sehat, bukan cuma yang paling cepat.</p>`;
+      ? `<h1 class="search__title">Halo, ${namaUser.split(' ')[0]}</h1>
+         <p class="search__sub">Profil kesehatan ${sensitifKesehatan ? 'aktif — bobot polusi udara diprioritaskan saat rute dinilai' : 'nonaktif — bobot penilaian memakai standar bawaan'}.</p>`
+      : `<h1 class="search__title">Rencanakan Rute Perjalanan</h1>
+         <p class="search__sub">Navigasi Jakarta dengan pertimbangan kualitas udara, lalu lintas, dan pantauan CCTV.</p>`;
   }
 
   show($('#menuBadgeSensitif'), masuk && sensitifKesehatan);

@@ -1,183 +1,179 @@
 /*
-   JakSafe, Design Tokens
-   Palette mengikuti Brand Guide resmi JakSafe.
-   File lain TIDAK boleh menulis nilai warna mentah.
+   JakSafe — Design Tokens (Unslopped Civic-Tech System)
+   Primary Brand Palette:
+   - Deep Navy   (#0A2E6B) : Trust, safety, stability
+   - Bright Blue (#0284FF) : Technology, navigation, connectivity
+   - Lime Green  (#A3E635) : Environmental awareness, clean air, safer mobility
 */
 
 :root {
-  /* PALETTE RESMI (Brand Guide) */
-  --jk-blue-1:   #2A40D0;   /* Primary Blue     */
-  --jk-blue-2:   #3D50D5;   /* Secondary Blue   */
-  --jk-lime:     #D9ED66;   /* Accent Lime      */
-  --jk-green:    #90B83E;   /* Supporting Green */
-  --jk-navy:     #223469;   /* Text / Deep Navy */
-  --jk-bg:       #F5F6F5;   /* Background       */
-  --jk-white:    #FFFFFF;
+  /* BRAND PALETTE UTAMA */
+  --jk-navy:      #0A2E6B;   /* Deep Navy   */
+  --jk-blue-1:    #0284FF;   /* Bright Blue */
+  --jk-blue-2:    #0068CC;   /* Darker Blue for hover/active */
+  --jk-lime:      #A3E635;   /* Lime Green  */
+  --jk-green:     #4D7C0F;   /* Darker Lime-Green for accessible 4.5:1 text/icon on light surfaces */
+  --jk-bg:        #F8FAFC;   /* Ink-tinted neutral background */
+  --jk-white:     #FFFFFF;
 
-  /* turunan dari palette, untuk kedalaman dan gradasi */
-  --jk-blue-deep:  #1E2FA3;
-  --jk-blue-pale:  #EEF1FE;
-  --jk-lime-pale:  #F7FBE4;
-  --jk-green-pale: #EFF6E2;
-  --jk-navy-pale:  #EDEFF6;
+  /* TURUNAN NETRAL & TINT HALUS */
+  --jk-blue-deep:  #07214E;
+  --jk-blue-pale:  #EFF6FF;
+  --jk-lime-pale:  #F7FEE7;
+  --jk-green-pale: #F7FEE7;
+  --jk-navy-pale:  #F1F5F9;
 
-  /* GRADIEN BRAND */
-  --grad-blue:  linear-gradient(135deg, var(--jk-blue-2) 0%, var(--jk-blue-1) 55%, var(--jk-blue-deep) 100%);
-  --grad-lime:  linear-gradient(135deg, var(--jk-lime) 0%, var(--jk-green) 100%);
-  --grad-navy:  linear-gradient(150deg, var(--jk-navy) 0%, #16224A 100%);
-  --grad-hero:  linear-gradient(165deg, #EDF2FF 0%, #F6F9F0 55%, #FFFFFF 100%);
-  --grad-sheen: linear-gradient(100deg, transparent 0%, rgba(255,255,255,.42) 50%, transparent 100%);
+  /* PERMUKAAN SOLID (Tanpa gradien warna-warni antar-hue) */
+  --grad-blue:  #0284FF;
+  --grad-lime:  #A3E635;
+  --grad-navy:  #0A2E6B;
+  --grad-hero:  #F8FAFC;
+  --grad-sheen: none;
 
-  /* STATUS RUTE
-     AMAN memakai Supporting Green dari palette.
-     HATI-HATI dan HINDARI adalah tambahan semantik karena
-     palette brand tidak punya warna peringatan. Nuansanya
-     diselaraskan agar tetap serasi dengan lime dan biru. */
-  --st-aman:        #90B83E;
-  --st-aman-bg:     #EFF6E2;
-  --st-aman-grad:   linear-gradient(135deg, #A9CB58, #7CA331);
+  /* STATUS KESELAMATAN RUTE (Semantik & Kontras Terukur) */
+  --st-aman:        #16A34A;
+  --st-aman-bg:     #F0FDF4;
+  --st-aman-grad:   #16A34A;
 
-  --st-hati:        #E0A126;
-  --st-hati-bg:     #FCF3E0;
-  --st-hati-grad:   linear-gradient(135deg, #EFB740, #CE8C14);
+  --st-hati:        #D97706;
+  --st-hati-bg:     #FFFBEB;
+  --st-hati-grad:   #D97706;
 
-  --st-hindari:     #D5443F;
-  --st-hindari-bg:  #FBEAE9;
-  --st-hindari-grad:linear-gradient(135deg, #E35C56, #BB2F2A);
+  --st-hindari:     #DC2626;
+  --st-hindari-bg:  #FEF2F2;
+  --st-hindari-grad:#DC2626;
 
-  /* SKALA KUALITAS UDARA */
-  --aqi-good:      #6FBF86;
-  --aqi-moderate:  #C7DB57;
-  --aqi-sensitive: #E6B33F;
-  --aqi-unhealthy: #DB6B4D;
-  --aqi-very:      #9A5BA6;
+  /* SKALA KUALITAS UDARA (PM2.5) */
+  --aqi-good:      #16A34A;
+  --aqi-moderate:  #84CC16;
+  --aqi-sensitive: #EAB308;
+  --aqi-unhealthy: #F97316;
+  --aqi-very:      #DC2626;
 
-  /* TEKS */
-  --text-1:   #16224A;
-  --text-2:   #4E566B;
-  --text-3:   #858CA0;
+  /* TIGA PERAN TEKS (Satu Ramp Ink-Neutral) */
+  --text-1:   #0A2E6B;   /* Primary text (Deep Navy) */
+  --text-2:   #334155;   /* Secondary text */
+  --text-3:   #64748B;   /* Muted text & metadata */
   --text-inv: #FFFFFF;
 
-  /* PERMUKAAN */
+  /* PERMUKAAN & GARIS BATAS (Quiet Chrome) */
   --surface:        #FFFFFF;
-  --surface-2:      #F5F6F5;
-  --surface-3:      #EBEDEF;
-  --border:         #E6E8EC;
-  --border-strong:  #D2D6DD;
+  --surface-2:      #F1F5F9;
+  --surface-3:      #E2E8F0;
+  --border:         #E2E8F0;
+  --border-strong:  #CBD5E1;
 
-  /* WARNA KARTU
-     Tiap kartu diberi rona tipis yang berbeda supaya batas antar
-     bagian terlihat tanpa membuat tampilan jadi ramai. */
-  --card-score:   linear-gradient(170deg, #FFFFFF 0%, var(--jk-blue-pale) 100%);
-  --card-reason:  var(--grad-navy);
-  --card-detail:  linear-gradient(170deg, #FFFFFF 0%, var(--jk-navy-pale) 100%);
-  --card-aqi:     linear-gradient(170deg, #FFFFFF 0%, var(--jk-green-pale) 100%);
-  --card-cctv:    linear-gradient(170deg, #FFFFFF 0%, #F2F4F7 100%);
-  --card-log:     linear-gradient(170deg, #FFFFFF 0%, var(--jk-lime-pale) 100%);
+  /* PERMUKAAN KARTU SERAGAM (Tidak ada lagi rainbow cards) */
+  --card-score:   var(--surface);
+  --card-reason:  #0A2E6B;
+  --card-detail:  var(--surface);
+  --card-aqi:     var(--surface);
+  --card-cctv:    var(--surface);
+  --card-log:     var(--surface);
 
   --accent-detail: var(--jk-blue-1);
   --accent-aqi:    var(--jk-green);
   --accent-cctv:   var(--jk-navy);
-  --accent-log:    var(--jk-lime);
+  --accent-log:    var(--jk-blue-1);
 
-  /* RADIUS */
-  --r-xs:   8px;
-  --r-sm:  12px;
-  --r-md:  18px;
-  --r-lg:  24px;
-  --r-xl:  32px;
+  /* RADIUS TERUKUR (Nested Radius Math — Bukan Full Pill di Semua Tempat) */
+  --r-xs:   6px;
+  --r-sm:   8px;
+  --r-md:  10px;
+  --r-lg:  12px;
+  --r-xl:  16px;
   --r-pill: 999px;
 
-  /* SPACING (basis 4px) */
+  /* SKALA SPASI (4px Grid System) */
   --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
   --s5: 20px; --s6: 24px; --s7: 28px; --s8: 32px;
   --s10: 40px; --s12: 48px; --s16: 64px;
 
-  /* BAYANGAN */
-  --sh-1: 0 1px 2px rgba(22,34,74,.05), 0 2px 8px rgba(22,34,74,.04);
-  --sh-2: 0 2px 4px rgba(22,34,74,.05), 0 8px 22px rgba(22,34,74,.07);
-  --sh-3: 0 4px 8px rgba(22,34,74,.06), 0 18px 44px rgba(22,34,74,.11);
-  --sh-4: 0 8px 16px rgba(22,34,74,.08), 0 32px 72px rgba(22,34,74,.15);
-  --sh-brand: 0 6px 16px rgba(42,64,208,.20), 0 14px 36px rgba(42,64,208,.22);
-  --sh-lime:  0 6px 16px rgba(144,184,62,.26), 0 14px 34px rgba(144,184,62,.20);
-  --sh-inset: inset 0 1px 0 rgba(255,255,255,.7);
+  /* BAYANGAN NETRAL HALUS (Tanpa Colored Glows) */
+  --sh-1: 0 1px 2px rgba(10, 46, 107, 0.05);
+  --sh-2: 0 2px 6px rgba(10, 46, 107, 0.06), 0 1px 2px rgba(10, 46, 107, 0.04);
+  --sh-3: 0 8px 24px rgba(10, 46, 107, 0.08), 0 2px 6px rgba(10, 46, 107, 0.04);
+  --sh-4: 0 16px 36px rgba(10, 46, 107, 0.12), 0 4px 10px rgba(10, 46, 107, 0.06);
+  --sh-brand: 0 1px 2px rgba(10, 46, 107, 0.08);
+  --sh-lime:  0 1px 2px rgba(10, 46, 107, 0.08);
+  --sh-inset: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 
   /* TIPOGRAFI */
-  --font-display: 'League Spartan', 'Segoe UI', system-ui, sans-serif;
-  --font-text:    'Manrope', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-text:    'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --fs-xs: 12px;  --fs-sm: 14px;  --fs-base: 16px; --fs-md: 18px;
-  --fs-lg: 22px;  --fs-xl: 28px;  --fs-2xl: 36px;  --fs-3xl: 52px;
+  --fs-xs: 12px;  --fs-sm: 13px;  --fs-base: 14px; --fs-md: 16px;
+  --fs-lg: 20px;  --fs-xl: 24px;  --fs-2xl: 30px;  --fs-3xl: 40px;
 
-  --lh-tight: 1.15; --lh-snug: 1.35; --lh-base: 1.6;
+  --lh-tight: 1.2; --lh-snug: 1.4; --lh-base: 1.55;
 
-  /* UKURAN KONTROL */
-  --control-h:    52px;
-  --control-h-sm: 44px;
+  /* UKURAN KONTROL (Proporsi Aplikasi Desktop/Web Modern) */
+  --control-h:    42px;
+  --control-h-sm: 36px;
 
-  /* KETEBALAN GARIS IKON
-     Dinaikkan sesuai permintaan supaya panah dan ikon terbaca
-     jelas, termasuk oleh pengguna usia lanjut. */
-  --stroke:       2.4;
-  --stroke-arrow: 3.4;
+  /* KETEBALAN GARIS IKON */
+  --stroke:       1.8;
+  --stroke-arrow: 2.2;
 
-  /* MOTION */
-  --ease: cubic-bezier(.22,.61,.36,1);
-  --ease-io: cubic-bezier(.65,0,.35,1);
-  --dur-1: .16s; --dur-2: .3s; --dur-3: .55s;
+  /* SATU KURVA TRANSISI */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-io: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-1: 140ms; --dur-2: 200ms; --dur-3: 320ms;
 
-  /* LAYER */
+  /* Z-INDEX LAYER */
   --z-map: 1; --z-mapctrl: 10; --z-panel: 20;
   --z-topbar: 30; --z-dock: 40; --z-modal: 60;
 }
 
 /*
-   TEMA 2, GELAP
-   Latar navy pekat, aksen lime dinaikkan agar tetap kontras.
+   TEMA 2: GELAP (Deep Navy Ink Ramp)
 */
 [data-theme="gelap"] {
-  --jk-bg: #0E1430;
+  --jk-bg:       #060D1A;
+  --jk-green:    #A3E635;
 
-  --text-1:   #F2F4FA;
-  --text-2:   #BFC6DA;
-  --text-3:   #8089A4;
-  --text-inv: #0E1430;
+  --text-1:   #F1F5F9;
+  --text-2:   #94A3B8;
+  --text-3:   #64748B;
+  --text-inv: #060D1A;
 
-  --surface:       #18204A;
-  --surface-2:     #121936;
-  --surface-3:     #212A58;
-  --border:        #2A3463;
-  --border-strong: #3A467C;
+  --surface:       #0B1528;
+  --surface-2:     #111F38;
+  --surface-3:     #1A2C4E;
+  --border:        rgba(241, 245, 249, 0.09);
+  --border-strong: rgba(241, 245, 249, 0.16);
 
-  --jk-blue-pale:  #1B2550;
-  --jk-lime-pale:  #232B3C;
-  --jk-green-pale: #1D2B2A;
-  --jk-navy-pale:  #1A2248;
+  --jk-blue-pale:   rgba(2, 132, 255, 0.14);
+  --jk-lime-pale:  rgba(163, 230, 53, 0.12);
+  --jk-green-pale: rgba(163, 230, 53, 0.12);
+  --jk-navy-pale:  #111F38;
 
-  --card-score:  linear-gradient(170deg, #1C2654 0%, #151D42 100%);
-  --card-reason: linear-gradient(150deg, #101840 0%, #0A0F2A 100%);
-  --card-detail: linear-gradient(170deg, #1A2350 0%, #141C40 100%);
-  --card-aqi:    linear-gradient(170deg, #1A2A3E 0%, #142334 100%);
-  --card-cctv:   linear-gradient(170deg, #1B2246 0%, #151B38 100%);
-  --card-log:    linear-gradient(170deg, #222A46 0%, #191F3A 100%);
+  --card-score:  var(--surface);
+  --card-reason: #0F1E3A;
+  --card-detail: var(--surface);
+  --card-aqi:    var(--surface);
+  --card-cctv:   var(--surface);
+  --card-log:    var(--surface);
 
-  --st-aman-bg:    #1E3020;
-  --st-hati-bg:    #33280F;
-  --st-hindari-bg: #3A1B1A;
+  --st-aman:       #4ADE80;
+  --st-aman-bg:    rgba(34, 197, 94, 0.14);
+  --st-hati:       #FBBF24;
+  --st-hati-bg:    rgba(245, 158, 11, 0.14);
+  --st-hindari:    #F87171;
+  --st-hindari-bg: rgba(239, 68, 68, 0.14);
 
-  --grad-hero: linear-gradient(165deg, #141C44 0%, #101735 55%, #0E1430 100%);
+  --grad-hero: #060D1A;
 
-  --sh-1: 0 1px 2px rgba(0,0,0,.3),  0 2px 8px rgba(0,0,0,.26);
-  --sh-2: 0 2px 4px rgba(0,0,0,.32), 0 8px 22px rgba(0,0,0,.34);
-  --sh-3: 0 4px 8px rgba(0,0,0,.34), 0 18px 44px rgba(0,0,0,.42);
-  --sh-4: 0 8px 16px rgba(0,0,0,.38), 0 32px 72px rgba(0,0,0,.5);
-  --sh-inset: inset 0 1px 0 rgba(255,255,255,.08);
+  --sh-1: none;
+  --sh-2: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --sh-3: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --sh-4: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --sh-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /*
-   TEMA 3, KONTRAS TINGGI
-   Dibuat untuk pengguna usia lanjut dan pengguna dengan
-   penglihatan terbatas. Rona tipis dihilangkan, batas dipertegas.
+   TEMA 3: KONTRAS TINGGI
 */
 [data-theme="kontras"] {
   --text-1: #000000;
@@ -185,23 +181,22 @@
   --text-3: #3D3D3D;
 
   --surface:       #FFFFFF;
-  --surface-2:     #FFFFFF;
-  --surface-3:     #E8E8E8;
+  --surface-2:     #F4F4F5;
+  --surface-3:     #E4E4E7;
   --border:        #000000;
   --border-strong: #000000;
 
-  --jk-blue-1: #10239E;
+  --jk-blue-1: #0052CC;
   --jk-navy:   #000000;
-  --jk-green:  #4F7A11;
+  --jk-green:  #365314;
 
-  --st-aman:    #2E6B0F;
-  --st-hati:    #9A6400;
-  --st-hindari: #B3100A;
+  --st-aman:    #15803D;
+  --st-hati:    #B45309;
+  --st-hindari: #B91C1C;
   --st-aman-bg: #FFFFFF;
   --st-hati-bg: #FFFFFF;
   --st-hindari-bg: #FFFFFF;
 
-  /* rona kartu dimatikan, pembeda memakai garis tebal */
   --card-score: #FFFFFF; --card-detail: #FFFFFF;
   --card-aqi:   #FFFFFF; --card-cctv:   #FFFFFF;
   --card-log:   #FFFFFF;
@@ -209,8 +204,8 @@
 
   --grad-hero: #FFFFFF;
 
-  --stroke: 3;
-  --stroke-arrow: 4;
+  --stroke: 2.5;
+  --stroke-arrow: 3;
 
   --sh-1: none; --sh-2: none; --sh-3: none; --sh-4: none;
   --sh-brand: none; --sh-lime: none; --sh-inset: none;
@@ -219,18 +214,18 @@
 [data-theme="kontras"] .card,
 [data-theme="kontras"] .scorecard,
 [data-theme="kontras"] .legend,
-[data-theme="kontras"] .disclosure { border-width: 2.5px; }
+[data-theme="kontras"] .disclosure { border-width: 2px; }
 
-[data-theme="kontras"] :focus-visible { outline-width: 4px; }
+[data-theme="kontras"] :focus-visible { outline-width: 3px; }
 
 /*
    MODE TEKS BESAR
 */
 [data-textsize="large"] {
-  --fs-xs: 14px;  --fs-sm: 16px;  --fs-base: 18px; --fs-md: 21px;
-  --fs-lg: 26px;  --fs-xl: 33px;  --fs-2xl: 42px;  --fs-3xl: 60px;
-  --control-h: 60px;
-  --control-h-sm: 52px;
+  --fs-xs: 13px;  --fs-sm: 15px;  --fs-base: 16px; --fs-md: 18px;
+  --fs-lg: 22px;  --fs-xl: 26px;  --fs-2xl: 34px;  --fs-3xl: 46px;
+  --control-h: 48px;
+  --control-h-sm: 40px;
 }
 
 /*
@@ -240,7 +235,6 @@
   :root { --dur-1: .01ms; --dur-2: .01ms; --dur-3: .01ms; }
 }
 
-/* kartu statistik ikut diratakan pada mode kontras tinggi */
 [data-theme="kontras"] .stat--a,
 [data-theme="kontras"] .stat--b,
 [data-theme="kontras"] .saveditem { background: #FFFFFF; border-color: #000000; }

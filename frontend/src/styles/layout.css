@@ -1,53 +1,42 @@
 /*
-   JakSafe, Layout — Clean Google Maps-inspired Workspace & Collapsible Sidebar
+   JakSafe — Layout (Unslopped Civic-Tech Workspace)
 */
 
-.app { display: flex; flex-direction: column; height: 100vh; background: var(--jk-white); }
+.app { display: flex; flex-direction: column; height: 100vh; background: var(--jk-bg); }
 
-/* TOPBAR */
+/* TOPBAR (Quiet Chrome, 56px height on 4px grid) */
 .topbar {
   position: relative;
   z-index: var(--z-topbar);
   display: flex;
   align-items: center;
   gap: var(--s3);
-  height: 58px;
+  height: 56px;
   padding: 0 var(--s5);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-}
-.topbar::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: -1px;
-  height: 2px;
-  background: linear-gradient(90deg,
-    var(--jk-blue-1) 0%, var(--jk-blue-2) 32%,
-    var(--jk-green) 66%, var(--jk-lime) 100%);
-  opacity: .85;
 }
 
 .topbar__menubtn {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   border-color: var(--border);
 }
 
 .brandlink { text-decoration: none; display: inline-flex; }
 
 /* LOGO */
-.logo { display: inline-flex; align-items: center; gap: var(--s3); }
+.logo { display: inline-flex; align-items: center; gap: 10px; }
 
 .logomark {
   position: relative;
   display: block;
   flex: 0 0 auto;
-  border-radius: 27%;
+  border-radius: var(--r-sm);
   overflow: hidden;
   background: #FFFFFF;
-  box-shadow: var(--sh-brand);
-  transition: transform var(--dur-2) var(--ease);
+  border: 1px solid var(--border);
 }
 .logomark__img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .logomark__fb  { display: none; position: absolute; inset: 0; }
@@ -55,60 +44,57 @@
 .logomark.is-fallback .logomark__img { display: none; }
 .logomark.is-fallback .logomark__fb  { display: block; }
 
-.brandlink:hover .logomark { transform: translateY(-1px); }
-
-.logo__text { display: flex; flex-direction: column; line-height: 1; }
+.logo__text { display: flex; flex-direction: column; line-height: 1.1; }
 
 .logo__word {
   font-family: var(--font-display);
-  font-size: var(--fs-lg);
-  font-weight: 800;
-  letter-spacing: -.025em;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 .w-jak  { color: var(--jk-navy); }
-.w-safe { color: var(--jk-green); }
-[data-theme="gelap"] .w-jak  { color: #DCE3FF; }
+.w-safe { color: var(--jk-blue-1); }
+[data-theme="gelap"] .w-jak  { color: #F1F5F9; }
 [data-theme="gelap"] .w-safe { color: var(--jk-lime); }
 
 .logo__tag {
   font-size: 11px;
   color: var(--text-3);
-  letter-spacing: .02em;
+  font-weight: 400;
   margin-top: 2px;
 }
-
-.logoleaf { transform-origin: 52px 12px; animation: leafsway 4.5s var(--ease-io) infinite; }
-@keyframes leafsway { 50% { transform: rotate(-9deg) translateY(-1px); } }
-
-.roadline { animation: roadrun 3.2s linear infinite; }
-@keyframes roadrun { to { stroke-dashoffset: -32; } }
 
 .topbar__spacer { flex: 1; }
 .topbar__tools { display: flex; align-items: center; gap: var(--s2); }
 
-/* PEMILIH TEMA (TERANG / GELAP) */
+/* PEMILIH TEMA (Nested Radius: 8px container -> 6px button) */
 .themeswitch {
   display: flex;
   gap: 2px;
-  padding: 3px;
-  border-radius: var(--r-pill);
+  padding: 2px;
+  border-radius: var(--r-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
 .themeswitch__btn {
-  padding: 6px 12px;
-  border-radius: var(--r-pill);
+  padding: 5px 10px;
+  border-radius: var(--r-xs);
   font-size: var(--fs-xs);
-  font-weight: 700;
+  font-weight: 500;
   color: var(--text-3);
   white-space: nowrap;
-  transition: all var(--dur-1) var(--ease);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .themeswitch__btn:hover { color: var(--text-1); }
 .themeswitch__btn[aria-pressed="true"] {
-  background: var(--grad-blue);
-  color: #fff;
+  background: var(--surface);
+  color: var(--text-1);
+  font-weight: 600;
   box-shadow: var(--sh-1);
+}
+[data-theme="gelap"] .themeswitch__btn[aria-pressed="true"] {
+  background: var(--surface-3);
+  color: var(--text-1);
 }
 
 /* CHIP AKUN */
@@ -117,25 +103,25 @@
   align-items: center;
   gap: var(--s2);
   height: var(--control-h-sm);
-  padding: 0 var(--s3) 0 5px;
-  border-radius: var(--r-pill);
+  padding: 0 10px 0 6px;
+  border-radius: var(--r-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  transition: all var(--dur-1) var(--ease);
+  transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
 }
-.userchip:hover { border-color: var(--jk-blue-1); }
+.userchip:hover { border-color: var(--border-strong); background: var(--surface); }
 .userchip__ava {
-  width: 30px; height: 30px;
-  border-radius: 50%;
+  width: 24px; height: 24px;
+  border-radius: var(--r-xs);
   display: grid; place-items: center;
-  background: var(--grad-blue);
-  color: #fff;
-  font-size: var(--fs-xs);
-  font-weight: 800;
+  background: var(--jk-navy);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
 }
-.userchip__name { font-size: var(--fs-sm); font-weight: 700; color: var(--text-1); }
+.userchip__name { font-size: var(--fs-sm); font-weight: 500; color: var(--text-1); }
 
-/* WORKSPACE & COLLAPSIBLE SIDEBAR ALA GOOGLE MAPS */
+/* WORKSPACE & COLLAPSIBLE SIDEBAR (384px = 96 * 4px) */
 .workspace {
   flex: 1;
   display: flex;
@@ -148,19 +134,19 @@
 .sidepanel {
   position: relative;
   z-index: var(--z-panel);
-  width: 396px;
-  flex: 0 0 396px;
+  width: 384px;
+  flex: 0 0 384px;
   background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-height: 0;
-  box-shadow: 4px 0 24px rgba(14, 20, 48, 0.08);
-  transition: margin-left 0.25s var(--ease), box-shadow 0.25s var(--ease);
+  box-shadow: 2px 0 12px rgba(10, 46, 107, 0.04);
+  transition: margin-left var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
 
 .workspace[data-sidebar="collapsed"] .sidepanel {
-  margin-left: -396px;
+  margin-left: -384px;
   box-shadow: none;
 }
 
@@ -173,19 +159,19 @@
   gap: var(--s4);
 }
 
-/* Tab lipat/buka di pinggir kanan sidebar persis seperti Google Maps */
+/* Tab lipat/buka di pinggir kanan sidebar */
 .sidepanel__tab {
   position: absolute;
   top: 50%;
   right: -24px;
   transform: translateY(-50%);
   width: 24px;
-  height: 56px;
-  border-radius: 0 10px 10px 0;
+  height: 48px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: none;
-  box-shadow: 4px 2px 12px rgba(14, 20, 48, 0.12);
+  box-shadow: 2px 1px 6px rgba(10, 46, 107, 0.08);
   display: grid;
   place-items: center;
   color: var(--text-2);
@@ -198,10 +184,9 @@
   color: var(--jk-blue-1);
 }
 
-/* Panah menghadap kiri saat terbuka, menghadap kanan saat tertutup */
 .sidepanel__tabicon {
   transform: rotate(90deg);
-  transition: transform 0.25s var(--ease);
+  transition: transform var(--dur-2) var(--ease);
 }
 .workspace[data-sidebar="collapsed"] .sidepanel__tabicon {
   transform: rotate(-90deg);

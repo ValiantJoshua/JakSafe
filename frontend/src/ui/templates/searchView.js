@@ -17,7 +17,7 @@ export function templateSearchView() {
 <section id="viewSearch" class="slide-in">
 
   <div class="greet" id="greetBox">
-    <h1 class="search__title">Mau ke mana <em>hari ini?</em></h1>
+    <h1 class="search__title">Rencanakan Rute Perjalanan</h1>
     <p class="search__sub">Navigasi Jakarta dengan pertimbangan kualitas udara, lalu lintas, dan pantauan CCTV.</p>
   </div>
 
@@ -51,13 +51,13 @@ export function templateSearchView() {
     ${barisProfil()}
   </div>
 
-  <button type="button" class="btn btn--primary btn--block btn--lg sheen" id="btnSearch" style="margin-bottom:var(--s5)">
+  <button type="button" class="btn btn--primary btn--block btn--lg press" id="btnSearch" style="margin-bottom:var(--s5)">
     Cari Rute Aman
     <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>
   </button>
 
   <div id="savedBox" hidden style="margin-bottom:var(--s5)">
-    <p class="sectlabel">${ikon('i-star', 14)} Rute Tersimpan</p>
+    <p class="sectlabel">Rute Tersimpan</p>
     <div class="savedlist" id="savedList"></div>
   </div>
 

@@ -18,8 +18,8 @@ import { calculateRouteScore, DEFAULT_WEIGHTS } from '../scoring/routeScorer.js'
 import { findNearest, publicView } from '../services/cctvCatalog.js';
 import { saveExecutionLog } from '../db/mongoClient.js';
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
-const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-3.5-flash-lite'];
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-latest'];
 const MAX_STEPS = 6;
 
 const SYSTEM_INSTRUCTION = [
