@@ -135,12 +135,6 @@ const tileCache = new Map();
 
 /** @type {Cesium.PolylineCollection|null} */
 let roadLineCollection = null;
-/** @type {Cesium.PointPrimitiveCollection|null} */
-let particleCollection = null;
-/** @type {Array<object>} */
-let activeParticles = [];
-/** @type {number|null} */
-let animFrameId = null;
 /** @type {number|null} */
 let cameraDebounceTimer = null;
 
@@ -187,29 +181,27 @@ export function getTrafficLayerStatus() {
 }
 
 /**
- * Menentukan warna garis jalan dan partikel berdasarkan tingkat kelancaran (0.0 macet .. 1.0 lancar).
+ * Menentukan warna garis jalan berdasarkan tingkat kelancaran (0.0 macet .. 1.0 lancar).
+ * Menggunakan warna arus lalu lintas solid ala Google Maps / Waze tanpa efek partikel titik.
  * @param {number} level
  */
 function warnaLaluLintas(level, dimmed = false) {
   const l = Number.isFinite(level) ? level : 0.65;
   if (l < 0.36) {
-    // Macet berat -> Merah lembut transparan
+    // Macet berat -> Merah tegas
     return {
-      line: Cesium.Color.fromCssColorString('#EF4444').withAlpha(dimmed ? 0.28 : 0.55),
-      dot: Cesium.Color.fromCssColorString('#FCA5A5').withAlpha(dimmed ? 0.45 : 0.70),
+      line: Cesium.Color.fromCssColorString('#DC2626').withAlpha(dimmed ? 0.28 : 0.78),
     };
   }
   if (l < 0.68) {
-    // Padat merayap -> Kuning / Oranye lembut transparan
+    // Padat merayap -> Kuning / Oranye tegas
     return {
-      line: Cesium.Color.fromCssColorString('#F59E0B').withAlpha(dimmed ? 0.22 : 0.50),
-      dot: Cesium.Color.fromCssColorString('#FDE68A').withAlpha(dimmed ? 0.40 : 0.68),
+      line: Cesium.Color.fromCssColorString('#F59E0B').withAlpha(dimmed ? 0.24 : 0.75),
     };
   }
-  // Lancar -> Hijau zamrud lembut transparan
+  // Lancar -> Hijau bersih
   return {
-    line: Cesium.Color.fromCssColorString('#22C55E').withAlpha(dimmed ? 0.16 : 0.46),
-    dot: Cesium.Color.fromCssColorString('#86EFAC').withAlpha(dimmed ? 0.35 : 0.62),
+    line: Cesium.Color.fromCssColorString('#16A34A').withAlpha(dimmed ? 0.20 : 0.70),
   };
 }
 
@@ -318,51 +310,29 @@ function computeCumulativeLengths(coords) {
   return { lengths, total };
 }
 
-/** Interpolasi posisi Cartesian3 di sepanjang koordinat jalan pada jarak distM. */
-function interpolateAlongRoad(coords, lengths, total, distM) {
-  const d = ((distM % total) + total) % total;
-  for (let i = 1; i < lengths.length; i += 1) {
-    if (d <= lengths[i]) {
-      const segStart = lengths[i - 1];
-      const segLen = Math.max(0.001, lengths[i] - segStart);
-      const t = (d - segStart) / segLen;
-      const lon = coords[i - 1][0] + (coords[i][0] - coords[i - 1][0]) * t;
-      const lat = coords[i - 1][1] + (coords[i][1] - coords[i - 1][1]) * t;
-      return Cesium.Cartesian3.fromDegrees(lon, lat, 12);
-    }
-  }
-  const last = coords[coords.length - 1];
-  return Cesium.Cartesian3.fromDegrees(last[0], last[1], 12);
-}
-
 /**
- * Menggambar kumpulan ruas jalan (polylines) dan partikel arus kendaraan di Cesium.
+ * Menggambar kumpulan ruas jalan (polylines) arus lalu lintas di Cesium.
+ * Menggunakan garis arus solid tanpa partikel bergerak agar bersih dan bebas gangguan visual.
  * @param {Array<{id:string, highway?:string, trafficLevel:number, coords:number[][]}>} roads
  */
 function renderRoadsAndParticles(roads) {
   const viewer = getViewer();
-  if (!viewer || !roadLineCollection || !particleCollection) return;
+  if (!viewer || !roadLineCollection) return;
 
   lastRenderedRoads = roads;
   roadLineCollection.removeAll();
-  particleCollection.removeAll();
-  activeParticles = [];
 
-  const cappedRoads = roads.slice(0, 260);
+  const cappedRoads = roads.slice(0, 320);
   activeRoadCount = cappedRoads.length;
-
-  // Partikel titik hanya muncul saat zoom dekat (< 3.000m) agar tidak menimbulkan
-  // efek "manik-manik" saat kamera melihat keseluruhan rute dari jauh.
-  const maxParticleDistance = routeFocusActive ? 2200 : 3000;
 
   for (const road of cappedRoads) {
     if (!Array.isArray(road.coords) || road.coords.length < 2) continue;
 
-    const { lengths, total } = computeCumulativeLengths(road.coords);
+    const { total } = computeCumulativeLengths(road.coords);
     if (total < 45) continue;
 
     const style = warnaLaluLintas(road.trafficLevel, routeFocusActive);
-    const baseWidth = road.highway === 'motorway' ? 4.2 : road.highway === 'trunk' ? 3.5 : 2.6;
+    const baseWidth = road.highway === 'motorway' ? 4.4 : road.highway === 'trunk' ? 3.6 : 2.8;
     const width = routeFocusActive ? baseWidth * 0.8 : baseWidth;
 
     const positions = road.coords.map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(lon, lat, 10));
@@ -372,82 +342,15 @@ function renderRoadsAndParticles(roads) {
       width,
       material: Cesium.Material.fromType('Color', { color: style.line }),
     });
-
-    // Buat partikel kendaraan bergerak di sepanjang jalan (tampil hanya pada zoom dekat)
-    const particleCount = Math.max(1, Math.min(8, Math.floor(total / 380)));
-    // Kecepatan gerak partikel proporsional terhadap kelancaran lalu lintas (m/s)
-    const speedMps = 18 + Math.max(0.12, road.trafficLevel ?? 0.6) * 55;
-
-    for (let p = 0; p < particleCount; p += 1) {
-      const startOffset = (total / particleCount) * p;
-      const initialPos = interpolateAlongRoad(road.coords, lengths, total, startOffset);
-      const pointPrimitive = particleCollection.add({
-        position: initialPos,
-        pixelSize: road.highway === 'motorway' ? 4.8 : 3.8,
-        color: style.dot,
-        outlineColor: Cesium.Color.fromCssColorString('#0E1430').withAlpha(routeFocusActive ? 0.25 : 0.40),
-        outlineWidth: 1.0,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, maxParticleDistance),
-        scaleByDistance: new Cesium.NearFarScalar(400, 1.0, maxParticleDistance, 0.45),
-      });
-
-      activeParticles.push({
-        primitive: pointPrimitive,
-        coords: road.coords,
-        lengths,
-        total,
-        offsetM: startOffset,
-        speedMps,
-      });
-    }
   }
 
   viewer.scene.requestRender();
 }
 
-/** Loop animasi partikel kendaraan di jalan raya. */
-let lastTickMs = 0;
-function tickTrafficParticles(nowMs) {
-  if (!layerEnabled) {
-    animFrameId = null;
-    return;
-  }
-  const dt = lastTickMs ? Math.min(0.1, (nowMs - lastTickMs) / 1000) : 0.016;
-  lastTickMs = nowMs;
-
-  if (activeParticles.length > 0) {
-    for (const item of activeParticles) {
-      item.offsetM = (item.offsetM + item.speedMps * dt) % item.total;
-      item.primitive.position = interpolateAlongRoad(
-        item.coords,
-        item.lengths,
-        item.total,
-        item.offsetM,
-      );
-    }
-    getViewer()?.scene.requestRender();
-  }
-
-  animFrameId = requestAnimationFrame(tickTrafficParticles);
-}
-
-function startParticleLoop() {
-  if (animFrameId !== null) return;
-  lastTickMs = performance.now();
-  animFrameId = requestAnimationFrame(tickTrafficParticles);
-}
-
-function stopParticleLoop() {
-  if (animFrameId !== null) {
-    cancelAnimationFrame(animFrameId);
-    animFrameId = null;
-  }
-}
-
 /**
  * Memuat data lalu lintas untuk area pandang saat ini.
- * Menggabungkan koridor utama Jakarta dengan live tile TomTom (bila tersedia dan dekat).
+ * Menggunakan live tile TomTom bila tersedia di area pandang, atau fallback ke koridor utama Jakarta
+ * tanpa menumpuk keduanya di jalan yang sama.
  */
 export async function refreshTrafficViewport() {
   const viewer = getViewer();
@@ -480,7 +383,7 @@ export async function refreshTrafficViewport() {
         const liveRoads = tileRoadArrays.flat();
         if (liveRoads.length > 0) {
           currentSourceMode = 'live';
-          renderRoadsAndParticles([...KORIDOR_ARTERI_JAKARTA, ...liveRoads]);
+          renderRoadsAndParticles(liveRoads);
           notifyListeners();
           return;
         }
@@ -502,13 +405,9 @@ export async function refreshTrafficViewport() {
 export function setTrafficLayerEnabled(enabled) {
   layerEnabled = Boolean(enabled);
   if (roadLineCollection) roadLineCollection.show = layerEnabled;
-  if (particleCollection) particleCollection.show = layerEnabled;
 
   if (layerEnabled) {
     refreshTrafficViewport();
-    startParticleLoop();
-  } else {
-    stopParticleLoop();
   }
 
   getViewer()?.scene.requestRender();
@@ -544,16 +443,13 @@ export async function initTrafficLayer() {
 
   if (!roadLineCollection) {
     roadLineCollection = viewer.scene.primitives.add(new Cesium.PolylineCollection());
-    particleCollection = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection());
   }
 
   roadLineCollection.show = layerEnabled;
-  particleCollection.show = layerEnabled;
 
-  // Muat pertama kali (koridor arteri langsung tampil seketika, lalu diperkaya TomTom Live)
+  // Muat pertama kali (koridor arteri langsung tampil seketika, lalu digantikan TomTom Live bila tersedia)
   renderRoadsAndParticles(KORIDOR_ARTERI_JAKARTA);
   if (layerEnabled) {
-    startParticleLoop();
     refreshTrafficViewport();
   }
 

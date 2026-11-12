@@ -844,29 +844,35 @@
 
 /* =====================================================================
    MENU KONTEKS TITIK PETA TERPILIH (CLICK-TO-PICK COORDINATE)
+   Unslopped: Solid white surface, clear typographic hierarchy,
+   precise 4px-grid spacing, and quiet accessible action buttons.
    ===================================================================== */
 
 .mappick-menu {
   position: absolute;
   z-index: calc(var(--z-mapctrl) + 8);
-  width: min(310px, calc(100% - 24px));
-  padding: 12px 14px;
+  width: min(320px, calc(100% - 24px));
+  padding: 16px;
   border-radius: var(--r-lg);
-  background: rgba(10, 46, 107, 0.96);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
-  color: #F8FAFC;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 12px 32px rgba(10, 46, 107, 0.16), 0 2px 6px rgba(10, 46, 107, 0.08);
+  color: var(--text-1);
   animation: popup-scale var(--dur-2) var(--ease) both;
   transform-origin: top left;
   pointer-events: auto;
 }
 
+[data-theme="gelap"] .mappick-menu {
+  background: #0B192E;
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.48);
+}
+
 @keyframes popup-scale {
   from {
     opacity: 0;
-    transform: scale(0.92) translateY(6px);
+    transform: scale(0.95) translateY(4px);
   }
   to {
     opacity: 1;
@@ -885,7 +891,7 @@
 .mappick__locname {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
   flex: 1;
 }
@@ -894,18 +900,24 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--jk-lime);
+  color: var(--jk-blue-1);
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .mappick__title {
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 700;
-  line-height: 1.3;
-  color: #FFFFFF;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-1);
   margin: 0;
   word-break: break-word;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="gelap"] .mappick__title {
+  color: #F8FAFC;
 }
 
 .mappick__close {
@@ -914,48 +926,51 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.12);
-  color: #E2E8F0;
+  border-radius: var(--r-xs);
+  border: 1px solid transparent;
+  background: var(--surface-2);
+  color: var(--text-3);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+  transition: all var(--dur-1) var(--ease);
 }
 
 .mappick__close:hover {
-  background: rgba(255, 255, 255, 0.22);
-  color: #FFFFFF;
+  background: var(--surface-3);
+  color: var(--text-1);
+  border-color: var(--border);
 }
 
 .mappick__body {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-left: 22px;
+  gap: 4px;
+  padding-left: 23px;
 }
 
 .mappick__area {
   font-size: 12px;
-  color: #CBD5E1;
+  color: var(--text-2);
   margin: 0;
-  line-height: 1.35;
+  line-height: 1.4;
   word-break: break-word;
 }
 
 .mappick__coords {
   font-size: 11px;
   font-family: var(--font-mono, monospace);
-  color: #94A3B8;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
   margin: 0;
   line-height: 1.25;
 }
 
 .mappick__actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+  padding-top: 4px;
 }
 
 .mappick__btn {
@@ -963,64 +978,80 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 10px;
+  height: 34px;
+  padding: 0 12px;
   border-radius: var(--r-sm);
-  font-size: 11.5px;
-  font-weight: 700;
-  border: none;
+  font-family: var(--font-text);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-1);
   cursor: pointer;
-  transition: transform var(--dur-1) var(--ease), filter var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+  transition: all var(--dur-1) var(--ease);
+}
+
+.mappick__btn:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
 }
 
 .mappick__btn--origin {
   flex: 1;
-  background: #16A34A;
+  background: var(--jk-blue-1);
+  border-color: var(--jk-blue-1);
   color: #FFFFFF;
 }
 
 .mappick__btn--origin:hover {
-  background: #15803D;
-  filter: brightness(1.08);
+  background: var(--jk-blue-2);
+  border-color: var(--jk-blue-2);
 }
 
 .mappick__btn--dest {
   flex: 1;
-  background: var(--jk-blue);
-  color: #FFFFFF;
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text-1);
 }
 
 .mappick__btn--dest:hover {
-  background: #006EE6;
-  filter: brightness(1.08);
+  background: var(--surface-2);
+  border-color: var(--text-2);
+}
+
+[data-theme="gelap"] .mappick__btn--dest {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #F8FAFC;
 }
 
 .mappick__btn--copy {
   flex: 0 0 auto;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #E2E8F0;
+  padding: 0 10px;
+  color: var(--text-2);
 }
 
-.mappick__btn--copy:hover {
-  background: rgba(255, 255, 255, 0.20);
+.mappick__indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mappick__indicator--origin {
+  background: rgba(255, 255, 255, 0.28);
   color: #FFFFFF;
 }
 
-.mappick__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex: 0 0 7px;
-}
-
-.mappick__dot--origin {
-  background: #4ADE80;
-  box-shadow: 0 0 6px #4ADE80;
-}
-
-.mappick__dot--dest {
-  background: #93C5FD;
-  box-shadow: 0 0 6px #93C5FD;
+.mappick__indicator--dest {
+  background: var(--st-hindari);
+  color: #FFFFFF;
 }
 
 /* =====================================================================
