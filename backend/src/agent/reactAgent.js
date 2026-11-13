@@ -16,6 +16,7 @@ import { analyzeImageDeclaration, analyzeImage } from './tools/analyzeImage.js';
 import { getTrafficDeclaration, getTraffic } from './tools/getTraffic.js';
 import { calculateRouteScore, DEFAULT_WEIGHTS } from '../scoring/routeScorer.js';
 import { findNearest, publicView } from '../services/cctvCatalog.js';
+import { attachHealth, sortCandidatesByHealth } from '../services/cctvHealthService.js';
 import { saveExecutionLog } from '../db/mongoClient.js';
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
@@ -519,13 +520,14 @@ export async function runNavigationAgent({
         const altTarget = altTraffic?.worstSegment?.delayPercent > 0
           ? altTraffic.worstSegment
           : altMid;
-        let nearestList = findNearest(altTarget.lat, altTarget.lon, { radiusM: 1000, limit: 1 });
+        let nearestList = findNearest(altTarget.lat, altTarget.lon, { radiusM: 1000, limit: 6 });
         if (nearestList.length === 0 && altTarget !== altMid) {
-          nearestList = findNearest(altMid.lat, altMid.lon, { radiusM: 1000, limit: 1 });
+          nearestList = findNearest(altMid.lat, altMid.lon, { radiusM: 1000, limit: 6 });
         }
         if (nearestList.length > 0) {
-          const found = nearestList[0];
-          const camView = publicView(found.camera);
+          const prioritized = sortCandidatesByHealth(nearestList);
+          const found = prioritized[0];
+          const camView = attachHealth(publicView(found.camera));
           const sameAsPrimary = visualResult?.cameraId === camView.id;
           altVisual = {
             cameraId: camView.id,

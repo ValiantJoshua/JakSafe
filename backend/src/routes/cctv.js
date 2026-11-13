@@ -4,13 +4,23 @@ import { fetchFrame, FrameError, assertPublicHttpUrl } from '../services/cctvFra
 import { parseCoords, RouteError } from '../services/osrm.js';
 import { analyzeRoadImage, VisionError } from '../services/geminiVision.js';
 import { cctvVisionCache } from '../services/cacheService.js';
+import {
+  attachHealth,
+  getHealthSummary,
+  recordCameraHealth,
+} from '../services/cctvHealthService.js';
 
 const router = Router();
 
+// GET /api/cctv/health  -> aggregate online/offline/unknown camera status summary
+router.get('/health', (_req, res) => {
+  res.json({ ok: true, ...getHealthSummary() });
+});
+
 // GET /api/cctv/sources  -> all cameras (without source URLs)
 router.get('/sources', (_req, res) => {
-  const cameras = loadCatalog().map(publicView);
-  res.json({ ok: true, count: cameras.length, cameras });
+  const cameras = loadCatalog().map((c) => attachHealth(publicView(c)));
+  res.json({ ok: true, count: cameras.length, summary: getHealthSummary(), cameras });
 });
 
 // GET /api/cctv/nearest?coords=lon,lat&radius=500&limit=3
@@ -20,7 +30,7 @@ router.get('/nearest', (req, res) => {
     const radiusM = Math.min(Math.max(Number(req.query.radius) || 500, 50), 5000);
     const limit = Math.min(Math.max(Number(req.query.limit) || 3, 1), 10);
     const found = findNearest(lat, lon, { radiusM, limit })
-      .map((x) => ({ ...publicView(x.camera), distanceM: x.distanceM }));
+      .map((x) => ({ ...attachHealth(publicView(x.camera)), distanceM: x.distanceM }));
     res.json({ ok: true, count: found.length, cameras: found });
   } catch (e) {
     if (e instanceof RouteError) return res.status(e.status).json({ ok: false, error: e.message });
@@ -33,8 +43,13 @@ router.get('/nearest', (req, res) => {
 router.get('/frame/:id', async (req, res) => {
   const camera = getCameraById(req.params.id);
   if (!camera) return res.status(404).json({ ok: false, error: 'camera not found' });
+  const startedAt = Date.now();
   try {
     const { buffer, contentType, fetchedAt } = await fetchFrame(camera);
+    recordCameraHealth(camera.id, {
+      status: 'online',
+      latencyMs: Date.now() - startedAt,
+    });
     res.set({
       'Content-Type': contentType,
       'Cache-Control': 'no-store',
@@ -42,6 +57,11 @@ router.get('/frame/:id', async (req, res) => {
     });
     res.send(buffer);
   } catch (e) {
+    recordCameraHealth(camera.id, {
+      status: 'offline',
+      reason: e.message,
+      latencyMs: Date.now() - startedAt,
+    });
     if (e instanceof FrameError) return res.status(e.status).json({ ok: false, error: e.message });
     console.error('[cctv/frame]', e);
     res.status(500).json({ ok: false, error: 'internal error' });
@@ -78,7 +98,7 @@ router.get('/stream/:id.m3u8', async (req, res) => {
   try {
     await assertPublicHttpUrl(camera.hlsUrl);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
+    const timer = setTimeout(() => controller.abort(), 9000);
     const upstreamRes = await fetch(camera.hlsUrl, {
       signal: controller.signal,
       headers: { 'User-Agent': 'jaksafe-backend/dev (academic project)' },
@@ -206,18 +226,30 @@ router.get('/analyze/:id', async (req, res) => {
     return res.json({ ok: true, cached: true, ...hit });
   }
 
+  const startedAt = Date.now();
   try {
     const { buffer, contentType, fetchedAt } = await fetchFrame(camera);
+    recordCameraHealth(camera.id, {
+      status: 'online',
+      latencyMs: Date.now() - startedAt,
+    });
     const analysis = await analyzeRoadImage({
       base64: buffer.toString('base64'),
       mimeType: contentType,
       context: camera.name,
       cacheKey: `img:${camera.id}`,
     });
-    const payload = { camera: publicView(camera), fetchedAt, analysis };
+    const payload = { camera: attachHealth(publicView(camera)), fetchedAt, analysis };
     cctvVisionCache.set(cacheKey, payload);
     res.json({ ok: true, cached: false, ...payload });
   } catch (e) {
+    if (e instanceof FrameError) {
+      recordCameraHealth(camera.id, {
+        status: 'offline',
+        reason: e.message,
+        latencyMs: Date.now() - startedAt,
+      });
+    }
     if (e instanceof FrameError || e instanceof VisionError) {
       return res.status(e.status).json({ ok: false, error: e.message });
     }

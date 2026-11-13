@@ -53,9 +53,14 @@ function gambarKeadaanMasuk(keadaan) {
 
   const namaUser = pengguna?.name || 'Pengguna JakSafe';
   const emailUser = pengguna?.email || '';
+  const inisial = inisialNama(namaUser);
+  const namaPendek = namaUser.trim().split(/\s+/)[0] || 'Akun';
+
+  setText($('#userChipAva') || document.querySelector('.userchip__ava'), inisial);
+  setText($('#userChipNama') || document.querySelector('.userchip__name'), namaPendek);
 
   const ava = document.querySelector('.usermenu__ava');
-  if (ava) ava.textContent = inisialNama(namaUser);
+  if (ava) ava.textContent = inisial;
 
   setText($('#menuNama'), namaUser);
   setText($('#menuEmail'), emailUser);

@@ -224,6 +224,12 @@ export const geocodeCache = new InMemoryLRUCache({
   defaultTtlMs: 24 * 60 * 60 * 1000,
 });
 
+export const cctvHealthCache = new InMemoryLRUCache({
+  name: 'cctv_health',
+  max: 1000,
+  defaultTtlMs: 15 * 60 * 1000, // 15 minutes
+});
+
 /**
  * Get aggregated statistics for all registered cache stores.
  * @returns {object}
@@ -231,6 +237,7 @@ export const geocodeCache = new InMemoryLRUCache({
 export function getAllCacheStats() {
   return {
     cctvVision: cctvVisionCache.getStats(),
+    cctvHealth: cctvHealthCache.getStats(),
     routeGeometry: routeGeometryCache.getStats(),
     navigation: navigationCache.getStats(),
     geocoding: geocodeCache.getStats(),
@@ -242,6 +249,7 @@ export function getAllCacheStats() {
  */
 export function clearAllCaches() {
   cctvVisionCache.clear();
+  cctvHealthCache.clear();
   routeGeometryCache.clear();
   navigationCache.clear();
   geocodeCache.clear();

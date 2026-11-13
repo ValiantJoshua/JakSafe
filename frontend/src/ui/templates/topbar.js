@@ -42,8 +42,8 @@ export function templateTopbar() {
     </button>
 
     <button type="button" class="userchip press" id="userChip" hidden>
-      <span class="userchip__ava">GS</span>
-      <span class="userchip__name">Gerald</span>
+      <span class="userchip__ava" id="userChipAva">JS</span>
+      <span class="userchip__name" id="userChipNama">Akun</span>
       ${ikon('i-chev', 15)}
     </button>
   </div>

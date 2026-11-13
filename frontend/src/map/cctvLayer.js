@@ -38,6 +38,8 @@ let selectedCameraId = null;
 let activeHls = null;
 /** @type {number|null} */
 let activeSnapTimer = null;
+/** @type {number|null} */
+let activeSnapRetryTimer = null;
 /** @type {boolean} */
 let autoRefreshEnabled = true;
 /** @type {'video'|'snapshot'} */
@@ -79,7 +81,7 @@ export function getAllLoadedCameras() {
 
 /**
  * Menggambar ikon penanda kamera di atas kanvas untuk dijadikan billboard Cesium.
- * @param {'normal'|'route'|'selected'} variant
+ * @param {'normal'|'route'|'selected'|'offline'} variant
  * @returns {string} data URL PNG
  */
 function buatIkonBillboardKamera(variant = 'normal') {
@@ -97,10 +99,14 @@ function buatIkonBillboardKamera(variant = 'normal') {
     ? '#A3E635'
     : variant === 'route'
       ? '#0284FF'
-      : '#0A2E6B';
+      : variant === 'offline'
+        ? '#64748B'
+        : '#0A2E6B';
   const ring = variant === 'selected'
     ? '#0A2E6B'
-    : '#FFFFFF';
+    : variant === 'offline'
+      ? '#E2E8F0'
+      : '#FFFFFF';
   const fg = variant === 'selected' ? '#0A2E6B' : '#FFFFFF';
 
   // Lingkaran inti solid dengan bayangan netral halus (tanpa outer neon glow)
@@ -133,6 +139,15 @@ function buatIkonBillboardKamera(variant = 'normal') {
   ctx.lineTo(cx + 2.5, cy + 2.2);
   ctx.closePath();
   ctx.fill();
+
+  if (variant === 'offline') {
+    ctx.beginPath();
+    ctx.moveTo(cx - 7.5, cy + 7.5);
+    ctx.lineTo(cx + 7.5, cy - 7.5);
+    ctx.lineWidth = 2.1;
+    ctx.strokeStyle = '#FEE2E2';
+    ctx.stroke();
+  }
 
   const url = canvas.toDataURL('image/png');
   iconCache.set(variant, url);
@@ -223,12 +238,13 @@ function renderEntitasKamera() {
 
     const isSelected = cam.id === selectedCameraId;
     const isRouteCam = cam.id === highlightedCameraId;
+    const isOffline = cam.status === 'offline';
     const isNearRoute = hasActiveRoute
       ? (isSelected || isRouteCam || jarakKameraKeRuteM(cam.lon, cam.lat, activeRouteGeometry) <= CORRIDOR_RADIUS_M)
       : true;
     const isDimmedOutside = hasActiveRoute && !isNearRoute;
 
-    const variant = isSelected ? 'selected' : isRouteCam ? 'route' : 'normal';
+    const variant = isSelected ? 'selected' : isOffline ? 'offline' : isRouteCam ? 'route' : 'normal';
 
     const heading = Number.isFinite(cam.headingDeg) ? cam.headingDeg : 0;
     const fov = Number.isFinite(cam.fovDeg) ? cam.fovDeg : 55;
@@ -236,9 +252,8 @@ function renderEntitasKamera() {
 
     // 1. Kerucut pandang (Viewshed Cone) di permukaan tanah.
     //    Warna disatukan ke rentang biru/slate tenang agar tidak bertabrakan dengan warna
-    //    semantik kemacetan lalu lintas (hijau/kuning/merah), serta hanya ditampilkan pada
-    //    kamera terpilih, kamera rute, atau saat pengguna melakukan zoom dekat.
-    if (!isDimmedOutside) {
+    //    semantik kemacetan lalu lintas (hijau/kuning/merah), serta disembunyikan untuk kamera offline.
+    if (!isDimmedOutside && (!isOffline || isSelected)) {
       const coneCoords = hitungKerucutPandang(cam.lat, cam.lon, heading, fov, rangeM);
       const flatDegrees = coneCoords.flatMap(([lon, lat]) => [lon, lat]);
       const coneColor = isSelected
@@ -273,7 +288,8 @@ function renderEntitasKamera() {
     }
 
     // 2. Penanda Billboard & Label Kamera
-    const markerSize = isSelected ? 34 : isRouteCam ? 30 : isDimmedOutside ? 16 : 24;
+    const markerSize = isSelected ? 34 : isRouteCam ? 30 : isDimmedOutside ? 16 : isOffline ? 21 : 24;
+    const markerAlpha = isDimmedOutside ? 0.20 : isOffline && !isSelected ? 0.65 : 1.0;
     const entityDef = {
       id: `cctv-node-${cam.id}`,
       position: Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat, 0),
@@ -285,7 +301,7 @@ function renderEntitasKamera() {
         image: buatIkonBillboardKamera(variant),
         width: markerSize,
         height: markerSize,
-        color: isDimmedOutside ? Cesium.Color.WHITE.withAlpha(0.20) : Cesium.Color.WHITE,
+        color: Cesium.Color.WHITE.withAlpha(markerAlpha),
         verticalOrigin: Cesium.VerticalOrigin.CENTER,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -332,6 +348,10 @@ function hentikanStreamKamera() {
     clearInterval(activeSnapTimer);
     activeSnapTimer = null;
   }
+  if (activeSnapRetryTimer) {
+    clearTimeout(activeSnapRetryTimer);
+    activeSnapRetryTimer = null;
+  }
 
   const videoEl = /** @type {HTMLVideoElement|null} */ (document.getElementById('mapCctvVideo'));
   if (videoEl) {
@@ -357,6 +377,26 @@ function setLoadingSpinner(visible, teks = 'Menghubungkan ke live stream...') {
   const spinTxt = document.getElementById('mapCctvSpinnerText');
   if (spinWrap) spinWrap.hidden = !visible;
   if (spinTxt && teks) spinTxt.textContent = teks;
+}
+
+function perbaruiBadgeStatusKamera(cam) {
+  const statusEl = document.getElementById('mapCctvStatusBadge');
+  if (!statusEl || !cam) return;
+  const status = cam.status === 'online' || cam.status === 'offline' ? cam.status : 'unknown';
+  statusEl.hidden = false;
+  statusEl.dataset.status = status;
+  if (status === 'online') {
+    statusEl.textContent = 'ONLINE';
+    statusEl.title = cam.lastCheckedAt
+      ? `Terakhir aktif: ${new Date(cam.lastCheckedAt).toLocaleTimeString('id-ID')}`
+      : 'Kamera aktif';
+  } else if (status === 'offline') {
+    statusEl.textContent = 'OFFLINE';
+    statusEl.title = cam.statusReason ? `Gangguan: ${cam.statusReason}` : 'Kamera tidak merespons';
+  } else {
+    statusEl.textContent = 'CEK...';
+    statusEl.title = 'Status kamera sedang diperiksa berkala';
+  }
 }
 
 /**
@@ -460,14 +500,52 @@ function tampilkanModeKamera(cam, mode) {
       tampilkanModeKamera(cam, 'snapshot');
     }
   } else {
-    // Mode Snapshot (Foto)
+    // Mode Snapshot (Foto) — sertai 1x auto-retry lembut untuk kamera cold-start
     if (videoEl) videoEl.hidden = true;
+    let retriesLeft = 1;
     if (imgEl) {
       imgEl.hidden = false;
       frameEl?.removeAttribute('data-gagal');
+      setLoadingSpinner(true, 'Memuat cuplikan CCTV...');
+      imgEl.onload = () => {
+        setLoadingSpinner(false);
+        frameEl?.removeAttribute('data-gagal');
+        if (cam.status !== 'online') {
+          cam.status = 'online';
+          cam.statusReason = null;
+          cam.lastCheckedAt = new Date().toISOString();
+          perbaruiBadgeStatusKamera(cam);
+          renderEntitasKamera();
+        }
+      };
+      imgEl.onerror = () => {
+        if (retriesLeft > 0 && selectedCameraId === cam.id && currentViewMode === 'snapshot') {
+          retriesLeft -= 1;
+          setLoadingSpinner(true, 'Menyambungkan ulang kamera...');
+          activeSnapRetryTimer = window.setTimeout(() => {
+            activeSnapRetryTimer = null;
+            if (selectedCameraId === cam.id && currentViewMode === 'snapshot') {
+              imgEl.src = urlBingkaiKamera(cam.id, Date.now());
+            }
+          }, 500);
+          return;
+        }
+        setLoadingSpinner(false);
+        frameEl?.setAttribute('data-gagal', '1');
+        if (fallbackMsg && cam.statusReason) {
+          fallbackMsg.textContent = `Kamera sedang offline (${cam.statusReason})`;
+        }
+        if (cam.status !== 'offline') {
+          cam.status = 'offline';
+          cam.lastCheckedAt = new Date().toISOString();
+          perbaruiBadgeStatusKamera(cam);
+          renderEntitasKamera();
+        }
+      };
       imgEl.src = urlBingkaiKamera(cam.id, Date.now());
+    } else {
+      setLoadingSpinner(false);
     }
-    setLoadingSpinner(false);
 
     // Pasang interval auto-refresh jika diaktifkan pengguna
     if (autoRefreshEnabled) {
@@ -510,9 +588,19 @@ export function bukaPopupKameraPeta(cam) {
   const tabVid = document.getElementById('tabMapCctvVideo');
 
   if (titleEl) titleEl.textContent = cam.nama;
+  perbaruiBadgeStatusKamera(cam);
+  const fallbackMsgEl = document.getElementById('mapCctvFallbackMsg');
+  if (fallbackMsgEl) {
+    fallbackMsgEl.textContent = cam.status === 'offline' && cam.statusReason
+      ? `Kamera sedang offline (${cam.statusReason})`
+      : 'Kamera sedang tidak merespons';
+  }
   if (metaEl) {
     const arah = Number.isFinite(cam.headingDeg) ? `Arah ${cam.headingDeg}°` : 'Arah 360°';
-    metaEl.textContent = `${cam.provider || 'CCTV Jakarta'} · ${arah} · ${cam.lat.toFixed(4)}, ${cam.lon.toFixed(4)}`;
+    const waktuCek = cam.lastCheckedAt
+      ? ` · Cek ${new Date(cam.lastCheckedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`
+      : '';
+    metaEl.textContent = `${cam.provider || 'CCTV Jakarta'} · ${arah} · ${cam.lat.toFixed(4)}, ${cam.lon.toFixed(4)}${waktuCek}`;
   }
   if (aiBoxEl) {
     aiBoxEl.hidden = true;

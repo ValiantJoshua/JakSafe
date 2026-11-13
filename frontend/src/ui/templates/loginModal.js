@@ -119,7 +119,7 @@ export function templateUserMenu() {
   return `
 <div class="usermenu" id="userMenu" hidden>
   <div class="usermenu__head">
-    <span class="usermenu__ava">GS</span>
+    <span class="usermenu__ava">JS</span>
     <span>
       <span class="usermenu__name" id="menuNama">Pengguna JakSafe</span>
       <span class="usermenu__mail" id="menuEmail"></span>

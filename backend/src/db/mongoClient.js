@@ -1,7 +1,16 @@
+import dns from 'node:dns';
 import mongoose from 'mongoose';
 
 const DEFAULT_URI = 'mongodb://localhost:27017/jaksafe';
+const PUBLIC_SRV_DNS = ['1.1.1.1', '8.8.8.8'];
+const SERVER_SELECTION_TIMEOUT_MS = 8000;
 let isConnected = false;
+
+function isLoopbackOnlyDns(servers) {
+  return Array.isArray(servers)
+    && servers.length > 0
+    && servers.every((s) => s === '127.0.0.1' || s === '::1');
+}
 
 const ExecutionLogSchema = new mongoose.Schema(
   {
@@ -60,13 +69,32 @@ export const ExecutionLog = mongoose.models.ExecutionLog || mongoose.model('Exec
  */
 export async function connectDb() {
   const uri = process.env.MONGODB_URI || DEFAULT_URI;
-  try {
+  const isSrv = uri.startsWith('mongodb+srv://');
+
+  if (isSrv && isLoopbackOnlyDns(dns.getServers())) {
+    dns.setServers(PUBLIC_SRV_DNS);
+  }
+
+  const attemptConnect = () => {
     mongoose.set('strictQuery', false);
-    await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 3000,
+    return mongoose.connect(uri, {
+      serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
     });
+  };
+
+  try {
+    try {
+      await attemptConnect();
+    } catch (firstErr) {
+      if (isSrv && /querySrv/i.test(firstErr?.message || '')) {
+        dns.setServers(PUBLIC_SRV_DNS);
+        await attemptConnect();
+      } else {
+        throw firstErr;
+      }
+    }
     isConnected = true;
-    console.log(`[db] Connected to MongoDB at ${uri.replace(/\/\/.*@/, '//<auth>@')}`);
+    console.log(`[db] Connected to MongoDB (${mongoose.connection.name}) at ${uri.replace(/\/\/.*@/, '//<auth>@')}`);
   } catch (err) {
     isConnected = false;
     console.warn(`[db] MongoDB connection failed (${err.message}). Logging to MongoDB is suspended.`);
