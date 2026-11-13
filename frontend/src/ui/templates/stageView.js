@@ -151,6 +151,39 @@ export function templateStage() {
     <div class="mapcctv__aibox" id="mapCctvAiResult" hidden></div>
   </aside>
 
+  <!-- Menu Titik Peta Terpilih (Click-to-Pick Coordinate) -->
+  <aside class="mappick-menu" id="mapPickMenu" aria-label="Detail Titik Lokasi Peta" hidden>
+    <div class="mappick__head">
+      <div class="mappick__locname">
+        <span class="mappick__pin" aria-hidden="true">${ikon('i-pin', 15)}</span>
+        <h4 class="mappick__title" id="mapPickTitle">Mendeteksi alamat...</h4>
+      </div>
+      <button type="button" class="mappick__close" id="btnMapPickClose" aria-label="Tutup info titik lokasi" title="Tutup">
+        ${ikon('i-x', 14)}
+      </button>
+    </div>
+
+    <div class="mappick__body">
+      <p class="mappick__area" id="mapPickArea">Jakarta &amp; Sekitarnya</p>
+      <p class="mappick__coords" id="mapPickCoords">[-6.2088, 106.8456]</p>
+    </div>
+
+    <div class="mappick__actions">
+      <button type="button" class="mappick__btn mappick__btn--origin press" id="btnPickAsOrigin" title="Jadikan titik awal">
+        <span class="mappick__indicator mappick__indicator--origin" aria-hidden="true">A</span>
+        <span>Titik Awal</span>
+      </button>
+      <button type="button" class="mappick__btn mappick__btn--dest press" id="btnPickAsDest" title="Jadikan tujuan">
+        <span class="mappick__indicator mappick__indicator--dest" aria-hidden="true">B</span>
+        <span>Tujuan</span>
+      </button>
+      <button type="button" class="mappick__btn mappick__btn--copy press" id="btnPickCopy" title="Salin koordinat">
+        ${ikon('i-copy', 13)}
+        <span>Salin</span>
+      </button>
+    </div>
+  </aside>
+
   <!-- Kanan Bawah: Legenda Ringkas -->
   <div class="mapstage__float mapstage__float--br" id="legendWrap">
     <div class="legend">

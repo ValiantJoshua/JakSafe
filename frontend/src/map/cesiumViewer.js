@@ -73,10 +73,14 @@ let baseImageryLayer = null;
 
 /** @type {'3d'|'2d-road'|'2d-sat'} */
 let currentMode = '3d';
+/** @type {'road'|'sat'|'hybrid'|null} */
+let currentImageryStyle = null;
 /** @type {boolean} */
 let buildingsEnabled = true;
 /** @type {string} */
 let statusMessage = '3D Peta Jakarta';
+/** @type {number} */
+let lastFogHeight = -1;
 
 /** @type {Set<(info:{mode:string, buildingsEnabled:boolean, message:string, hasIonToken:boolean})=>void>} */
 const modeListeners = new Set();
@@ -164,13 +168,19 @@ export async function toggleBuildingsLayer() {
  */
 function optimize3DTileset(tileset) {
   if (!tileset) return;
-  tileset.maximumScreenSpaceError = 6;
+  tileset.maximumScreenSpaceError = 9;
   tileset.dynamicScreenSpaceError = true;
   tileset.dynamicScreenSpaceErrorDensity = 0.00278;
   tileset.dynamicScreenSpaceErrorFactor = 4.0;
   tileset.dynamicScreenSpaceErrorHeightFalloff = 0.25;
   tileset.cullRequestsWhileMoving = true;
   tileset.cullRequestsWhileMovingMultiplier = 60.0;
+  tileset.skipLevelOfDetail = true;
+  tileset.baseScreenSpaceError = 1024;
+  tileset.skipScreenSpaceErrorFactor = 16;
+  tileset.skipLevels = 1;
+  tileset.immediatelyLoadDesiredLevelOfDetail = false;
+  tileset.loadSiblings = false;
   tileset.preloadWhenHidden = false;
 }
 
@@ -348,11 +358,13 @@ function pasangAcuanTanahGedung(tileset) {
   });
 }
 
-/** Menyesuaikan jarak kabut gedung dengan ketinggian kamera (dipanggil tiap preRender). */
+/** Menyesuaikan jarak kabut gedung dengan ketinggian kamera (hanya saat berubah signifikan). */
 function perbaruiKabutGedung() {
   if (!viewerInstance || !buildingShader) return;
   const h = viewerInstance.camera.positionCartographic?.height;
   if (!Number.isFinite(h)) return;
+  if (lastFogHeight >= 0 && Math.abs(h - lastFogHeight) < 5) return;
+  lastFogHeight = h;
   const near = Math.max(1200, Math.min(30000, h * 1.6));
   buildingShader.setUniform('u_fogNear', near);
   buildingShader.setUniform('u_fogFar', near * 3.6);
@@ -400,9 +412,14 @@ function create2DImageryProvider(style = 'road') {
   }
 }
 
-/** Mengganti basemap pada globe. */
+/** Mengganti basemap pada globe (melewati reload jika style aktif masih sama). */
 async function applyGlobeImagery(style = 'road') {
   if (!viewerInstance) return;
+  if (currentImageryStyle === style && baseImageryLayer) {
+    terapkanNadaBasemap();
+    return;
+  }
+
   const layers = viewerInstance.imageryLayers;
   const provider = create2DImageryProvider(style);
 
@@ -412,6 +429,7 @@ async function applyGlobeImagery(style = 'road') {
   }
 
   baseImageryLayer = layers.addImageryProvider(provider, 0);
+  currentImageryStyle = style;
   baseImageryLayer.brightness = 1.0;
   baseImageryLayer.contrast = 1.02;
   baseImageryLayer.saturation = 1.0;
@@ -525,11 +543,19 @@ export async function setMapViewMode(mode, { fly = true } = {}) {
       statusMessage = '3D Globe Standar';
     }
   } else if (mode === '2d-sat') {
+    // Mode 2D Satelit: Kunci kemiringan kamera (kamera murni tegak lurus dari atas / top-down)
+    controller.enableTilt = false;
+    controller.enableLook = false;
+
     if (osmBuildingsTileset) osmBuildingsTileset.show = false;
     viewerInstance.scene.globe.show = true;
     await applyGlobeImagery('hybrid');
     statusMessage = '2D Satelit';
   } else {
+    // Mode 2D Peta Normal: Kunci kemiringan kamera (kamera murni tegak lurus dari atas / top-down)
+    controller.enableTilt = false;
+    controller.enableLook = false;
+
     if (osmBuildingsTileset) osmBuildingsTileset.show = false;
     viewerInstance.scene.globe.show = true;
     await applyGlobeImagery('road');
@@ -631,13 +657,14 @@ export function zoomMap(direction = 1) {
     new Cesium.Cartesian3(),
   );
 
-  // Transisi animasi mulus & responsif
+  // Transisi animasi mulus & responsif dengan orientasi terkunci per mode
+  const is3D = currentMode === '3d';
   camera.flyTo({
     destination: targetDestination,
     orientation: {
-      heading: camera.heading,
-      pitch: camera.pitch,
-      roll: camera.roll,
+      heading: is3D ? camera.heading : 0,
+      pitch: is3D ? camera.pitch : Cesium.Math.toRadians(-89.9),
+      roll: 0,
     },
     duration: 0.35,
     easingFunction: Cesium.EasingFunction.QUADRATIC_OUT,
@@ -707,18 +734,20 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
     skyAtmosphere: new Cesium.SkyAtmosphere(),
     terrainProvider: flatTerrainProvider,
     shouldAnimate: true,
-    requestRenderMode: false,
+    requestRenderMode: true,
+    maximumRenderTimeChange: Infinity,
     msaaSamples: 4,
     baseLayer: new Cesium.ImageryLayer(create2DImageryProvider('road')),
   });
 
   viewerInstance = viewer;
   baseImageryLayer = viewer.imageryLayers.get(0);
+  currentImageryStyle = 'road';
 
   // Optimasi Resolusi Layar (HiDPI / Retina) & Anti-Aliasing
-  viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 2.0);
+  viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 1.5);
   if (viewer.scene.postProcessStages?.fxaa) {
-    viewer.scene.postProcessStages.fxaa.enabled = true;
+    viewer.scene.postProcessStages.fxaa.enabled = false;
   }
 
   // Pencahayaan arah mengikuti arah pandang kamera (Headlight + Sun dari atas)
@@ -741,10 +770,10 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
   const globe = viewer.scene.globe;
   globe.enableLighting = false;
   globe.depthTestAgainstTerrain = false;
-  globe.maximumScreenSpaceError = 1.35;
+  globe.maximumScreenSpaceError = 1.85;
   globe.tileCacheSize = 1000;
   globe.preloadAncestors = true;
-  globe.preloadSiblings = true;
+  globe.preloadSiblings = false;
   globe.baseColor = Cesium.Color.fromCssColorString('#E8EEF5');
 
   viewer.scene.fog.enabled = true;
@@ -754,6 +783,33 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
   const ctrl = viewer.scene.screenSpaceCameraController;
   ctrl.minimumZoomDistance = 45;
   ctrl.maximumZoomDistance = 4500000;
+  ctrl.inertiaSpin = 0.90;
+  ctrl.inertiaTranslate = 0.92;
+  ctrl.inertiaZoom = 0.85;
+
+  // Hapus aksi LEFT_DOUBLE_CLICK bawaan Cesium yang menyebabkan kamera tilting ke cakrawala.
+  // Gantikan dengan zoomMap(1) yang aman dan menjaga orientasi kamera 2D tetap tegak lurus.
+  viewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+  viewer.screenSpaceEventHandler.setInputAction(() => {
+    zoomMap(1);
+  }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+
+  // Penjaga konsistensi mode 2D: jika ada pergerakan kamera di mode 2D yang mengubah pitch,
+  // kembalikan segera ke posisi tegak lurus top-down (-89.9 derajat).
+  viewer.camera.moveEnd.addEventListener(() => {
+    if (currentMode !== '3d') {
+      const pitchDeg = Cesium.Math.toDegrees(viewer.camera.pitch);
+      if (pitchDeg > -85) {
+        viewer.camera.setView({
+          orientation: {
+            heading: 0,
+            pitch: Cesium.Math.toRadians(-89.9),
+            roll: 0,
+          },
+        });
+      }
+    }
+  });
 
   enforceIndonesiaBounds(viewer);
 

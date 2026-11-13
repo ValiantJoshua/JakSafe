@@ -119,6 +119,256 @@ function extractRouteSummary(route, index = 0, usedSummaries = new Set()) {
 }
 
 /**
+ * Menerjemahkan tipe manuver & modifier OSRM menjadi kunci arah (directionKey)
+ * serta instruksi bahasa Indonesia yang alami.
+ */
+function buildStepInstruction(maneuver = {}, roadLabel = '') {
+  const type = String(maneuver.type || 'continue').toLowerCase();
+  const mod = String(maneuver.modifier || '').toLowerCase();
+  const exit = Number.isInteger(maneuver.exit) ? maneuver.exit : null;
+  const target = roadLabel ? ` ke ${roadLabel}` : '';
+  const diTarget = roadLabel ? ` di ${roadLabel}` : '';
+  const menujuTarget = roadLabel ? ` menuju ${roadLabel}` : '';
+
+  if (type === 'depart') {
+    return {
+      directionKey: 'depart',
+      instruction: roadLabel ? `Mulai perjalanan di ${roadLabel}` : 'Mulai perjalanan dari titik awal',
+    };
+  }
+
+  if (type === 'arrive') {
+    const posHint = mod === 'left'
+      ? ' (di sebelah kiri)'
+      : mod === 'right'
+        ? ' (di sebelah kanan)'
+        : '';
+    return {
+      directionKey: 'arrive',
+      instruction: `Tiba di tujuan${posHint}`,
+    };
+  }
+
+  if (type === 'roundabout' || type === 'rotary' || type === 'roundabout turn') {
+    const exitStr = exit ? ` ambil jalan keluar ke-${exit}` : ' ikuti bundaran';
+    return {
+      directionKey: 'roundabout',
+      instruction: `Masuk bundaran,${exitStr}${menujuTarget}`,
+    };
+  }
+
+  if (type === 'exit roundabout' || type === 'exit rotary') {
+    return {
+      directionKey: mod.includes('left') ? 'slight-left' : 'slight-right',
+      instruction: `Keluar bundaran${menujuTarget}`,
+    };
+  }
+
+  if (mod === 'uturn') {
+    return {
+      directionKey: 'uturn',
+      instruction: `Putar balik${diTarget}`,
+    };
+  }
+
+  if (type === 'merge') {
+    return {
+      directionKey: mod.includes('left') ? 'slight-left' : mod.includes('right') ? 'slight-right' : 'merge',
+      instruction: `Bergabung ke jalur${menujuTarget}`,
+    };
+  }
+
+  if (type === 'on ramp' || type === 'off ramp') {
+    const rampType = type === 'on ramp' ? 'Ambil jalur masuk (ramp)' : 'Ambil jalur keluar (exit ramp)';
+    const dirKey = mod.includes('left') ? 'slight-left' : mod.includes('right') ? 'slight-right' : 'ramp';
+    return {
+      directionKey: dirKey,
+      instruction: `${rampType}${menujuTarget}`,
+    };
+  }
+
+  if (type === 'fork') {
+    if (mod.includes('left')) {
+      return {
+        directionKey: 'slight-left',
+        instruction: `Ambil percabangan kiri${menujuTarget}`,
+      };
+    }
+    if (mod.includes('right')) {
+      return {
+        directionKey: 'slight-right',
+        instruction: `Ambil percabangan kanan${menujuTarget}`,
+      };
+    }
+    return {
+      directionKey: 'straight',
+      instruction: `Ikuti percabangan lurus${menujuTarget}`,
+    };
+  }
+
+  if (type === 'end of road') {
+    if (mod.includes('left')) {
+      return {
+        directionKey: 'left',
+        instruction: `Di ujung jalan, belok kiri${target}`,
+      };
+    }
+    if (mod.includes('right')) {
+      return {
+        directionKey: 'right',
+        instruction: `Di ujung jalan, belok kanan${target}`,
+      };
+    }
+  }
+
+  // Turn / Continue / New name / Notification dengan modifier arah
+  if (mod === 'sharp left') {
+    return { directionKey: 'sharp-left', instruction: `Belok tajam ke kiri${target}` };
+  }
+  if (mod === 'left') {
+    return { directionKey: 'left', instruction: `Belok kiri${target}` };
+  }
+  if (mod === 'slight left') {
+    return { directionKey: 'slight-left', instruction: `Sedikit ke kiri${menujuTarget}` };
+  }
+  if (mod === 'sharp right') {
+    return { directionKey: 'sharp-right', instruction: `Belok tajam ke kanan${target}` };
+  }
+  if (mod === 'right') {
+    return { directionKey: 'right', instruction: `Belok kanan${target}` };
+  }
+  if (mod === 'slight right') {
+    return { directionKey: 'slight-right', instruction: `Sedikit ke kanan${menujuTarget}` };
+  }
+
+  if (type === 'new name' && roadLabel) {
+    return {
+      directionKey: 'straight',
+      instruction: `Lanjut lurus ke ${roadLabel}`,
+    };
+  }
+
+  return {
+    directionKey: 'straight',
+    instruction: roadLabel ? `Lurus terus di ${roadLabel}` : 'Lanjut lurus mengikuti jalan',
+  };
+}
+
+/**
+ * Mengekstrak daftar langkah manuver (Turn-by-Turn steps) dari objek rute OSRM,
+ * menerjemahkan ke Bahasa Indonesia, dan menggabungkan segmen lurus berurutan di jalan yang sama.
+ *
+ * @param {object} route Objek route dari OSRM (`route.legs[].steps[]`)
+ * @returns {Array<{
+ *   index: number,
+ *   instruction: string,
+ *   roadName: string,
+ *   directionKey: string,
+ *   type: string,
+ *   modifier: string,
+ *   distanceM: number,
+ *   durationS: number,
+ *   location: [number, number] | null
+ * }>}
+ */
+export function extractRouteSteps(route) {
+  const legs = Array.isArray(route?.legs) ? route.legs : [];
+  const rawSteps = [];
+
+  for (let legIdx = 0; legIdx < legs.length; legIdx++) {
+    const leg = legs[legIdx];
+    const steps = Array.isArray(leg?.steps) ? leg.steps : [];
+    const isFirstLeg = legIdx === 0;
+    const isLastLeg = legIdx === legs.length - 1;
+
+    for (let sIdx = 0; sIdx < steps.length; sIdx++) {
+      const step = steps[sIdx];
+      const maneuver = step?.maneuver || {};
+      const type = String(maneuver.type || 'continue').toLowerCase();
+      const modifier = String(maneuver.modifier || '').toLowerCase();
+      const distanceM = Math.max(0, Math.round(Number(step?.distance) || 0));
+      const durationS = Math.max(0, Math.round(Number(step?.duration) || 0));
+      const isFirstStepOfLeg = sIdx === 0;
+      const isLastStepOfLeg = sIdx === steps.length - 1;
+
+      // Pada rute multi-leg (misal rute alternatif dengan via-waypoint):
+      // Langkah terakhir dari leg perantara memiliki type='arrive' (ke titik waypoint perantara),
+      // dan langkah pertama dari leg berikutnya memiliki type='depart'.
+      // Keduanya BUKAN awal atau akhir sebenarnya dari rute keseluruhan pengguna,
+      // sehingga harus diabaikan atau diubah menjadi navigasi lanjutan agar tidak muncul "dua tujuan".
+      if (!isLastLeg && isLastStepOfLeg && type === 'arrive') {
+        continue;
+      }
+      if (!isFirstLeg && isFirstStepOfLeg && type === 'depart') {
+        // Gabungkan jarak/durasi transit ke langkah sebelumnya jika ada
+        const prev = rawSteps[rawSteps.length - 1];
+        if (prev) {
+          prev.distanceM += distanceM;
+          prev.durationS += durationS;
+        }
+        continue;
+      }
+
+      // Lewati langkah mikro (< 4 meter) kecuali depart awal atau arrive akhir
+      if (type !== 'depart' && type !== 'arrive' && distanceM < 4) {
+        continue;
+      }
+
+      const name = String(step?.name || '').trim();
+      const ref = String(step?.ref || '').trim();
+      const destinations = String(step?.destinations || '').trim();
+      const rotaryName = String(step?.rotary_name || '').trim();
+
+      let roadName = name || destinations || rotaryName || '';
+      if (ref && roadName && !roadName.includes(ref)) {
+        roadName = `${roadName} (${ref})`;
+      } else if (!roadName && ref) {
+        roadName = ref;
+      }
+
+      const loc = Array.isArray(maneuver.location) && maneuver.location.length >= 2
+        ? [Number(maneuver.location[0]), Number(maneuver.location[1])]
+        : Array.isArray(step?.geometry?.coordinates?.[0])
+          ? [Number(step.geometry.coordinates[0][0]), Number(step.geometry.coordinates[0][1])]
+          : null;
+
+      const { directionKey, instruction } = buildStepInstruction(maneuver, roadName);
+
+      // Gabungkan langkah lurus berurutan pada nama jalan yang sama agar daftar langkah ringkas
+      const prev = rawSteps[rawSteps.length - 1];
+      if (
+        prev &&
+        prev.directionKey === 'straight' &&
+        directionKey === 'straight' &&
+        prev.roadName &&
+        roadName &&
+        prev.roadName.toLowerCase() === roadName.toLowerCase()
+      ) {
+        prev.distanceM += distanceM;
+        prev.durationS += durationS;
+        continue;
+      }
+
+      rawSteps.push({
+        instruction,
+        roadName: roadName || (type === 'arrive' ? 'Titik Tujuan' : 'Jalan Lokal'),
+        directionKey,
+        type,
+        modifier,
+        distanceM,
+        durationS,
+        location: loc && Number.isFinite(loc[0]) && Number.isFinite(loc[1]) ? loc : null,
+      });
+    }
+  }
+
+  return rawSteps.map((s, idx) => ({
+    index: idx + 1,
+    ...s,
+  }));
+}
+
+/**
  * Fetch raw OSRM route JSON by racing two independent public OSRM mirrors in parallel.
  * Whichever mirror responds first with valid route data wins immediately.
  */
@@ -224,12 +474,63 @@ function buildUrbanCorridorFallback(p, coords, alternatives = false) {
     const distanceM = Math.round(straightM * distMultipliers[idx]);
     const durationS = Math.max(60, Math.round(distanceM / speed));
     const summary = rankedCorridors[idx]?.name || (idx === 0 ? 'Jalur Arteri Utama' : `Jalur Alternatif ${idx + 1}`);
+    const corridorParts = summary.split(',').map((s) => s.trim()).filter(Boolean);
+    const roadA = corridorParts[0] || 'Jalur Arteri Utama';
+    const roadB = corridorParts[1] || 'Jalur Penghubung Tujuan';
+
+    const fallbackSteps = [
+      {
+        index: 1,
+        instruction: `Mulai perjalanan menuju ${roadA}`,
+        roadName: roadA,
+        directionKey: 'depart',
+        type: 'depart',
+        modifier: 'straight',
+        distanceM: Math.round(distanceM * 0.18),
+        durationS: Math.max(15, Math.round(durationS * 0.18)),
+        location: geometry[0],
+      },
+      {
+        index: 2,
+        instruction: `Lurus terus di ${roadA}`,
+        roadName: roadA,
+        directionKey: 'straight',
+        type: 'continue',
+        modifier: 'straight',
+        distanceM: Math.round(distanceM * 0.47),
+        durationS: Math.max(25, Math.round(durationS * 0.47)),
+        location: geometry[Math.floor(geometry.length * 0.25)],
+      },
+      {
+        index: 3,
+        instruction: `${idx % 2 === 0 ? 'Belok kanan' : 'Belok kiri'} ke ${roadB}`,
+        roadName: roadB,
+        directionKey: idx % 2 === 0 ? 'right' : 'left',
+        type: 'turn',
+        modifier: idx % 2 === 0 ? 'right' : 'left',
+        distanceM: Math.max(20, distanceM - Math.round(distanceM * 0.18) - Math.round(distanceM * 0.47)),
+        durationS: Math.max(20, durationS - Math.round(durationS * 0.18) - Math.round(durationS * 0.47)),
+        location: geometry[Math.floor(geometry.length * 0.68)],
+      },
+      {
+        index: 4,
+        instruction: 'Tiba di tujuan',
+        roadName: 'Titik Tujuan',
+        directionKey: 'arrive',
+        type: 'arrive',
+        modifier: '',
+        distanceM: 0,
+        durationS: 0,
+        location: geometry[geometry.length - 1],
+      },
+    ];
 
     return {
       distanceM,
       durationS,
       summary,
       geometry,
+      steps: fallbackSteps,
     };
   });
 
@@ -242,7 +543,7 @@ function buildUrbanCorridorFallback(p, coords, alternatives = false) {
  * @param {string} [opts.profile='car']  car | bike | foot
  * @param {number[][]} opts.coords       [[lon, lat], ...]
  * @param {boolean} [opts.alternatives]  request alternative routes (for multi-criteria comparison)
- * @returns {Promise<{profile: string, routes: {distanceM: number, durationS: number, summary: string, geometry: number[][]}[]}>}
+ * @returns {Promise<{profile: string, routes: {distanceM: number, durationS: number, summary: string, geometry: number[][], steps: object[]}[]}>}
  */
 export async function getRoutes({ profile = 'car', coords, alternatives = false }) {
   const p = PROFILE_ALIASES[String(profile).toLowerCase()];
@@ -321,6 +622,7 @@ export async function getRoutes({ profile = 'car', coords, alternatives = false 
       durationS: Math.round(r.duration),
       summary: extractRouteSummary(r, idx, usedSummaries),
       geometry: r.geometry.coordinates,
+      steps: extractRouteSteps(r),
     })),
   };
 

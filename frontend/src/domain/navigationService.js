@@ -243,6 +243,7 @@ async function rangkaiPratinjau({
       durationS: r.durationS,
       summary: r.summary || `Jalur Alternatif ${idx + 2}`,
       geometry: r.geometry,
+      steps: Array.isArray(r.steps) ? r.steps : [],
       totalScore: s.totalScore,
       label: s.label,
       color: s.color,

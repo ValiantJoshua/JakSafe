@@ -99,6 +99,24 @@ export function templateResultView() {
     <div class="reason__text" id="sReason"></div>
   </div>
 
+  <!-- Daftar Manuver Langkah Rute (Turn-by-Turn Steps) -->
+  <div class="card card--steps rise rise-3" id="turnByTurnCard">
+    <div class="card__head steps__head">
+      <span class="card__icon">${ikon('i-route', 18)}</span>
+      <div class="steps__headtext">
+        <span class="card__title">Panduan Langkah Rute</span>
+        <span class="steps__sub" id="stepsSub">Klik langkah untuk melihat titik belokan di peta</span>
+      </div>
+      <span class="badge steps__badge" id="stepsCountBadge">0 langkah</span>
+      <button type="button" class="steps__toggle press" id="btnToggleSteps" aria-expanded="true" aria-controls="stepsListWrap" title="Ciutkan atau bentangkan daftar belokan">
+        ${ikon('i-chev', 15, 'steps__chev')}
+      </button>
+    </div>
+    <div class="steps__wrap" id="stepsListWrap">
+      <ol class="steps__list" id="stepsList" aria-label="Daftar langkah manuver rute"></ol>
+    </div>
+  </div>
+
   <div class="card card--detail rise rise-4">
     <div class="card__head">
       <span class="card__icon">${ikon('i-route', 18)}</span>
