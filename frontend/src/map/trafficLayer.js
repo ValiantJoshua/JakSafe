@@ -1,28 +1,22 @@
-// Adapted from God's Eye View (MIT) — gods-eye-view/src/data/traffic.js & gods-eye-view/src/data/flowTiles.js
 /*
    Lapisan Lalu Lintas (Traffic Flow) di atas peta CesiumJS JakSafe.
 
    Fitur:
    - Mendukung sakelar ON / OFF layer lalu lintas (setTrafficLayerEnabled).
-   - Mode Live TomTom Vector Tiles:
-     Mengunduh tile vektor biner (/api/tomtom/flow/{z}/{x}/{y}.pbf) untuk area
-     pandang Jakarta saat ini, menguraikan protobuf MVT memakai `pbf` dan
-     `@mapbox/vector-tile`, lalu menggambar garis koridor jalan berwarna
-     (Hijau = Lancar, Kuning/Oranye = Padat, Merah = Macet) beserta partikel
-     arus kendaraan yang bergerak secara real-time mengikuti kecepatan jalan.
-   - Mode Koridor Arteri Jakarta (Fallback / Pendamping):
-     Menampilkan koridor utama Jakarta (Sudirman-Thamrin, Gatot Subroto,
-     Rasuna Said, MT Haryono, S. Parman, TB Simatupang, dll.) sehingga
-     layer Traffic tetap hidup dan responsif meskipun kuota TomTom habis
-     atau kamera sedang melihat dari ketinggian menengah.
+   - Mode Live TomTom Raster Flow Overlay (`UrlTemplateImageryProvider`):
+     Menampilkan layer PNG transparan TomTom (`/api/tomtom/flow/{z}/{x}/{y}.png?style=relative0&tileSize=512`)
+     di atas globe Cesium sehingga detail jalan beradaptasi otomatis terhadap level zoom
+     seperti Google Maps (tol & arteri utama saat zoom out; jalan kolektor & lokal
+     muncul bertahap saat zoom in) di seluruh area pandang.
+   - Mode Koridor Arteri Jakarta (Fallback):
+     Aktif otomatis bila kuota / kunci API TomTom tidak tersedia sehingga layer Traffic
+     tetap tampil sebagai garis koridor utama Jakarta.
 */
 
 import * as Cesium from 'cesium';
-import { PbfReader as Pbf } from 'pbf';
-import { VectorTile } from '@mapbox/vector-tile';
 import { cekStatusLaluLintas } from '../api/trafficApi.js';
 import { urlSumberDaya } from '../api/httpClient.js';
-import { getViewer } from './cesiumViewer.js';
+import { getViewer, INDONESIA_BOUNDS } from './cesiumViewer.js';
 
 /** Koridor arteri utama Jakarta sebagai baseline / fallback visual lalu lintas. */
 const KORIDOR_ARTERI_JAKARTA = [
@@ -129,14 +123,17 @@ const KORIDOR_ARTERI_JAKARTA = [
   },
 ];
 
-const TILE_CACHE_TTL_MS = 90_000;
-const MAX_TILES_PER_VIEW = 6;
-const tileCache = new Map();
+const LIVE_CAMERA_MAX_HEIGHT_M = 450_000;
+const STATUS_CHECK_MIN_INTERVAL_MS = 30_000;
+const ALPHA_LIVE_NORMAL = 0.65;
+const ALPHA_LIVE_FOCUS = 0.22;
 
+/** @type {Cesium.ImageryLayer|null} */
+let trafficImageryLayer = null;
 /** @type {Cesium.PolylineCollection|null} */
 let roadLineCollection = null;
-/** @type {number|null} */
-let cameraDebounceTimer = null;
+/** @type {Cesium.Event.RemoveCallback|null} */
+let moveEndUnsub = null;
 
 /** @type {boolean} */
 let layerEnabled = true;
@@ -146,8 +143,12 @@ let currentSourceMode = 'arteri';
 let activeRoadCount = 0;
 /** @type {boolean} Apakah sedang dalam Mode Fokus Rute (rute aktif digambar di peta) */
 let routeFocusActive = false;
-/** @type {Array<{id:string, highway?:string, trafficLevel:number, coords:number[][]}>} */
-let lastRenderedRoads = KORIDOR_ARTERI_JAKARTA;
+/** @type {number} */
+let lastStatusCheckMs = 0;
+/** @type {boolean} */
+let errorFallbackPending = false;
+/** @type {Promise<void>|null} */
+let refreshInflight = null;
 
 /** @type {Set<(info:{enabled:boolean, mode:string, roadCount:number})=>void>} */
 const listeners = new Set();
@@ -181,221 +182,174 @@ export function getTrafficLayerStatus() {
 }
 
 /**
- * Menentukan warna garis jalan berdasarkan tingkat kelancaran (0.0 macet .. 1.0 lancar).
- * Menggunakan warna arus lalu lintas solid ala Google Maps / Waze tanpa efek partikel titik.
+ * Menentukan warna garis jalan fallback berdasarkan tingkat kelancaran (0.0 macet .. 1.0 lancar).
  * @param {number} level
  */
 function warnaLaluLintas(level, dimmed = false) {
   const l = Number.isFinite(level) ? level : 0.65;
   if (l < 0.36) {
-    // Macet berat -> Merah tegas
-    return {
-      line: Cesium.Color.fromCssColorString('#DC2626').withAlpha(dimmed ? 0.28 : 0.78),
-    };
+    return Cesium.Color.fromCssColorString('#DC2626').withAlpha(dimmed ? 0.28 : 0.78);
   }
   if (l < 0.68) {
-    // Padat merayap -> Kuning / Oranye tegas
-    return {
-      line: Cesium.Color.fromCssColorString('#F59E0B').withAlpha(dimmed ? 0.24 : 0.75),
-    };
+    return Cesium.Color.fromCssColorString('#F59E0B').withAlpha(dimmed ? 0.24 : 0.75);
   }
-  // Lancar -> Hijau bersih
-  return {
-    line: Cesium.Color.fromCssColorString('#16A34A').withAlpha(dimmed ? 0.20 : 0.70),
-  };
+  return Cesium.Color.fromCssColorString('#16A34A').withAlpha(dimmed ? 0.20 : 0.70);
 }
 
-/** Konversi lon/lat ke koordinat slippy tile {x, y} pada zoom z. */
-function lonLatToTile(lon, lat, z) {
-  const n = 2 ** z;
-  const x = Math.max(0, Math.min(n - 1, Math.floor(((lon + 180) / 360) * n)));
-  const latRad = (Math.max(-85.05, Math.min(85.05, lat)) * Math.PI) / 180;
-  const y = Math.max(
-    0,
-    Math.min(n - 1, Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n)),
-  );
-  return { x, y };
-}
-
-/** Konversi titik di dalam MVT tile (0..extent) menjadi [lon, lat]. */
-function tilePixelToLonLat(z, x, y, px, py, extent = 4096) {
-  const n = 2 ** z;
-  const lon = ((x + px / extent) / n) * 360 - 180;
-  const latRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + py / extent)) / n)));
-  const lat = (latRad * 180) / Math.PI;
-  return [lon, lat];
-}
-
-/**
- * Mengurai satu tile biner TomTom Flow (.pbf) menjadi daftar segmen jalan.
- * Adapted from God's Eye View (MIT) — gods-eye-view/src/data/flowTiles.js
- */
-function decodeTomTomFlowPbf(buffer, z, x, y) {
-  if (!buffer || buffer.byteLength === 0) return [];
-  let tile;
-  try {
-    tile = new VectorTile(new Pbf(new Uint8Array(buffer)));
-  } catch {
-    return [];
-  }
-
-  const layer = tile.layers['Traffic flow']
-    || tile.layers.traffic_flow
-    || tile.layers[Object.keys(tile.layers)[0]];
-  if (!layer) return [];
-
-  const extent = layer.extent || 4096;
-  const roads = [];
-
-  for (let i = 0; i < layer.length; i += 1) {
-    const feat = layer.feature(i);
-    if (feat.type !== 2) continue; // 2 = LineString
-
-    const props = feat.properties || {};
-    const rawLevel = Number(props.traffic_level ?? props.relative_speed);
-    const closed = Boolean(props.road_closure || props.closed);
-    const trafficLevel = closed
-      ? 0.05
-      : Number.isFinite(rawLevel)
-        ? Math.max(0, Math.min(1, rawLevel > 1 ? rawLevel / 100 : rawLevel))
-        : 0.65;
-
-    const roadType = String(props.road_type || props.road_category || 'primary').toLowerCase();
-    const geom = feat.loadGeometry();
-
-    for (let g = 0; g < geom.length; g += 1) {
-      const ring = geom[g];
-      if (!ring || ring.length < 2) continue;
-      const coords = ring.map((pt) => tilePixelToLonLat(z, x, y, pt.x, pt.y, extent));
-      roads.push({
-        id: `tt-${z}-${x}-${y}-${i}-${g}`,
-        highway: roadType.includes('motorway') || roadType.includes('0') ? 'motorway' : 'primary',
-        trafficLevel,
-        coords,
-      });
-    }
-  }
-  return roads;
-}
-
-/** Mengambil satu tile .pbf dari backend dengan cache memori. */
-async function fetchTomTomTile(z, x, y) {
-  const key = `${z}/${x}/${y}`;
-  const cached = tileCache.get(key);
-  if (cached && Date.now() - cached.at < TILE_CACHE_TTL_MS) {
-    return cached.roads;
-  }
-
-  const url = urlSumberDaya(`/tomtom/flow/${z}/${x}/${y}.pbf`);
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const buf = await resp.arrayBuffer();
-  const roads = decodeTomTomFlowPbf(buf, z, x, y);
-  tileCache.set(key, { at: Date.now(), roads });
-  return roads;
-}
-
-/** Menghitung panjang kumulatif tiap titik pada satu ruas jalan (dalam meter kasar). */
-function computeCumulativeLengths(coords) {
-  const lengths = [0];
-  let total = 0;
-  for (let i = 1; i < coords.length; i += 1) {
-    const [lon1, lat1] = coords[i - 1];
-    const [lon2, lat2] = coords[i];
-    const dx = (lon2 - lon1) * 111320 * Math.cos((lat1 * Math.PI) / 180);
-    const dy = (lat2 - lat1) * 110540;
-    total += Math.hypot(dx, dy);
-    lengths.push(total);
-  }
-  return { lengths, total };
-}
-
-/**
- * Menggambar kumpulan ruas jalan (polylines) arus lalu lintas di Cesium.
- * Menggunakan garis arus solid tanpa partikel bergerak agar bersih dan bebas gangguan visual.
- * @param {Array<{id:string, highway?:string, trafficLevel:number, coords:number[][]}>} roads
- */
-function renderRoadsAndParticles(roads) {
+/** Menggambar koridor arteri statis ke `roadLineCollection` untuk mode fallback offline/non-API. */
+function renderFallbackCorridors() {
   const viewer = getViewer();
   if (!viewer || !roadLineCollection) return;
 
-  lastRenderedRoads = roads;
   roadLineCollection.removeAll();
+  activeRoadCount = KORIDOR_ARTERI_JAKARTA.length;
 
-  const cappedRoads = roads.slice(0, 320);
-  activeRoadCount = cappedRoads.length;
-
-  for (const road of cappedRoads) {
+  for (const road of KORIDOR_ARTERI_JAKARTA) {
     if (!Array.isArray(road.coords) || road.coords.length < 2) continue;
-
-    const { total } = computeCumulativeLengths(road.coords);
-    if (total < 45) continue;
-
-    const style = warnaLaluLintas(road.trafficLevel, routeFocusActive);
+    const color = warnaLaluLintas(road.trafficLevel, routeFocusActive);
     const baseWidth = road.highway === 'motorway' ? 4.4 : road.highway === 'trunk' ? 3.6 : 2.8;
     const width = routeFocusActive ? baseWidth * 0.8 : baseWidth;
 
-    const positions = road.coords.map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(lon, lat, 10));
-
     roadLineCollection.add({
-      positions,
+      positions: road.coords.map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(lon, lat, 10)),
       width,
-      material: Cesium.Material.fromType('Color', { color: style.line }),
+      material: Cesium.Material.fromType('Color', { color }),
     });
+  }
+}
+
+/** Menyelaraskan tampilan overlay raster live dan polyline fallback dengan status & ketinggian kamera. */
+function sinkronkanVisibilitasLayer() {
+  const viewer = getViewer();
+  if (!viewer) return;
+
+  const height = viewer.camera?.positionCartographic?.height ?? 5000;
+  const dalamRentangLive = height <= LIVE_CAMERA_MAX_HEIGHT_M;
+
+  if (trafficImageryLayer && !trafficImageryLayer.isDestroyed?.()) {
+    trafficImageryLayer.show = layerEnabled && currentSourceMode === 'live' && dalamRentangLive;
+    trafficImageryLayer.alpha = routeFocusActive ? ALPHA_LIVE_FOCUS : ALPHA_LIVE_NORMAL;
+  }
+
+  if (roadLineCollection) {
+    roadLineCollection.show = layerEnabled && currentSourceMode === 'arteri';
   }
 
   viewer.scene.requestRender();
 }
 
-/**
- * Memuat data lalu lintas untuk area pandang saat ini.
- * Menggunakan live tile TomTom bila tersedia di area pandang, atau fallback ke koridor utama Jakarta
- * tanpa menumpuk keduanya di jalan yang sama.
- */
-export async function refreshTrafficViewport() {
-  const viewer = getViewer();
-  if (!viewer || !layerEnabled) return;
+/** Beralih ke koridor arteri fallback jika tile TomTom gagal atau kuota tidak tersedia. */
+function aktifkanModeFallbackArteri() {
+  const sebelumnya = currentSourceMode;
+  currentSourceMode = 'arteri';
+  renderFallbackCorridors();
+  sinkronkanVisibilitasLayer();
+  if (sebelumnya !== 'arteri') {
+    notifyListeners();
+  }
+}
 
-  const carto = viewer.camera.positionCartographic;
-  const height = carto?.height || 5000;
-  const lon = carto ? Cesium.Math.toDegrees(carto.longitude) : 106.8230;
-  const lat = carto ? Cesium.Math.toDegrees(carto.latitude) : -6.1950;
-
-  // Cek apakah berada di sekitar Jabodetabek dan cukup dekat untuk meminta tile vektor TomTom
-  const diJabodetabek = lon >= 106.55 && lon <= 107.15 && lat >= -6.55 && lat <= -6.02;
-
-  if (diJabodetabek && height <= 38000) {
-    const status = await cekStatusLaluLintas();
-    if (status.tersedia) {
-      try {
-        const z = height < 6000 ? 14 : 13;
-        const centerTile = lonLatToTile(lon, lat, z);
-        const coordsToFetch = [
-          { z, x: centerTile.x, y: centerTile.y },
-          { z, x: centerTile.x + 1, y: centerTile.y },
-          { z, x: centerTile.x - 1, y: centerTile.y },
-          { z, x: centerTile.x, y: centerTile.y + 1 },
-        ].slice(0, MAX_TILES_PER_VIEW);
-
-        const tileRoadArrays = await Promise.all(
-          coordsToFetch.map((t) => fetchTomTomTile(t.z, t.x, t.y).catch(() => [])),
-        );
-        const liveRoads = tileRoadArrays.flat();
-        if (liveRoads.length > 0) {
-          currentSourceMode = 'live';
-          renderRoadsAndParticles(liveRoads);
-          notifyListeners();
-          return;
-        }
-      } catch {
-        // Fallback ke koridor arteri Jakarta
-      }
-    }
+/** Membuat atau mengembalikan ImageryLayer TomTom Raster Flow PNG di atas basemap. */
+function ensureTrafficImageryLayer(viewer) {
+  if (
+    trafficImageryLayer
+    && !trafficImageryLayer.isDestroyed?.()
+    && viewer.imageryLayers.contains(trafficImageryLayer)
+  ) {
+    return trafficImageryLayer;
   }
 
-  currentSourceMode = 'arteri';
-  renderRoadsAndParticles(KORIDOR_ARTERI_JAKARTA);
-  notifyListeners();
+  const baseFlowUrl = urlSumberDaya('/tomtom/flow');
+  const provider = new Cesium.UrlTemplateImageryProvider({
+    url: `${baseFlowUrl}/{z}/{x}/{y}.png?style=relative0&tileSize=512`,
+    minimumLevel: 0,
+    maximumLevel: 17,
+    rectangle: Cesium.Rectangle.fromDegrees(
+      INDONESIA_BOUNDS.west,
+      INDONESIA_BOUNDS.south,
+      INDONESIA_BOUNDS.east,
+      INDONESIA_BOUNDS.north,
+    ),
+    tileWidth: 256,
+    tileHeight: 256,
+    hasAlphaChannel: true,
+    enablePickFeatures: false,
+    credit: new Cesium.Credit('TomTom Traffic'),
+  });
+
+  provider.errorEvent.addEventListener(() => {
+    if (errorFallbackPending || !layerEnabled || currentSourceMode !== 'live') return;
+    errorFallbackPending = true;
+    setTimeout(async () => {
+      try {
+        const status = await cekStatusLaluLintas();
+        lastStatusCheckMs = Date.now();
+        if (!status.tersedia && layerEnabled) {
+          aktifkanModeFallbackArteri();
+        }
+      } finally {
+        errorFallbackPending = false;
+      }
+    }, 450);
+  });
+
+  trafficImageryLayer = viewer.imageryLayers.addImageryProvider(provider);
+  trafficImageryLayer.alpha = routeFocusActive ? ALPHA_LIVE_FOCUS : ALPHA_LIVE_NORMAL;
+  trafficImageryLayer.saturation = 1.15;
+  trafficImageryLayer.show = false;
+  return trafficImageryLayer;
+}
+
+/**
+ * Memeriksa kesiapan TomTom Live Raster dan mengaktifkan overlay PNG atau fallback arteri.
+ * @param {{ forceStatusCheck?: boolean }} [opts]
+ */
+export async function refreshTrafficViewport({ forceStatusCheck = false } = {}) {
+  const viewer = getViewer();
+  if (!viewer) return;
+  if (!layerEnabled) {
+    sinkronkanVisibilitasLayer();
+    return;
+  }
+
+  const now = Date.now();
+  if (
+    !forceStatusCheck
+    && currentSourceMode === 'live'
+    && now - lastStatusCheckMs < STATUS_CHECK_MIN_INTERVAL_MS
+  ) {
+    sinkronkanVisibilitasLayer();
+    return;
+  }
+
+  if (refreshInflight) return refreshInflight;
+
+  refreshInflight = (async () => {
+    const status = await cekStatusLaluLintas();
+    lastStatusCheckMs = Date.now();
+
+    if (!layerEnabled) {
+      sinkronkanVisibilitasLayer();
+      return;
+    }
+
+    if (status.tersedia) {
+      ensureTrafficImageryLayer(viewer);
+      currentSourceMode = 'live';
+      activeRoadCount = 0;
+      sinkronkanVisibilitasLayer();
+      notifyListeners();
+      return;
+    }
+
+    aktifkanModeFallbackArteri();
+  })();
+
+  try {
+    await refreshInflight;
+  } finally {
+    refreshInflight = null;
+  }
 }
 
 /**
@@ -404,13 +358,12 @@ export async function refreshTrafficViewport() {
  */
 export function setTrafficLayerEnabled(enabled) {
   layerEnabled = Boolean(enabled);
-  if (roadLineCollection) roadLineCollection.show = layerEnabled;
+  sinkronkanVisibilitasLayer();
 
   if (layerEnabled) {
-    refreshTrafficViewport();
+    refreshTrafficViewport({ forceStatusCheck: currentSourceMode !== 'live' });
   }
 
-  getViewer()?.scene.requestRender();
   notifyListeners();
 }
 
@@ -421,7 +374,7 @@ export function toggleTrafficLayer() {
 
 /**
  * Mengatur Mode Fokus Rute pada layer Traffic.
- * Saat rute aktif digambar di peta, garis traffic latar belakang diredupkan agar
+ * Saat rute aktif digambar di peta, opasitas layer traffic diredupkan agar
  * garis rute utama tetap dominan dan mudah dibaca.
  * @param {boolean} active
  */
@@ -429,9 +382,11 @@ export function setTrafficRouteFocusMode(active) {
   const next = Boolean(active);
   if (routeFocusActive === next) return;
   routeFocusActive = next;
-  if (layerEnabled && lastRenderedRoads.length > 0) {
-    renderRoadsAndParticles(lastRenderedRoads);
+
+  if (currentSourceMode === 'arteri' && roadLineCollection) {
+    renderFallbackCorridors();
   }
+  sinkronkanVisibilitasLayer();
 }
 
 /**
@@ -445,20 +400,21 @@ export async function initTrafficLayer() {
     roadLineCollection = viewer.scene.primitives.add(new Cesium.PolylineCollection());
   }
 
-  roadLineCollection.show = layerEnabled;
+  // Gambar fallback arteri sekali sebagai cadangan instan bila status TomTom offline
+  renderFallbackCorridors();
+  sinkronkanVisibilitasLayer();
 
-  // Muat pertama kali (koridor arteri langsung tampil seketika, lalu digantikan TomTom Live bila tersedia)
-  renderRoadsAndParticles(KORIDOR_ARTERI_JAKARTA);
   if (layerEnabled) {
-    refreshTrafficViewport();
+    await refreshTrafficViewport({ forceStatusCheck: true });
   }
 
-  // Muat ulang tile TomTom saat kamera selesai berpindah
-  viewer.camera.moveEnd.addEventListener(() => {
-    if (!layerEnabled) return;
-    if (cameraDebounceTimer) clearTimeout(cameraDebounceTimer);
-    cameraDebounceTimer = setTimeout(() => {
-      refreshTrafficViewport();
-    }, 650);
-  });
+  if (!moveEndUnsub) {
+    moveEndUnsub = viewer.camera.moveEnd.addEventListener(() => {
+      if (!layerEnabled) return;
+      sinkronkanVisibilitasLayer();
+      if (Date.now() - lastStatusCheckMs >= STATUS_CHECK_MIN_INTERVAL_MS) {
+        void refreshTrafficViewport();
+      }
+    });
+  }
 }

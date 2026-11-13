@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getFlowTile,
+  getFlowRasterTile,
   getFlowSegment,
   sampleRouteTraffic,
   getCurrentBudget,
@@ -9,6 +10,16 @@ import {
 import { parseCoords, RouteError } from '../services/osrm.js';
 
 const router = Router();
+
+function sendTileError(res, logTag, err) {
+  const msg = err?.message || '';
+  if (msg === 'invalid_tile') return res.status(400).json({ error: 'invalid_tile' });
+  if (msg === 'no_key') return res.status(503).json({ error: 'no_key' });
+  if (msg === 'budget_exceeded') return res.status(429).json({ error: 'budget_exceeded' });
+  if (msg === 'upstream_error') return res.status(502).json({ error: 'upstream_error' });
+  console.error(logTag, err);
+  return res.status(500).json({ error: 'internal_error' });
+}
 
 // GET /api/tomtom/status
 // Reports whether an API key is configured and the remaining budget.
@@ -29,7 +40,7 @@ router.get('/status', async (_req, res) => {
 });
 
 // GET /api/tomtom/flow/:z/:x/:y.pbf
-// Serves Mapbox Vector Tile (.pbf) flow tiles for CesiumJS live traffic coloring.
+// Serves Mapbox Vector Tile (.pbf) flow tiles.
 router.get('/flow/:z/:x/:y.pbf', async (req, res) => {
   const z = Number(req.params.z);
   const x = Number(req.params.x);
@@ -39,18 +50,34 @@ router.get('/flow/:z/:x/:y.pbf', async (req, res) => {
     const { buf, cacheStatus } = await getFlowTile(z, x, y);
     res.set({
       'Content-Type': 'application/x-protobuf',
-      'Cache-Control': 'no-store',
+      'Cache-Control': 'public, max-age=180',
       'x-tomtom-cache': cacheStatus,
     });
     res.send(buf);
   } catch (err) {
-    const msg = err?.message || '';
-    if (msg === 'invalid_tile') return res.status(400).json({ error: 'invalid_tile' });
-    if (msg === 'no_key') return res.status(503).json({ error: 'no_key' });
-    if (msg === 'budget_exceeded') return res.status(429).json({ error: 'budget_exceeded' });
-    if (msg === 'upstream_error') return res.status(502).json({ error: 'upstream_error' });
-    console.error('[tomtom-tile]', err);
-    res.status(500).json({ error: 'internal_error' });
+    sendTileError(res, '[tomtom-tile]', err);
+  }
+});
+
+// GET /api/tomtom/flow/:z/:x/:y.png
+// Serves transparent PNG raster flow tiles for CesiumJS ImageryLayer zoom-level rendering.
+router.get('/flow/:z/:x/:y.png', async (req, res) => {
+  const z = Number(req.params.z);
+  const x = Number(req.params.x);
+  const y = Number(req.params.y);
+  const style = typeof req.query.style === 'string' ? req.query.style : 'relative0';
+  const tileSize = Number(req.query.tileSize) === 256 ? 256 : 512;
+
+  try {
+    const { buf, cacheStatus } = await getFlowRasterTile(z, x, y, { style, tileSize });
+    res.set({
+      'Content-Type': 'image/png',
+      'Cache-Control': 'public, max-age=180',
+      'x-tomtom-cache': cacheStatus,
+    });
+    res.send(buf);
+  } catch (err) {
+    sendTileError(res, '[tomtom-raster-tile]', err);
   }
 });
 

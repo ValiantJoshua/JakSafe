@@ -7,18 +7,30 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 export const MIN_TILE_ZOOM = 8;
-export const MAX_TILE_ZOOM = 16;
+export const MAX_TILE_ZOOM = 18;
 const MERCATOR_LAT_LIMIT = 85.05112878;
 
-const TILE_TTL_MS = 120_000; // 2 minutes
-const MEM_MAX_ENTRIES = 256;
+const TILE_TTL_MS = 180_000; // 3 minutes
+const MEM_MAX_ENTRIES = 512;
 const UPSTREAM_TIMEOUT_MS = 15_000;
-const DEFAULT_DAILY_BUDGET = 2400; // Safe cap under the 2,500/day free tier limit
+const DEFAULT_DAILY_BUDGET = 6000; // Generous cap well under 200k/month TomTom freemium pool
+const RASTER_STYLES = new Set([
+  'relative0',
+  'relative0-dark',
+  'relative',
+  'relative-delay',
+  'absolute',
+  'reduced-sensitivity',
+]);
+const TRANSPARENT_1PX_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=',
+  'base64'
+);
 
 const CACHE_DIR = path.resolve(process.cwd(), '.cache', 'tomtom');
 const BUDGET_PATH = path.join(CACHE_DIR, 'budget.json');
 
-/** Memory cache for tiles: key `z/x/y` -> { at: number, buf: Buffer } */
+/** Memory cache for tiles -> { at: number, buf: Buffer } */
 const tileMemCache = new Map();
 /** In-flight deduplication per tile */
 const tileInflight = new Map();
@@ -31,11 +43,15 @@ let budgetLoaded = false;
 
 // ── Tile Math & Validation (Adapted from GEV tomtomTiles.js) ──
 
-export function isValidTileCoord(z, x, y) {
+function isWithinTileGrid(z, x, y) {
   if (!Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y)) return false;
-  if (z < MIN_TILE_ZOOM || z > MAX_TILE_ZOOM) return false;
+  if (z < 0 || z > MAX_TILE_ZOOM) return false;
   const n = 2 ** z;
   return x >= 0 && x < n && y >= 0 && y < n;
+}
+
+export function isValidTileCoord(z, x, y) {
+  return z >= MIN_TILE_ZOOM && isWithinTileGrid(z, x, y);
 }
 
 export function lonLatToTile(lon, lat, z) {
@@ -112,13 +128,14 @@ async function recordUpstreamFetch() {
 
 // ── Disk Tile Cache ──
 
-const tileDiskPath = (key) => path.join(CACHE_DIR, `flow-${key.replaceAll('/', '-')}.pbf`);
+const tileDiskPath = (diskFile) => path.join(CACHE_DIR, diskFile);
 
-async function readDiskTile(key) {
+async function readDiskTile(diskFile) {
   try {
+    const filePath = tileDiskPath(diskFile);
     const [stat, buf] = await Promise.all([
-      fsp.stat(tileDiskPath(key)),
-      fsp.readFile(tileDiskPath(key)),
+      fsp.stat(filePath),
+      fsp.readFile(filePath),
     ]);
     return { at: stat.mtimeMs, buf };
   } catch {
@@ -126,12 +143,12 @@ async function readDiskTile(key) {
   }
 }
 
-async function writeDiskTile(key, buf) {
+async function writeDiskTile(diskFile, buf) {
   try {
     await fsp.mkdir(CACHE_DIR, { recursive: true });
-    await fsp.writeFile(tileDiskPath(key), buf);
+    await fsp.writeFile(tileDiskPath(diskFile), buf);
   } catch (err) {
-    console.warn(`[tomtom] tile cache write failed for ${key}:`, err?.message || err);
+    console.warn(`[tomtom] tile cache write failed for ${diskFile}:`, err?.message || err);
   }
 }
 
@@ -145,11 +162,11 @@ function memSetTile(key, entry) {
 
 // ── Upstream Fetchers ──
 
-async function fetchTileUpstream(z, x, y) {
+async function fetchTileUpstream(buildUrl) {
   const apiKey = process.env.TOMTOM_API_KEY;
   if (!apiKey) throw new Error('no_key');
 
-  const url = `https://api.tomtom.com/traffic/map/4/tile/flow/relative/${z}/${x}/${y}.pbf?key=${encodeURIComponent(apiKey)}`;
+  const url = buildUrl(apiKey);
   await recordUpstreamFetch();
 
   const res = await fetch(url, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
@@ -160,24 +177,15 @@ async function fetchTileUpstream(z, x, y) {
 }
 
 /**
- * Fetch a vector flow tile with multi-level caching, single-flight deduplication, and budget governing.
- * @param {number} z
- * @param {number} x
- * @param {number} y
- * @returns {Promise<{ buf: Buffer, cacheStatus: string }>}
+ * Shared multi-level tile cache, single-flight deduplication, and budget governor.
  */
-export async function getFlowTile(z, x, y) {
-  if (!isValidTileCoord(z, x, y)) {
-    throw new Error('invalid_tile');
-  }
-
-  const key = `${z}/${x}/${y}`;
+async function getCachedTile({ cacheKey, diskFile, buildUrl }) {
   const now = Date.now();
 
-  let entry = tileMemCache.get(key);
+  let entry = tileMemCache.get(cacheKey);
   if (!entry) {
-    entry = await readDiskTile(key);
-    if (entry) memSetTile(key, entry);
+    entry = await readDiskTile(diskFile);
+    if (entry) memSetTile(cacheKey, entry);
   }
 
   // Fresh cache hit
@@ -200,25 +208,25 @@ export async function getFlowTile(z, x, y) {
   }
 
   // Single-flight fetch
-  if (!tileInflight.has(key)) {
+  if (!tileInflight.has(cacheKey)) {
     tileInflight.set(
-      key,
-      fetchTileUpstream(z, x, y)
+      cacheKey,
+      fetchTileUpstream(buildUrl)
         .then(async (buf) => {
           const fresh = { at: Date.now(), buf };
-          memSetTile(key, fresh);
-          await writeDiskTile(key, buf);
+          memSetTile(cacheKey, fresh);
+          await writeDiskTile(diskFile, buf);
           return fresh;
         })
         .catch((err) => {
-          console.warn(`[tomtom] tile ${key} fetch failed (${err.message}) — serving stale if any`);
+          console.warn(`[tomtom] tile ${cacheKey} fetch failed (${err.message}) — serving stale if any`);
           return null;
         })
-        .finally(() => tileInflight.delete(key))
+        .finally(() => tileInflight.delete(cacheKey))
     );
   }
 
-  const fresh = await tileInflight.get(key);
+  const fresh = await tileInflight.get(cacheKey);
   if (fresh) {
     return { buf: fresh.buf, cacheStatus: 'MISS' };
   }
@@ -226,6 +234,54 @@ export async function getFlowTile(z, x, y) {
     return { buf: entry.buf, cacheStatus: 'STALE-ERROR' };
   }
   throw new Error('upstream_error');
+}
+
+/**
+ * Fetch a vector flow tile with multi-level caching, single-flight deduplication, and budget governing.
+ * @param {number} z
+ * @param {number} x
+ * @param {number} y
+ * @returns {Promise<{ buf: Buffer, cacheStatus: string }>}
+ */
+export async function getFlowTile(z, x, y) {
+  if (!isValidTileCoord(z, x, y)) {
+    throw new Error('invalid_tile');
+  }
+
+  return getCachedTile({
+    cacheKey: `pbf:${z}/${x}/${y}`,
+    diskFile: `flow-${z}-${x}-${y}.pbf`,
+    buildUrl: (apiKey) =>
+      `https://api.tomtom.com/traffic/map/4/tile/flow/relative/${z}/${x}/${y}.pbf?key=${encodeURIComponent(apiKey)}`,
+  });
+}
+
+/**
+ * Fetch a transparent PNG raster flow tile for Cesium ImageryLayer overlays.
+ * Returns a 1x1 transparent PNG below MIN_TILE_ZOOM with zero upstream API hits.
+ * @param {number} z
+ * @param {number} x
+ * @param {number} y
+ * @param {{ style?: string, tileSize?: number }} [opts]
+ * @returns {Promise<{ buf: Buffer, cacheStatus: string }>}
+ */
+export async function getFlowRasterTile(z, x, y, { style = 'relative0', tileSize = 512 } = {}) {
+  if (!isWithinTileGrid(z, x, y)) {
+    throw new Error('invalid_tile');
+  }
+  if (z < MIN_TILE_ZOOM) {
+    return { buf: TRANSPARENT_1PX_PNG, cacheStatus: 'EMPTY-ZOOM' };
+  }
+
+  const safeStyle = RASTER_STYLES.has(style) ? style : 'relative0';
+  const safeSize = Number(tileSize) === 256 ? 256 : 512;
+
+  return getCachedTile({
+    cacheKey: `png:${safeStyle}:${safeSize}:${z}/${x}/${y}`,
+    diskFile: `flow-${safeStyle}-${safeSize}-${z}-${x}-${y}.png`,
+    buildUrl: (apiKey) =>
+      `https://api.tomtom.com/traffic/map/4/tile/flow/${safeStyle}/${z}/${x}/${y}.png?tileSize=${safeSize}&key=${encodeURIComponent(apiKey)}`,
+  });
 }
 
 /**
