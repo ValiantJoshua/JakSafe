@@ -603,6 +603,43 @@
   color: #CBD5E1;
 }
 
+.mapcctv__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.mapcctv__status[data-status="online"] {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.3);
+  color: #15803D;
+}
+
+.mapcctv__status[data-status="offline"] {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.32);
+  color: #B91C1C;
+}
+
+[data-theme="gelap"] .mapcctv__status[data-status="online"] {
+  background: rgba(74, 222, 128, 0.14);
+  border-color: rgba(74, 222, 128, 0.32);
+  color: #4ADE80;
+}
+
+[data-theme="gelap"] .mapcctv__status[data-status="offline"] {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.32);
+  color: #F87171;
+}
+
 .mapcctv__title {
   font-family: var(--font-display);
   font-size: 14px;

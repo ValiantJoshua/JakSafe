@@ -90,6 +90,7 @@ export function templateStage() {
         <div class="mapcctv__tagline">
           <span class="mapcctv__live" id="mapCctvLiveBadge"><span class="mapcctv__livedot"></span><span id="mapCctvLiveLabel">LIVE STREAM</span></span>
           <span class="mapcctv__quality" id="mapCctvQuality">HLS 640p</span>
+          <span class="mapcctv__status" id="mapCctvStatusBadge" data-status="unknown" hidden>Belum dicek</span>
         </div>
         <h3 class="mapcctv__title" id="mapCctvTitle">Kamera Jakarta</h3>
         <p class="mapcctv__meta" id="mapCctvMeta">Memuat info kamera...</p>

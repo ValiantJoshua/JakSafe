@@ -36,6 +36,10 @@ import { toCoordParam } from '../utils/geo.js';
  * @property {number|null} fovDeg
  * @property {number|null} rangeM
  * @property {string|null} provider
+ * @property {boolean} hasLiveStream
+ * @property {'online'|'offline'|'unknown'} status
+ * @property {string|null} statusReason
+ * @property {string|null} lastCheckedAt
  * @property {string|null} license
  */
 
@@ -54,6 +58,9 @@ function keKamera(c) {
     rangeM: Number.isFinite(c.rangeM) ? Number(c.rangeM) : null,
     provider: c.provider ?? null,
     hasLiveStream: Boolean(c.hasLiveStream),
+    status: c.status === 'online' || c.status === 'offline' ? c.status : 'unknown',
+    statusReason: c.statusReason ?? null,
+    lastCheckedAt: c.lastCheckedAt ?? null,
     license: c.license ?? null,
   };
 }
