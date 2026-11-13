@@ -34,36 +34,30 @@ let currentCoords = null;
 
 /**
  * Membuat ikon billboard penanda titik peta terpilih (drop-pin locator).
- * Menggunakan bentuk teardrop map-pin dengan ujung runcing di bagian bawah (cx, tipY)
- * sehingga menancap tepat di koordinat tanah tanpa efek melayang/floating.
+ * Menggunakan bentuk teardrop map-pin solid Deep Navy (#0A2E6B) dengan ring putih tegas
+ * dan inti lime green (#A3E635), seragam secara geometris dengan pin titik awal & tujuan.
  */
 function buatPinTitikTerpilih() {
   if (pinDataUrl) return pinDataUrl;
 
-  const width = 46;
-  const height = 56;
+  const width = 44;
+  const height = 54;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   const cx = width / 2;
-  const headCy = 19;
-  const headR = 14;
-  const tipY = 50;
+  const headCy = 18;
+  const headR = 13.5;
+  const tipY = 48;
 
-  // 1. Bayangan kontak tanah di bawah ujung jarum pin
+  // 1. Bayangan kontak tanah di bawah ujung jarum pin (kontak halus tanpa pendaran)
   ctx.beginPath();
-  ctx.ellipse(cx, tipY + 2, 7, 2.5, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(10, 46, 107, 0.32)';
+  ctx.ellipse(cx, tipY + 1.5, 6.5, 2.2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
   ctx.fill();
 
-  // 2. Halo pendaran lembut di sekitar kepala pin
-  ctx.beginPath();
-  ctx.arc(cx, headCy, headR + 4, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(2, 132, 255, 0.22)';
-  ctx.fill();
-
-  // 3. Badan pin tetes (teardrop pin) meruncing ke bawah tepat di (cx, tipY)
+  // 2. Badan pin tetes (teardrop pin) meruncing ke bawah tepat di (cx, tipY)
   ctx.beginPath();
   ctx.moveTo(cx, tipY);
   ctx.bezierCurveTo(cx - headR, tipY - 14, cx - headR, headCy, cx - headR, headCy);
@@ -71,31 +65,24 @@ function buatPinTitikTerpilih() {
   ctx.bezierCurveTo(cx + headR, headCy, cx + headR, tipY - 14, cx, tipY);
   ctx.closePath();
 
-  // Gradien biru khas JakSafe (#0284FF ke #0A2E6B)
-  const grad = ctx.createLinearGradient(0, headCy - headR, 0, tipY);
-  grad.addColorStop(0, '#0284FF');
-  grad.addColorStop(1, '#0A2E6B');
-  ctx.fillStyle = grad;
-  ctx.shadowColor = 'rgba(10, 46, 107, 0.40)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
+  // Warna solid Deep Navy khas JakSafe (#0A2E6B) - flat & tegas
+  ctx.fillStyle = '#0A2E6B';
   ctx.fill();
-  ctx.shadowColor = 'transparent';
 
   // Garis tepi putih tegas penegas kontras
-  ctx.lineWidth = 2.4;
+  ctx.lineWidth = 2.2;
   ctx.strokeStyle = '#FFFFFF';
   ctx.stroke();
 
-  // 4. Lingkaran putih di kepala pin
+  // 3. Lingkaran putih di kepala pin
   ctx.beginPath();
-  ctx.arc(cx, headCy, 5.5, 0, Math.PI * 2);
+  ctx.arc(cx, headCy, 7.5, 0, Math.PI * 2);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
 
-  // 5. Inti lime green (#A3E635) penegas posisi
+  // 4. Inti lime green (#A3E635) penegas posisi
   ctx.beginPath();
-  ctx.arc(cx, headCy, 2.8, 0, Math.PI * 2);
+  ctx.arc(cx, headCy, 3.8, 0, Math.PI * 2);
   ctx.fillStyle = '#A3E635';
   ctx.fill();
 
@@ -194,8 +181,8 @@ function renderPinSementara(lon, lat) {
     position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
     billboard: {
       image: buatPinTitikTerpilih(),
-      width: 44,
-      height: 54,
+      width: 36,
+      height: 44,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,

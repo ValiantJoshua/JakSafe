@@ -158,8 +158,8 @@ export function templateStage() {
         <span class="mappick__pin" aria-hidden="true">${ikon('i-pin', 15)}</span>
         <h4 class="mappick__title" id="mapPickTitle">Mendeteksi alamat...</h4>
       </div>
-      <button type="button" class="mappick__close" id="btnMapPickClose" aria-label="Tutup menu titik peta" title="Tutup">
-        ${ikon('i-x', 13)}
+      <button type="button" class="mappick__close" id="btnMapPickClose" aria-label="Tutup info titik lokasi" title="Tutup">
+        ${ikon('i-x', 14)}
       </button>
     </div>
 
@@ -169,12 +169,12 @@ export function templateStage() {
     </div>
 
     <div class="mappick__actions">
-      <button type="button" class="mappick__btn mappick__btn--origin press" id="btnPickAsOrigin" title="Jadikan titik ini sebagai titik awal perjalanan">
-        <span class="mappick__dot mappick__dot--origin"></span>
+      <button type="button" class="mappick__btn mappick__btn--origin press" id="btnPickAsOrigin" title="Jadikan titik awal">
+        <span class="mappick__indicator mappick__indicator--origin" aria-hidden="true">A</span>
         <span>Titik Awal</span>
       </button>
-      <button type="button" class="mappick__btn mappick__btn--dest press" id="btnPickAsDest" title="Jadikan titik ini sebagai tujuan perjalanan">
-        <span class="mappick__dot mappick__dot--dest"></span>
+      <button type="button" class="mappick__btn mappick__btn--dest press" id="btnPickAsDest" title="Jadikan tujuan">
+        <span class="mappick__indicator mappick__indicator--dest" aria-hidden="true">B</span>
         <span>Tujuan</span>
       </button>
       <button type="button" class="mappick__btn mappick__btn--copy press" id="btnPickCopy" title="Salin koordinat">

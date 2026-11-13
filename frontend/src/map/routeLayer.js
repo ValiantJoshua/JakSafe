@@ -22,56 +22,69 @@ let pinOriginDataUrl = null;
 let pinDestDataUrl = null;
 
 /**
- * Membuat ikon Titik Awal (Origin) yang identik dengan simbol di search bar:
- * Lingkaran biru berpendar (blue beacon dot) dengan cincin putih bersih dan outer glow.
+ * Membuat ikon Titik Awal (Origin) dengan bentuk jarum pin modern (teardrop pin):
+ * Warna Bright Blue (#0284FF) solid dengan border putih tegas dan huruf "A" di tengah,
+ * seragam secara geometris dengan Pin Titik Tujuan (B) dan Pin Peta Terpilih.
  * @returns {string} data URL PNG
  */
 function buatPinTitikAwal() {
   if (pinOriginDataUrl) return pinOriginDataUrl;
 
-  const size = 44;
+  const width = 44;
+  const height = 54;
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d');
-  const cx = size / 2;
-  const cy = size / 2;
+  const cx = width / 2;
+  const headCy = 18;
+  const headR = 13.5;
+  const tipY = 48;
 
-  // 1. Pendaran luar lembut (soft outer glow ala .field__pin--origin)
+  // 1. Bayangan kontak halus di bawah ujung pin
   ctx.beginPath();
-  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(37, 99, 235, 0.22)';
+  ctx.ellipse(cx, tipY + 1.5, 6.5, 2.2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
   ctx.fill();
 
-  // 2. Lingkaran putih penegas kontras
+  // 2. Bentuk tetes jarum peta (teardrop pin) menghadap ke bawah
   ctx.beginPath();
-  ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+  ctx.moveTo(cx, tipY);
+  ctx.bezierCurveTo(cx - headR, tipY - 14, cx - headR, headCy, cx - headR, headCy);
+  ctx.arc(cx, headCy, headR, Math.PI, 0, false);
+  ctx.bezierCurveTo(cx + headR, headCy, cx + headR, tipY - 14, cx, tipY);
+  ctx.closePath();
+
+  // Warna biru solid tegas (var(--jk-blue-1))
+  ctx.fillStyle = '#0284FF';
+  ctx.fill();
+
+  // Garis tepi putih tegas
+  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.stroke();
+
+  // 3. Lingkaran putih di tengah kepala pin
+  ctx.beginPath();
+  ctx.arc(cx, headCy, 7.5, 0, Math.PI * 2);
   ctx.fillStyle = '#FFFFFF';
-  ctx.shadowColor = 'rgba(14, 20, 48, 0.25)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
-  ctx.fill();
-  ctx.shadowColor = 'transparent';
-
-  // 3. Inti biru pekat (var(--jk-blue-1))
-  ctx.beginPath();
-  ctx.arc(cx, cy, 8.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#2563EB';
   ctx.fill();
 
-  // 4. Titik pusat putih (GPS beacon core)
-  ctx.beginPath();
-  ctx.arc(cx, cy, 3.2, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fill();
+  // 4. Huruf "A" penegas titik awal rute
+  ctx.fillStyle = '#0A2E6B';
+  ctx.font = '800 10.5px Manrope, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('A', cx, headCy + 0.6);
 
   pinOriginDataUrl = canvas.toDataURL('image/png');
   return pinOriginDataUrl;
 }
 
 /**
- * Membuat ikon Titik Tujuan (Destination) yang identik dengan simbol di search bar:
- * Pin tetes merah (teardrop map pin) dengan ujung runcing menghadap ke bawah tanah.
+ * Membuat ikon Titik Tujuan (Destination) dengan bentuk jarum pin modern (teardrop pin):
+ * Warna Carmine Red (#DC2626) solid dengan border putih tegas dan huruf "B" di tengah,
+ * seragam secara geometris dengan Pin Titik Awal (A) dan Pin Peta Terpilih.
  * @returns {string} data URL PNG
  */
 function buatPinTitikTujuan() {
@@ -88,10 +101,10 @@ function buatPinTitikTujuan() {
   const headR = 13.5;
   const tipY = 48;
 
-  // 1. Bayangan kontak di bawah ujung pin
+  // 1. Bayangan kontak halus di bawah ujung pin
   ctx.beginPath();
-  ctx.ellipse(cx, tipY + 2, 6, 2.5, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(14, 20, 48, 0.28)';
+  ctx.ellipse(cx, tipY + 1.5, 6.5, 2.2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
   ctx.fill();
 
   // 2. Bentuk tetes jarum peta (teardrop pin) menghadap ke bawah
@@ -102,30 +115,27 @@ function buatPinTitikTujuan() {
   ctx.bezierCurveTo(cx + headR, headCy, cx + headR, tipY - 14, cx, tipY);
   ctx.closePath();
 
-  // Warna merah pekat khas alert / destination (var(--st-hindari))
+  // Warna merah pekat solid (var(--st-hindari))
   ctx.fillStyle = '#DC2626';
-  ctx.shadowColor = 'rgba(220, 38, 38, 0.32)';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetY = 2;
   ctx.fill();
-  ctx.shadowColor = 'transparent';
 
   // Garis tepi putih tegas
-  ctx.lineWidth = 2.4;
+  ctx.lineWidth = 2.2;
   ctx.strokeStyle = '#FFFFFF';
   ctx.stroke();
 
   // 3. Lingkaran putih di tengah kepala pin
   ctx.beginPath();
-  ctx.arc(cx, headCy, 5, 0, Math.PI * 2);
+  ctx.arc(cx, headCy, 7.5, 0, Math.PI * 2);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
 
-  // 4. Titik merah kecil di dalam lingkaran putih
-  ctx.beginPath();
-  ctx.arc(cx, headCy, 2, 0, Math.PI * 2);
+  // 4. Huruf "B" penegas titik tujuan rute
   ctx.fillStyle = '#DC2626';
-  ctx.fill();
+  ctx.font = '800 10.5px Manrope, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('B', cx, headCy + 0.6);
 
   pinDestDataUrl = canvas.toDataURL('image/png');
   return pinDestDataUrl;
@@ -165,22 +175,23 @@ export function previewEndpointsOnMap(asal, tujuan, { fly = false } = {}) {
       position: Cesium.Cartesian3.fromDegrees(asal.lon, asal.lat, 0),
       billboard: {
         image: buatPinTitikAwal(),
-        width: 32,
-        height: 32,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        width: 36,
+        height: 44,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `Awal: ${asal.nama}`,
-        font: '800 12px Manrope, sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
-        outlineWidth: 3.5,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        text: `Awal · ${asal.nama}`,
+        font: '700 11.5px Manrope, -apple-system, sans-serif',
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
+        backgroundPadding: new Cesium.Cartesian2(9, 4),
+        fillColor: Cesium.Color.fromCssColorString('#0A2E6B'),
+        style: Cesium.LabelStyle.FILL,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-        pixelOffset: new Cesium.Cartesian2(0, -20),
+        pixelOffset: new Cesium.Cartesian2(0, -48),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
@@ -192,22 +203,23 @@ export function previewEndpointsOnMap(asal, tujuan, { fly = false } = {}) {
       position: Cesium.Cartesian3.fromDegrees(tujuan.lon, tujuan.lat, 0),
       billboard: {
         image: buatPinTitikTujuan(),
-        width: 34,
-        height: 42,
+        width: 36,
+        height: 44,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `Tujuan: ${tujuan.nama}`,
-        font: '800 12px Manrope, sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
-        outlineWidth: 3.5,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        text: `Tujuan · ${tujuan.nama}`,
+        font: '700 11.5px Manrope, -apple-system, sans-serif',
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
+        backgroundPadding: new Cesium.Cartesian2(9, 4),
+        fillColor: Cesium.Color.fromCssColorString('#DC2626'),
+        style: Cesium.LabelStyle.FILL,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-        pixelOffset: new Cesium.Cartesian2(0, -46),
+        pixelOffset: new Cesium.Cartesian2(0, -48),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
@@ -329,14 +341,12 @@ export function renderRouteOnMap(hasil) {
         properties: { routeOptionIndex: idx },
         label: {
           text: `Rute ${idx + 1} · ${effMin} mnt`,
-          font: '800 12px Manrope, sans-serif',
+          font: '700 11.5px Manrope, -apple-system, sans-serif',
           showBackground: true,
           backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
-          backgroundPadding: new Cesium.Cartesian2(11, 6),
+          backgroundPadding: new Cesium.Cartesian2(10, 5),
           fillColor: Cesium.Color.fromCssColorString('#581C87'),
-          outlineColor: Cesium.Color.fromCssColorString('#DDD6FE'),
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          style: Cesium.LabelStyle.FILL,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -10),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -387,22 +397,23 @@ export function renderRouteOnMap(hasil) {
       position: Cesium.Cartesian3.fromDegrees(asal.lon, asal.lat, 0),
       billboard: {
         image: buatPinTitikAwal(),
-        width: 32,
-        height: 32,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        width: 36,
+        height: 44,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `${asal.nama}`,
-        font: '800 12px Manrope, sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
-        outlineWidth: 3.5,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        text: `Awal · ${asal.nama}`,
+        font: '700 11.5px Manrope, -apple-system, sans-serif',
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
+        backgroundPadding: new Cesium.Cartesian2(9, 4),
+        fillColor: Cesium.Color.fromCssColorString('#0A2E6B'),
+        style: Cesium.LabelStyle.FILL,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-        pixelOffset: new Cesium.Cartesian2(0, -20),
+        pixelOffset: new Cesium.Cartesian2(0, -48),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
@@ -414,22 +425,23 @@ export function renderRouteOnMap(hasil) {
       position: Cesium.Cartesian3.fromDegrees(tujuan.lon, tujuan.lat, 0),
       billboard: {
         image: buatPinTitikTujuan(),
-        width: 34,
-        height: 42,
+        width: 36,
+        height: 44,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `${tujuan.nama} (Rute ${indeksAktif + 1})`,
-        font: '800 12px Manrope, sans-serif',
-        fillColor: Cesium.Color.WHITE,
-        outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
-        outlineWidth: 3.5,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        text: `Tujuan · ${tujuan.nama}`,
+        font: '700 11.5px Manrope, -apple-system, sans-serif',
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
+        backgroundPadding: new Cesium.Cartesian2(9, 4),
+        fillColor: Cesium.Color.fromCssColorString('#DC2626'),
+        style: Cesium.LabelStyle.FILL,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-        pixelOffset: new Cesium.Cartesian2(0, -46),
+        pixelOffset: new Cesium.Cartesian2(0, -48),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
@@ -450,12 +462,12 @@ export function clearRouteOnMap() {
 let pinStepFocusDataUrl = null;
 
 /**
- * Membuat ikon titik manuver (Turn-by-Turn step focus) dengan kontras tinggi.
+ * Membuat ikon titik manuver (Turn-by-Turn step focus) solid tanpa efek pendaran neon.
  */
 function buatPinFokusLangkah() {
   if (pinStepFocusDataUrl) return pinStepFocusDataUrl;
 
-  const size = 40;
+  const size = 36;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -463,26 +475,26 @@ function buatPinFokusLangkah() {
   const cx = size / 2;
   const cy = size / 2;
 
+  // 1. Bayangan kontak tanah halus
   ctx.beginPath();
-  ctx.arc(cx, cy, 17, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(163, 230, 53, 0.30)';
+  ctx.ellipse(cx, cy + 11, 7, 2.2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
   ctx.fill();
 
+  // 2. Lingkaran dasar Deep Navy (#0A2E6B)
   ctx.beginPath();
-  ctx.arc(cx, cy, 11.5, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 11, 0, Math.PI * 2);
   ctx.fillStyle = '#0A2E6B';
-  ctx.shadowColor = 'rgba(10, 46, 107, 0.38)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
   ctx.fill();
-  ctx.shadowColor = 'transparent';
 
-  ctx.lineWidth = 2.5;
+  // Garis tepi putih tegas
+  ctx.lineWidth = 2.2;
   ctx.strokeStyle = '#FFFFFF';
   ctx.stroke();
 
+  // 3. Inti solid lime green (#A3E635)
   ctx.beginPath();
-  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
   ctx.fillStyle = '#A3E635';
   ctx.fill();
 
@@ -514,21 +526,19 @@ export function focusStepOnMap(step) {
     position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
     billboard: {
       image: buatPinFokusLangkah(),
-      width: 32,
-      height: 32,
+      width: 30,
+      height: 30,
       verticalOrigin: Cesium.VerticalOrigin.CENTER,
       heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
     },
     label: {
       text: labelText.length > 48 ? `${labelText.slice(0, 46)}…` : labelText,
-      font: '700 11.5px Manrope, sans-serif',
+      font: '600 11.5px Manrope, -apple-system, sans-serif',
       showBackground: true,
       backgroundColor: Cesium.Color.fromCssColorString('#0A2E6B').withAlpha(0.94),
-      backgroundPadding: new Cesium.Cartesian2(10, 5),
+      backgroundPadding: new Cesium.Cartesian2(9, 4),
       fillColor: Cesium.Color.WHITE,
-      outlineColor: Cesium.Color.fromCssColorString('#A3E635'),
-      outlineWidth: 1,
       style: Cesium.LabelStyle.FILL,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
@@ -544,12 +554,12 @@ export function focusStepOnMap(step) {
 let pinUserLocationDataUrl = null;
 
 /**
- * Membuat ikon titik lokasi pengguna saat ini (blue GPS beacon dengan outer halo).
+ * Membuat ikon titik lokasi pengguna saat ini (blue GPS beacon dengan ring putih bersih).
  */
 function buatPinLokasiPengguna() {
   if (pinUserLocationDataUrl) return pinUserLocationDataUrl;
 
-  const size = 52;
+  const size = 44;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -557,31 +567,31 @@ function buatPinLokasiPengguna() {
   const cx = size / 2;
   const cy = size / 2;
 
-  // 1. Pendaran luar lembut
+  // 1. Lingkaran akurasi luar semi-transparan
   ctx.beginPath();
-  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(37, 99, 235, 0.25)';
+  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(2, 132, 255, 0.16)';
   ctx.fill();
 
-  // 2. Lingkaran putih penegas
+  // 2. Lingkaran putih penegas dengan bayangan kontak halus
   ctx.beginPath();
-  ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 11, 0, Math.PI * 2);
   ctx.fillStyle = '#FFFFFF';
-  ctx.shadowColor = 'rgba(14, 20, 48, 0.35)';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetY = 2;
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.25)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 1.5;
   ctx.fill();
   ctx.shadowColor = 'transparent';
 
   // 3. Inti biru pekat (GPS beacon core)
   ctx.beginPath();
-  ctx.arc(cx, cy, 10, 0, Math.PI * 2);
-  ctx.fillStyle = '#2563EB';
+  ctx.arc(cx, cy, 7.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#0284FF';
   ctx.fill();
 
   // 4. Titik pusat putih
   ctx.beginPath();
-  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 2.8, 0, Math.PI * 2);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
 
@@ -607,18 +617,19 @@ export function showUserLocationOnMap(lon, lat) {
     position: Cesium.Cartesian3.fromDegrees(lon, lat, 24),
     billboard: {
       image: buatPinLokasiPengguna(),
-      width: 38,
-      height: 38,
+      width: 36,
+      height: 36,
       verticalOrigin: Cesium.VerticalOrigin.CENTER,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
     },
     label: {
       text: 'Lokasi Anda',
-      font: '800 12px Manrope, sans-serif',
-      fillColor: Cesium.Color.WHITE,
-      outlineColor: Cesium.Color.fromCssColorString('#1E1B4B'),
-      outlineWidth: 3.5,
-      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      font: '600 11.5px Manrope, -apple-system, sans-serif',
+      showBackground: true,
+      backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
+      backgroundPadding: new Cesium.Cartesian2(8, 4),
+      fillColor: Cesium.Color.fromCssColorString('#0284FF'),
+      style: Cesium.LabelStyle.FILL,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       pixelOffset: new Cesium.Cartesian2(0, -22),
       disableDepthTestDistance: Number.POSITIVE_INFINITY,

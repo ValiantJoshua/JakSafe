@@ -17,6 +17,7 @@ import Hls from 'hls.js';
 import { ambilSemuaKamera, urlBingkaiKamera, urlStreamKamera, analisisKamera } from '../api/cctvApi.js';
 import { getViewer, flyToCoordinates } from './cesiumViewer.js';
 import { labelKondisiJalan, labelGenangan } from '../utils/format.js';
+import { ikon } from '../ui/icons.js';
 
 /** @type {Cesium.CustomDataSource|null} */
 let cctvDataSource = null;
@@ -84,7 +85,7 @@ export function getAllLoadedCameras() {
 function buatIkonBillboardKamera(variant = 'normal') {
   if (iconCache.has(variant)) return iconCache.get(variant);
 
-  const size = 44;
+  const size = 40;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -93,50 +94,43 @@ function buatIkonBillboardKamera(variant = 'normal') {
   const cy = size / 2;
 
   const bg = variant === 'selected'
-    ? '#D9ED66'
+    ? '#A3E635'
     : variant === 'route'
-      ? '#22C55E'
-      : '#1E3A8A';
+      ? '#0284FF'
+      : '#0A2E6B';
   const ring = variant === 'selected'
-    ? '#16224A'
-    : variant === 'route'
-      ? '#DCFCE7'
-      : '#38BDF8';
-  const fg = variant === 'selected' ? '#16224A' : '#FFFFFF';
+    ? '#0A2E6B'
+    : '#FFFFFF';
+  const fg = variant === 'selected' ? '#0A2E6B' : '#FFFFFF';
 
-  // Lingkaran pendar luar
+  // Lingkaran inti solid dengan bayangan netral halus (tanpa outer neon glow)
   ctx.beginPath();
-  ctx.arc(cx, cy, 19, 0, Math.PI * 2);
-  ctx.fillStyle = variant === 'selected'
-    ? 'rgba(217, 237, 102, 0.35)'
-    : variant === 'route'
-      ? 'rgba(34, 197, 94, 0.32)'
-      : 'rgba(56, 189, 248, 0.28)';
-  ctx.fill();
-
-  // Lingkaran inti
-  ctx.beginPath();
-  ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 13.5, 0, Math.PI * 2);
   ctx.fillStyle = bg;
+  ctx.shadowColor = 'rgba(10, 46, 107, 0.24)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 1.5;
   ctx.fill();
-  ctx.lineWidth = 2.6;
+  ctx.shadowColor = 'transparent';
+
+  ctx.lineWidth = 2.2;
   ctx.strokeStyle = ring;
   ctx.stroke();
 
   // Siluet kamera di tengah
   ctx.fillStyle = fg;
   ctx.strokeStyle = fg;
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.roundRect(cx - 7, cy - 4.5, 10, 9, 2);
+  ctx.roundRect(cx - 6.5, cy - 4, 9, 8, 1.8);
   ctx.fill();
 
   // Lensa corong kanan
   ctx.beginPath();
-  ctx.moveTo(cx + 3, cy - 2.5);
-  ctx.lineTo(cx + 7.5, cy - 4.5);
-  ctx.lineTo(cx + 7.5, cy + 4.5);
-  ctx.lineTo(cx + 3, cy + 2.5);
+  ctx.moveTo(cx + 2.5, cy - 2.2);
+  ctx.lineTo(cx + 6.8, cy - 4);
+  ctx.lineTo(cx + 6.8, cy + 4);
+  ctx.lineTo(cx + 2.5, cy + 2.2);
   ctx.closePath();
   ctx.fill();
 
@@ -241,20 +235,23 @@ function renderEntitasKamera() {
     const rangeM = Number.isFinite(cam.rangeM) ? cam.rangeM : 140;
 
     // 1. Kerucut pandang (Viewshed Cone) di permukaan tanah.
-    //    Hanya digambar untuk kamera di koridor rute (atau saat tidak ada rute aktif).
+    //    Warna disatukan ke rentang biru/slate tenang agar tidak bertabrakan dengan warna
+    //    semantik kemacetan lalu lintas (hijau/kuning/merah), serta hanya ditampilkan pada
+    //    kamera terpilih, kamera rute, atau saat pengguna melakukan zoom dekat.
     if (!isDimmedOutside) {
       const coneCoords = hitungKerucutPandang(cam.lat, cam.lon, heading, fov, rangeM);
       const flatDegrees = coneCoords.flatMap(([lon, lat]) => [lon, lat]);
       const coneColor = isSelected
-        ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.32)
+        ? Cesium.Color.fromCssColorString('#0284FF').withAlpha(0.22)
         : isRouteCam
-          ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.28)
-          : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.18);
+          ? Cesium.Color.fromCssColorString('#0284FF').withAlpha(0.16)
+          : Cesium.Color.fromCssColorString('#0A2E6B').withAlpha(0.08);
       const coneOutline = isSelected
-        ? Cesium.Color.fromCssColorString('#D9ED66').withAlpha(0.85)
+        ? Cesium.Color.fromCssColorString('#0284FF').withAlpha(0.75)
         : isRouteCam
-          ? Cesium.Color.fromCssColorString('#22C55E').withAlpha(0.8)
-          : Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.55);
+          ? Cesium.Color.fromCssColorString('#0284FF').withAlpha(0.55)
+          : Cesium.Color.fromCssColorString('#0A2E6B').withAlpha(0.28);
+      const coneMaxDist = isSelected || isRouteCam ? 25000 : 4500;
 
       cctvDataSource.entities.add({
         id: `cctv-cone-${cam.id}`,
@@ -262,19 +259,21 @@ function renderEntitasKamera() {
           hierarchy: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
           material: coneColor,
           classificationType: Cesium.ClassificationType.TERRAIN,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, coneMaxDist),
         },
         polyline: {
           positions: Cesium.Cartesian3.fromDegreesArray(flatDegrees),
-          width: isSelected || isRouteCam ? 2.4 : 1.5,
+          width: isSelected || isRouteCam ? 2.0 : 1.2,
           material: coneOutline,
           classificationType: Cesium.ClassificationType.TERRAIN,
           clampToGround: true,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, coneMaxDist),
         },
       });
     }
 
     // 2. Penanda Billboard & Label Kamera
-    const markerSize = isSelected ? 40 : isRouteCam ? 36 : isDimmedOutside ? 18 : 28;
+    const markerSize = isSelected ? 34 : isRouteCam ? 30 : isDimmedOutside ? 16 : 24;
     const entityDef = {
       id: `cctv-node-${cam.id}`,
       position: Cesium.Cartesian3.fromDegrees(cam.lon, cam.lat, 0),
@@ -521,7 +520,7 @@ export function bukaPopupKameraPeta(cam) {
   }
   if (btnAnalyze) {
     btnAnalyze.disabled = false;
-    btnAnalyze.textContent = 'Analisis AI Vision (Gemini)';
+    btnAnalyze.innerHTML = `${ikon('i-spark', 13)} Analisis AI`;
   }
 
   if (tabVid) {
@@ -664,7 +663,7 @@ function pasangTombolPopupKamera() {
     const lbl = document.getElementById('lblMapCctvAutoRefresh');
     if (lbl) {
       lbl.textContent = autoRefreshEnabled ? 'ON' : 'OFF';
-      lbl.style.color = autoRefreshEnabled ? '#22C55E' : '#94A3B8';
+      lbl.style.color = autoRefreshEnabled ? '' : 'var(--text-3)';
     }
     const cam = daftarKamera.find((c) => c.id === selectedCameraId);
     if (cam && currentViewMode === 'snapshot') {
@@ -742,7 +741,7 @@ function pasangTombolPopupKamera() {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = 'Analisis Ulang AI Vision';
+        btn.innerHTML = `${ikon('i-spark', 13)} Analisis Ulang AI`;
       }
     }
   });
