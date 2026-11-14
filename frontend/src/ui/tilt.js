@@ -1,20 +1,15 @@
 /*
-   Efek miring tiga dimensi mengikuti kursor.
+   Efek miring tiga dimensi mengikuti kursor dengan dua pegas X/Y independen
+   (WWDC Designing Fluid Interfaces §3 & §4).
 
    Dipasang pada kartu skor dan kartu kualitas udara. Sudut maksimalnya
-   dibatasi tujuh derajat, dan angka itu dipilih dengan sengaja. Sudut yang
-   lebih besar membuat teks di dalam kartu terlihat melengkung dan susah
-   dibaca, terutama pada layar kecil. Tujuannya memberi kesan kedalaman,
-   bukan memamerkan animasi.
-
-   Efek ini hanya aktif pada perangkat yang benar benar punya tetikus.
-   Pada layar sentuh, peristiwa pointermove datang dari jari yang sedang
-   menggulir, sehingga kartu akan bergoyang setiap kali halaman digeser.
-   Pemeriksaan pointer fine yang mencegah itu.
-
-   Kalau pengguna menyalakan pengurangan gerak di sistemnya, efek tidak
-   dipasang sama sekali. Ini aturan yang sama dengan yang berlaku di CSS.
+   dibatasi tujuh derajat agar teks tetap tajam dan terbaca.
+   Saat kursor bergerak atau meninggalkan kartu, rotasi X dan Y kembali ke 0deg
+   menggunakan pegas critically-damped (damping 1.0, response 0.32s) dari nilai
+   aktual di layar (presentation value) sehingga tidak pernah patah (hard-cut).
 */
+
+import { animateSpring } from '../utils/spring.js';
 
 /** Sudut maksimal dalam derajat. */
 const SUDUT_MAKS = 7;
@@ -32,20 +27,123 @@ export function pasangEfekMiring() {
     const lapisan = kartu.querySelector('.tilt__layer');
     if (!lapisan) continue;
 
+    let rotX = 0;
+    let rotY = 0;
+    let velX = 0;
+    let velY = 0;
+    let springX = null;
+    let springY = null;
+
+    const terapkanTransform = () => {
+      if (Math.abs(rotX) < 0.02 && Math.abs(rotY) < 0.02 && !springX && !springY) {
+        lapisan.style.transform = '';
+      } else {
+        lapisan.style.transform = `rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
+      }
+    };
+
     kartu.addEventListener('pointermove', (e) => {
+      if (springX) {
+        const sx = springX.stop();
+        rotX = sx.value;
+        velX = sx.velocity;
+        springX = null;
+      }
+      if (springY) {
+        const sy = springY.stop();
+        rotY = sy.value;
+        velY = sy.velocity;
+        springY = null;
+      }
+
       const kotak = kartu.getBoundingClientRect();
-      // Posisi kursor diubah menjadi nilai antara minus satu dan satu,
-      // dihitung dari titik tengah kartu.
       const x = (e.clientX - kotak.left) / kotak.width - 0.5;
       const y = (e.clientY - kotak.top) / kotak.height - 0.5;
-      // Sumbu X dibalik tandanya supaya kartu terasa condong menjauh dari
-      // kursor, bukan mengikuti, yang lebih sesuai dengan gerak benda nyata.
-      lapisan.style.transform =
-        `rotateX(${(-y * SUDUT_MAKS).toFixed(2)}deg) rotateY(${(x * SUDUT_MAKS).toFixed(2)}deg)`;
+      const targetX = -y * SUDUT_MAKS;
+      const targetY = x * SUDUT_MAKS;
+
+      springX = animateSpring({
+        from: rotX,
+        to: targetX,
+        velocity: velX,
+        damping: 1.0,
+        response: 0.18,
+        precision: 0.03,
+        onUpdate(v, vel) {
+          rotX = v;
+          velX = vel;
+          terapkanTransform();
+        },
+        onComplete() {
+          springX = null;
+        },
+      });
+
+      springY = animateSpring({
+        from: rotY,
+        to: targetY,
+        velocity: velY,
+        damping: 1.0,
+        response: 0.18,
+        precision: 0.03,
+        onUpdate(v, vel) {
+          rotY = v;
+          velY = vel;
+          terapkanTransform();
+        },
+        onComplete() {
+          springY = null;
+        },
+      });
     });
 
     kartu.addEventListener('pointerleave', () => {
-      lapisan.style.transform = '';
+      if (springX) {
+        const sx = springX.stop();
+        rotX = sx.value;
+        velX = sx.velocity;
+      }
+      if (springY) {
+        const sy = springY.stop();
+        rotY = sy.value;
+        velY = sy.velocity;
+      }
+
+      springX = animateSpring({
+        from: rotX,
+        to: 0,
+        velocity: velX,
+        damping: 1.0,
+        response: 0.34,
+        precision: 0.02,
+        onUpdate(v, vel) {
+          rotX = v;
+          velX = vel;
+          terapkanTransform();
+        },
+        onComplete() {
+          springX = null;
+          terapkanTransform();
+        },
+      });
+
+      springY = animateSpring({
+        from: rotY,
+        to: 0,
+        velocity: velY,
+        damping: 1.0,
+        response: 0.34,
+        precision: 0.02,
+        onUpdate(v, vel) {
+          rotY = v;
+          velY = vel;
+          terapkanTransform();
+        },
+        onComplete() {
+          springY = null;
+          terapkanTransform();
+        },
+      });
     });
   }
 }

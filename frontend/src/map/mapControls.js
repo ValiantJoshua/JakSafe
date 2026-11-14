@@ -7,6 +7,7 @@
 import { subscribe, getState } from '../state/appState.js';
 import { findPlaceById, registerCustomPlace } from '../config/jakartaPlaces.js';
 import { toast } from '../ui/toast.js';
+import { animateSpring, project, rubberband } from '../utils/spring.js';
 import {
   initCesiumViewer,
   setMapViewMode,
@@ -103,12 +104,210 @@ function sinkronkanTombolLayer() {
   }
 }
 
-/** Menutup atau membuka panel samping (Sidebar Toggle ala Google Maps). */
+let sheetSpring = null;
+let sheetOffsetY = 0;
+let sheetVelY = 0;
+
+function isMobileSheetViewport() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px)').matches;
+}
+
+function getMobileSheetDetents(panelEl) {
+  const h = Math.max(260, panelEl?.offsetHeight || Math.round(window.innerHeight * 0.78));
+  const peekOffset = Math.max(140, h - 82);
+  const halfOffset = Math.round(h * 0.34);
+  return {
+    height: h,
+    expanded: 0,
+    half: halfOffset,
+    peek: peekOffset,
+  };
+}
+
+function snapSheetKeDetent(namaDetent, initialVelocity = 0) {
+  const ws = document.getElementById('workspace');
+  const panel = document.getElementById('sidePanel');
+  if (!ws || !panel || !isMobileSheetViewport()) return;
+
+  if (sheetSpring) {
+    const prev = sheetSpring.stop();
+    sheetOffsetY = prev.value;
+    if (!initialVelocity) initialVelocity = prev.velocity;
+    sheetSpring = null;
+  }
+
+  const detents = getMobileSheetDetents(panel);
+  const targetOffset =
+    namaDetent === 'expanded'
+      ? detents.expanded
+      : namaDetent === 'peek'
+        ? detents.peek
+        : detents.half;
+
+  ws.setAttribute('data-sheet', namaDetent);
+  ws.setAttribute('data-sidebar', namaDetent === 'peek' ? 'collapsed' : 'open');
+
+  sheetSpring = animateSpring({
+    from: sheetOffsetY,
+    to: targetOffset,
+    velocity: initialVelocity,
+    damping: 0.82,
+    response: 0.32,
+    precision: 0.5,
+    onUpdate(y, v) {
+      sheetOffsetY = y;
+      sheetVelY = v;
+      panel.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+    },
+    onComplete() {
+      sheetSpring = null;
+      sheetOffsetY = targetOffset;
+      sheetVelY = 0;
+      panel.style.transform = `translate3d(0, ${targetOffset}px, 0)`;
+      const v = getViewer();
+      v?.resize();
+      v?.scene.requestRender();
+    },
+  });
+}
+
+function pasangGestureSheetMobile() {
+  const grabber = document.getElementById('sheetGrabber');
+  const panel = document.getElementById('sidePanel');
+  const ws = document.getElementById('workspace');
+  if (!grabber || !panel || !ws) return;
+
+  let dragging = false;
+  let startPointerY = 0;
+  let startOffsetY = 0;
+  let moved = false;
+  /** @type {Array<{ y: number, t: number }>} */
+  let samples = [];
+
+  const sinkronUkuranLayar = () => {
+    if (!isMobileSheetViewport()) {
+      if (sheetSpring) {
+        sheetSpring.stop();
+        sheetSpring = null;
+      }
+      sheetOffsetY = 0;
+      panel.style.transform = '';
+      return;
+    }
+    const detent = ws.getAttribute('data-sheet') || 'half';
+    const d = getMobileSheetDetents(panel);
+    sheetOffsetY = detent === 'expanded' ? d.expanded : detent === 'peek' ? d.peek : d.half;
+    panel.style.transform = `translate3d(0, ${sheetOffsetY}px, 0)`;
+  };
+
+  window.addEventListener('resize', sinkronUkuranLayar, { passive: true });
+  requestAnimationFrame(sinkronUkuranLayar);
+
+  grabber.addEventListener('pointerdown', (e) => {
+    if (!isMobileSheetViewport()) return;
+    if (sheetSpring) {
+      const prev = sheetSpring.stop();
+      sheetOffsetY = prev.value;
+      sheetVelY = prev.velocity;
+      sheetSpring = null;
+    }
+
+    dragging = true;
+    moved = false;
+    startPointerY = e.clientY;
+    startOffsetY = sheetOffsetY;
+    samples = [{ y: e.clientY, t: performance.now() }];
+    grabber.setPointerCapture?.(e.pointerId);
+  });
+
+  grabber.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dy = e.clientY - startPointerY;
+    if (!moved && Math.abs(dy) < 6) return;
+    moved = true;
+
+    const detents = getMobileSheetDetents(panel);
+    const rawOffset = startOffsetY + dy;
+
+    let clampedOffset = rawOffset;
+    if (rawOffset < detents.expanded) {
+      clampedOffset = detents.expanded + rubberband(rawOffset - detents.expanded, detents.height, 0.55);
+    } else if (rawOffset > detents.peek) {
+      clampedOffset = detents.peek + rubberband(rawOffset - detents.peek, detents.height, 0.55);
+    }
+
+    sheetOffsetY = clampedOffset;
+    panel.style.transform = `translate3d(0, ${clampedOffset.toFixed(2)}px, 0)`;
+
+    const now = performance.now();
+    samples.push({ y: e.clientY, t: now });
+    while (samples.length > 5 && now - samples[0].t > 100) {
+      samples.shift();
+    }
+  });
+
+  const akhiriDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    try {
+      grabber.releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+
+    if (!moved) {
+      // Tap singkat pada grabber: siklus half -> expanded -> peek -> half
+      const cur = ws.getAttribute('data-sheet') || 'half';
+      const next = cur === 'half' ? 'expanded' : cur === 'expanded' ? 'peek' : 'half';
+      snapSheetKeDetent(next, 0);
+      return;
+    }
+
+    let releaseVel = 0;
+    if (samples.length >= 2) {
+      const first = samples[0];
+      const last = samples[samples.length - 1];
+      const dt = (last.t - first.t) / 1000;
+      if (dt > 0.004) {
+        releaseVel = (last.y - first.y) / dt;
+      }
+    }
+
+    const detents = getMobileSheetDetents(panel);
+    const projected = sheetOffsetY + project(releaseVel, 0.99);
+    const candidates = [
+      { name: 'expanded', y: detents.expanded },
+      { name: 'half', y: detents.half },
+      { name: 'peek', y: detents.peek },
+    ];
+    candidates.sort((a, b) => Math.abs(a.y - projected) - Math.abs(b.y - projected));
+    snapSheetKeDetent(candidates[0].name, releaseVel);
+  };
+
+  grabber.addEventListener('pointerup', akhiriDrag);
+  grabber.addEventListener('pointercancel', akhiriDrag);
+  grabber.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      const cur = ws.getAttribute('data-sheet') || 'half';
+      const next = cur === 'half' ? 'expanded' : cur === 'expanded' ? 'peek' : 'half';
+      snapSheetKeDetent(next, 0);
+    }
+  });
+}
+
+/** Menutup atau membuka panel samping (Sidebar Toggle ala Google Maps & Fluid Mobile Sheet). */
 export function toggleSidebar(forceOpen) {
   const ws = document.getElementById('workspace');
   if (!ws) return;
   const sedangTerbuka = ws.getAttribute('data-sidebar') !== 'collapsed';
   const buka = typeof forceOpen === 'boolean' ? forceOpen : !sedangTerbuka;
+
+  if (isMobileSheetViewport()) {
+    snapSheetKeDetent(buka ? 'half' : 'peek', 0);
+    return;
+  }
+
   ws.setAttribute('data-sidebar', buka ? 'open' : 'collapsed');
 
   setTimeout(() => {
@@ -183,9 +382,10 @@ function arahkanKeLokasiPengguna() {
 
 /** Memasang seluruh event klik pada HUD peta & sidebar. */
 function pasangEventHudPeta() {
-  // 0. Tombol Lipat / Buka Sidebar (di Topbar & di Tepi Sidebar)
+  // 0. Tombol Lipat / Buka Sidebar (di Topbar, Tepi Sidebar, & Gesture Sheet Mobile)
   document.getElementById('btnToggleSidebar')?.addEventListener('click', () => toggleSidebar());
   document.getElementById('btnSidebarTab')?.addEventListener('click', () => toggleSidebar());
+  pasangGestureSheetMobile();
 
   // 1. Pemilih Mode Peta: 3D <-> 2D Peta <-> Satelit
   document.querySelectorAll('[data-map-mode]').forEach((btn) => {

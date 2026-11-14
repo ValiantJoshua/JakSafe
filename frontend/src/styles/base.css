@@ -11,18 +11,22 @@ body {
   font-family: var(--font-text);
   font-size: var(--fs-base);
   line-height: var(--lh-base);
+  letter-spacing: var(--tr-body, 0em);
+  font-optical-sizing: auto;
   color: var(--text-2);
   background: var(--jk-bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow: hidden;
+  transition: background-color var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
 }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
+  font-optical-sizing: auto;
   color: var(--text-1);
   line-height: var(--lh-tight);
-  letter-spacing: -0.015em;
+  letter-spacing: var(--tr-heading, -0.016em);
   margin: 0;
   font-weight: 600;
 }

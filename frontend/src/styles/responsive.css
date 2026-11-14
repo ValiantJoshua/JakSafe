@@ -17,27 +17,48 @@
   .mapstage__float--br { bottom: 72px; }
 }
 
-/* Ponsel */
+/* Ponsel — Interactive Fluid Bottom-Sheet (§2, §4–§6, §9, §12) */
 @media (max-width: 720px) {
   .workspace {
-    flex-direction: column-reverse;
+    display: block;
+    position: relative;
   }
 
-  .mapstage { min-height: 48vh; }
+  .mapstage {
+    position: absolute;
+    inset: 0;
+    min-height: 100%;
+  }
 
   .sidepanel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
-    flex: 0 0 auto;
+    height: 78vh;
+    max-height: 78vh;
+    flex: none;
     border-right: none;
     border-top: 1px solid var(--border);
     border-radius: var(--r-xl) var(--r-xl) 0 0;
-    box-shadow: 0 -8px 32px rgba(27,30,35,.12);
-    max-height: 55vh;
+    background: var(--glass-bg, var(--surface));
+    backdrop-filter: var(--glass-blur, blur(20px) saturate(180%));
+    -webkit-backdrop-filter: var(--glass-blur, blur(20px) saturate(180%));
+    box-shadow: var(--glass-edge, none), 0 -10px 34px rgba(10, 46, 107, 0.16);
     margin-left: 0 !important;
+    transform: translate3d(0, 34%, 0);
+    transition: none;
+    will-change: transform;
   }
 
   .workspace[data-sidebar="collapsed"] .sidepanel {
-    display: none;
+    margin-left: 0 !important;
+    opacity: 1;
+  }
+
+  .sidepanel__grabber {
+    display: flex;
   }
 
   .sidepanel__tab { display: none; }

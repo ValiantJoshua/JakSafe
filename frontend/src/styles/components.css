@@ -505,9 +505,12 @@
   top: 64px; right: var(--s5);
   width: min(296px, calc(100vw - 24px)); padding: var(--s2);
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background: var(--glass-bg, var(--surface));
+  backdrop-filter: var(--glass-blur, none);
+  -webkit-backdrop-filter: var(--glass-blur, none);
   border: 1px solid var(--border);
-  box-shadow: var(--sh-3);
+  box-shadow: var(--glass-edge, none), var(--sh-3);
+  transform-origin: top right;
   animation: pop var(--dur-2) var(--ease) both;
 }
 .usermenu__head { display: flex; align-items: center; gap: var(--s3); padding: var(--s3); }

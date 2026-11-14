@@ -98,15 +98,31 @@
   --sh-lime:  0 1px 2px rgba(10, 46, 107, 0.08);
   --sh-inset: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 
-  /* TIPOGRAFI */
+  /* TIPOGRAFI (Dynamic Type rem scale + Optical Sizing & Size-Specific Tracking §15) */
   --font-display: 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-text:    'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --fs-xs: 12px;  --fs-sm: 13px;  --fs-base: 14px; --fs-md: 16px;
-  --fs-lg: 20px;  --fs-xl: 24px;  --fs-2xl: 30px;  --fs-3xl: 40px;
+  --fs-xs:   0.75rem;    /* 12px */
+  --fs-sm:   0.8125rem;  /* 13px */
+  --fs-base: 0.875rem;   /* 14px */
+  --fs-md:   1rem;       /* 16px */
+  --fs-lg:   1.25rem;    /* 20px */
+  --fs-xl:   1.5rem;     /* 24px */
+  --fs-2xl:  1.875rem;   /* 30px */
+  --fs-3xl:  2.5rem;     /* 40px */
 
-  --lh-tight: 1.2; --lh-snug: 1.4; --lh-base: 1.55;
+  --lh-tight: 1.18; --lh-snug: 1.38; --lh-base: 1.55;
+
+  --tr-display: -0.028em;
+  --tr-heading: -0.016em;
+  --tr-body:     0em;
+  --tr-micro:    0.012em;
+
+  /* MATERIAL TRANSLUSEN & KEDALAMAN (§12) */
+  --glass-bg:     rgba(255, 255, 255, 0.84);
+  --glass-blur:   blur(20px) saturate(180%);
+  --glass-edge:   inset 0 1px 0 rgba(255, 255, 255, 0.55);
 
   /* UKURAN KONTROL (Proporsi Aplikasi Desktop/Web Modern) */
   --control-h:    42px;
@@ -170,6 +186,8 @@
   --sh-3: 0 8px 24px rgba(0, 0, 0, 0.45);
   --sh-4: 0 16px 40px rgba(0, 0, 0, 0.55);
   --sh-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(11, 21, 40, 0.84);
+  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 /*
@@ -222,17 +240,36 @@
    MODE TEKS BESAR
 */
 [data-textsize="large"] {
-  --fs-xs: 13px;  --fs-sm: 15px;  --fs-base: 16px; --fs-md: 18px;
-  --fs-lg: 22px;  --fs-xl: 26px;  --fs-2xl: 34px;  --fs-3xl: 46px;
+  --fs-xs: 0.8125rem;  --fs-sm: 0.9375rem;  --fs-base: 1rem; --fs-md: 1.125rem;
+  --fs-lg: 1.375rem;  --fs-xl: 1.625rem;  --fs-2xl: 2.125rem;  --fs-3xl: 2.875rem;
   --control-h: 48px;
   --control-h-sm: 40px;
 }
 
 /*
-   PENGURANGAN GERAK
+   PENGURANGAN GERAK & AKSESIBILITAS SENSORIK
 */
 @media (prefers-reduced-motion: reduce) {
-  :root { --dur-1: .01ms; --dur-2: .01ms; --dur-3: .01ms; }
+  :root { --dur-1: 120ms; --dur-2: 160ms; --dur-3: 180ms; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  [data-theme="gelap"] {
+    --glass-bg: var(--surface);
+    --glass-blur: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --border: #475569;
+    --border-strong: #0F172A;
+  }
+  [data-theme="gelap"] {
+    --border: rgba(255, 255, 255, 0.35);
+    --border-strong: rgba(255, 255, 255, 0.65);
+  }
 }
 
 [data-theme="kontras"] .stat--a,
