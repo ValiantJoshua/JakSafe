@@ -4,7 +4,8 @@
    persistensi database MongoDB / fallback lokal.
 */
 
-import { $, show, setText } from '../../utils/dom.js';
+import { $, $$, show, setText, setPressed } from '../../utils/dom.js';
+import { escapeHtml } from '../../utils/format.js';
 import { getState, setState, subscribe } from '../../state/appState.js';
 import {
   masukPengguna,
@@ -18,13 +19,107 @@ import { findPlaceById, registerCustomPlace } from '../../config/jakartaPlaces.j
 import { toast } from '../toast.js';
 import { ikon } from '../icons.js';
 
+let modeAutentikasi = 'login';
+
+/** Mengembalikan input kata sandi ke kondisi tersembunyi. */
+function resetTampilanPassword() {
+  const passEl = /** @type {HTMLInputElement|null} */ ($('#loginPass'));
+  const btnToggle = $('#btnTogglePass');
+  if (passEl) passEl.type = 'password';
+  if (btnToggle) {
+    btnToggle.setAttribute('aria-pressed', 'false');
+    btnToggle.setAttribute('aria-label', 'Tampilkan kata sandi');
+    btnToggle.innerHTML = ikon('i-eye', 17);
+  }
+}
+
+/** Menghapus pesan error inline dan penanda aria-invalid pada form modal. */
+function bersihkanErrorAuth() {
+  const alertEl = $('#authError');
+  if (alertEl) {
+    alertEl.innerHTML = '';
+    alertEl.hidden = true;
+  }
+  for (const id of ['#loginName', '#loginEmail', '#loginPass']) {
+    $(id)?.removeAttribute('aria-invalid');
+  }
+}
+
+/**
+ * Menampilkan pesan kesalahan inline pada modal autentikasi, dengan tombol
+ * aksi opsional (misalnya pindah ke tab Daftar/Masuk) bila relevan.
+ */
+function tampilkanErrorAuth(pesan, { fieldEl = null, actionLabel = '', onAction = null } = {}) {
+  const alertEl = $('#authError');
+  if (alertEl) {
+    alertEl.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = pesan;
+    alertEl.append(span);
+    if (actionLabel && typeof onAction === 'function') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'auth-alert__action';
+      btn.textContent = actionLabel;
+      btn.addEventListener('click', onAction);
+      alertEl.append(btn);
+    }
+    alertEl.hidden = false;
+  }
+  if (fieldEl) {
+    fieldEl.setAttribute('aria-invalid', 'true');
+    fieldEl.focus();
+  }
+}
+
+/** Mengganti mode modal antara 'login' (Masuk) dan 'register' (Daftar Akun). */
+function aturModeAuth(mode, { focusField = false } = {}) {
+  modeAutentikasi = mode === 'register' ? 'register' : 'login';
+  const isRegister = modeAutentikasi === 'register';
+
+  $('#tabLoginMode')?.setAttribute('aria-selected', String(!isRegister));
+  $('#tabRegisterMode')?.setAttribute('aria-selected', String(isRegister));
+
+  show($('#registerNameWrap'), isRegister);
+  show($('#registerSensitifWrap'), isRegister);
+
+  setText($('#loginTitle'), isRegister ? 'Buat Akun JakSafe' : 'Masuk ke JakSafe');
+  setText(
+    $('#loginSub'),
+    isRegister
+      ? 'Daftar gratis untuk simpan rute dan profil kesehatan.'
+      : 'Masuk dengan email dan kata sandi Anda.'
+  );
+
+  const passEl = /** @type {HTMLInputElement|null} */ ($('#loginPass'));
+  if (passEl) {
+    passEl.setAttribute('autocomplete', isRegister ? 'new-password' : 'current-password');
+  }
+
+  const submitBtn = $('#btnAuthSubmit');
+  if (submitBtn && !submitBtn.disabled) {
+    submitBtn.innerHTML = `${isRegister ? 'Daftar Sekarang' : 'Masuk Sekarang'} <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>`;
+  }
+
+  bersihkanErrorAuth();
+  if (focusField) {
+    setTimeout(() => $(isRegister ? '#loginName' : '#loginEmail')?.focus(), 40);
+  }
+}
+
 /** Membuka atau menutup jendela masuk. */
 function bukaModal(buka) {
   const modal = $('#loginModal');
   if (!modal) return;
   show(modal, buka);
+  resetTampilanPassword();
   if (buka) {
+    aturModeAuth('login');
     setTimeout(() => $('#loginEmail')?.focus(), 60);
+  } else {
+    bersihkanErrorAuth();
+    const passEl = /** @type {HTMLInputElement|null} */ ($('#loginPass'));
+    if (passEl) passEl.value = '';
   }
 }
 
@@ -68,7 +163,7 @@ function gambarKeadaanMasuk(keadaan) {
   const sapaan = $('#greetBox');
   if (sapaan) {
     sapaan.innerHTML = masuk
-      ? `<h1 class="search__title">Halo, ${namaUser.split(' ')[0]}</h1>
+      ? `<h1 class="search__title">Halo, ${escapeHtml(namaPendek)}</h1>
          <p class="search__sub">Profil kesehatan ${sensitifKesehatan ? 'aktif — bobot polusi udara diprioritaskan saat rute dinilai' : 'nonaktif — bobot penilaian memakai standar bawaan'}.</p>`
       : `<h1 class="search__title">Rencanakan Rute Perjalanan</h1>
          <p class="search__sub">Navigasi Jakarta dengan pertimbangan kualitas udara, lalu lintas, dan pantauan CCTV.</p>`;
@@ -89,11 +184,12 @@ function gambarRuteTersimpan(daftar) {
   }
 
   wadah.innerHTML = daftar.map((r, idx) => {
-    const asalNama = r.origin?.name || r.asal || 'Awal';
-    const tujuanNama = r.destination?.name || r.tujuan || 'Tujuan';
-    const totalScore = r.score?.totalScore ?? r.skor ?? '-';
-    const label = r.score?.label || r.label || 'AMAN';
-    const ruteId = r.id || r._id || '';
+    const asalNama = escapeHtml(r.origin?.name || r.asal || 'Awal');
+    const tujuanNama = escapeHtml(r.destination?.name || r.tujuan || 'Tujuan');
+    const totalScore = escapeHtml(r.score?.totalScore ?? r.skor ?? '-');
+    const label = String(r.score?.label || r.label || 'AMAN');
+    const labelAman = escapeHtml(label);
+    const ruteId = escapeHtml(r.id || r._id || '');
     const statusKey = label.toLowerCase().includes('hindari') ? 'hindari' : label.toLowerCase().includes('hati') ? 'hati' : 'aman';
 
     return `
@@ -101,7 +197,7 @@ function gambarRuteTersimpan(daftar) {
         <span class="saveditem__dot"></span>
         <span class="saveditem__body press" data-load-route="${idx}" title="Klik untuk memuat rute ini">
           <span class="saveditem__name">${asalNama} ${ikon('i-arrow-r', 12)} ${tujuanNama}</span>
-          <span class="saveditem__meta">Skor ${totalScore} · ${label}</span>
+          <span class="saveditem__meta">Skor ${totalScore} · ${labelAman}</span>
         </span>
         <button type="button" class="saveditem__del press" data-delete-route="${ruteId}" title="Hapus rute dari database" aria-label="Hapus rute">
           ${ikon('i-x', 14)}
@@ -121,6 +217,26 @@ export async function pasangPengendaliAuth() {
     tombol.addEventListener('click', () => bukaModal(false));
   }
 
+  $('#tabLoginMode')?.addEventListener('click', () => aturModeAuth('login', { focusField: true }));
+  $('#tabRegisterMode')?.addEventListener('click', () => aturModeAuth('register', { focusField: true }));
+
+  $('#btnTogglePass')?.addEventListener('click', () => {
+    const passEl = /** @type {HTMLInputElement|null} */ ($('#loginPass'));
+    const btnToggle = $('#btnTogglePass');
+    if (!passEl || !btnToggle) return;
+    const tampilkan = passEl.type === 'password';
+    passEl.type = tampilkan ? 'text' : 'password';
+    btnToggle.setAttribute('aria-pressed', String(tampilkan));
+    btnToggle.setAttribute('aria-label', tampilkan ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
+    btnToggle.innerHTML = ikon(tampilkan ? 'i-eye-off' : 'i-eye', 17);
+  });
+
+  for (const id of ['#loginName', '#loginEmail', '#loginPass']) {
+    $(id)?.addEventListener('input', () => {
+      $(id)?.removeAttribute('aria-invalid');
+    });
+  }
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       bukaModal(false);
@@ -128,47 +244,50 @@ export async function pasangPengendaliAuth() {
     }
   });
 
-  // Form submit: Login riil ke backend (dengan auto-register jika pengguna baru)
+  // Form submit: Masuk atau Daftar Akun secara eksplisit (tidak auto-register diam-diam)
   $('#loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = $('#loginEmail')?.value?.trim();
-    const password = $('#loginPass')?.value || '';
-    const sensitif = $('#chkSensitif')?.checked ?? false;
+    bersihkanErrorAuth();
 
-    if (!email) {
-      toast('Silakan masukkan alamat email');
+    const emailEl = /** @type {HTMLInputElement|null} */ ($('#loginEmail'));
+    const passEl = /** @type {HTMLInputElement|null} */ ($('#loginPass'));
+    const nameEl = /** @type {HTMLInputElement|null} */ ($('#loginName'));
+
+    const email = emailEl?.value?.trim() || '';
+    const password = passEl?.value || '';
+    const sensitif = $('#chkSensitif')?.checked ?? false;
+    const isRegister = modeAutentikasi === 'register';
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      tampilkanErrorAuth('Masukkan alamat email yang valid (contoh: nama@email.com).', { fieldEl: emailEl });
       return;
     }
     if (!password || password.length < 6) {
-      toast('Kata sandi minimal 6 karakter');
+      tampilkanErrorAuth('Kata sandi minimal 6 karakter.', { fieldEl: passEl });
       return;
     }
 
-    const submitBtn = $('#loginForm button[type="submit"]');
+    const submitBtn = $('#btnAuthSubmit');
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Menghubungkan...';
+      submitBtn.textContent = isRegister ? 'Mendaftarkan...' : 'Menghubungkan...';
     }
 
     try {
       let res;
-      try {
-        // Coba login terlebih dahulu
+      if (isRegister) {
+        const namaInput = nameEl?.value?.trim() || '';
+        const awalan = email.split('@')[0] || 'Pengguna';
+        const nama = namaInput || (awalan.charAt(0).toUpperCase() + awalan.slice(1));
+        res = await daftarPengguna({
+          email,
+          password,
+          name: nama,
+          isHealthSensitive: sensitif,
+        });
+        toast('Akun baru berhasil didaftarkan.');
+      } else {
         res = await masukPengguna({ email, password });
-      } catch (loginErr) {
-        // Jika akun belum terdaftar (404), lakukan registrasi otomatis
-        if (loginErr.status === 404) {
-          const namaAwal = email.split('@')[0];
-          res = await daftarPengguna({
-            email,
-            password,
-            name: namaAwal.charAt(0).toUpperCase() + namaAwal.slice(1),
-            isHealthSensitive: sensitif,
-          });
-          toast('Akun baru berhasil didaftarkan.');
-        } else {
-          throw loginErr;
-        }
       }
 
       const { token, user } = res;
@@ -179,7 +298,7 @@ export async function pasangPengendaliAuth() {
         masuk: true,
         token,
         pengguna: user,
-        sensitifKesehatan: Boolean(user?.healthProfile?.isSensitive ?? sensitif),
+        sensitifKesehatan: Boolean(user?.healthProfile?.isSensitive ?? (isRegister ? sensitif : false)),
       });
 
       bukaModal(false);
@@ -193,12 +312,35 @@ export async function pasangPengendaliAuth() {
         console.warn('[auth] Gagal mengambil rute tersimpan:', loadErr);
       }
     } catch (err) {
-      console.error('[auth] Login error:', err);
-      toast(err.message || 'Gagal masuk. Periksa email dan kata sandi Anda.');
+      console.error('[auth] Auth error:', err);
+      if (!isRegister && err.status === 404) {
+        tampilkanErrorAuth(
+          'Email ini belum terdaftar. Periksa kembali ejaan email Anda atau buat akun baru.',
+          {
+            fieldEl: emailEl,
+            actionLabel: 'Daftar dengan email ini',
+            onAction: () => aturModeAuth('register', { focusField: true }),
+          }
+        );
+      } else if (!isRegister && err.status === 401) {
+        tampilkanErrorAuth('Email atau kata sandi salah.', { fieldEl: passEl });
+      } else if (isRegister && err.status === 409) {
+        tampilkanErrorAuth(
+          'Email ini sudah terdaftar. Silakan masuk dengan akun tersebut.',
+          {
+            fieldEl: emailEl,
+            actionLabel: 'Pindah ke tab Masuk',
+            onAction: () => aturModeAuth('login', { focusField: false }),
+          }
+        );
+      } else {
+        tampilkanErrorAuth(err.message || 'Gagal memproses akun. Periksa koneksi dan coba lagi.');
+      }
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = `Masuk Sekarang <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>`;
+        const label = modeAutentikasi === 'register' ? 'Daftar Sekarang' : 'Masuk Sekarang';
+        submitBtn.innerHTML = `${label} <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>`;
       }
     }
   });
@@ -295,7 +437,16 @@ export async function pasangPengendaliAuth() {
       if (inpOrigin) inpOrigin.value = origin.name;
       if (inpDest) inpDest.value = dest.name;
 
-      setState({ idAsal: originId, idTujuan: destId });
+      const savedProfile = ['car', 'bike', 'foot'].includes(r.profile) ? r.profile : null;
+      const chipSet = $$('.chip[data-profile]');
+      const matchingChip = savedProfile ? chipSet.find((c) => c.dataset.profile === savedProfile) : null;
+      if (matchingChip) setPressed(chipSet, matchingChip);
+
+      setState({
+        idAsal: originId,
+        idTujuan: destId,
+        ...(savedProfile ? { profil: savedProfile } : {}),
+      });
       toast(`Rute dimuat: ${origin.name} → ${dest.name}`);
     }
   });

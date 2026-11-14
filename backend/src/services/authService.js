@@ -8,6 +8,9 @@ import {
 } from '../db/storageService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'jaksafe-dev-secret-key-2026';
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.warn('[authService] PERINGATAN: JWT_SECRET tidak diatur pada environment production; menggunakan fallback dev.');
+}
 const JWT_EXPIRES_IN = '7d';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

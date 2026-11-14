@@ -1,10 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {
   isOverBudget,
   normalizeBudget,
   pickTrafficSamplePoints,
   aggregateTrafficSegments,
+  pruneDiskCache,
 } from '../src/services/tomtom.js';
 
 describe('Unit Test: TomTom Budget & State Transitions (Braude Section 5)', () => {
@@ -102,6 +106,54 @@ describe('Unit Test: TomTom Budget & State Transitions (Braude Section 5)', () =
       ];
       const agg = aggregateTrafficSegments(segments);
       assert.equal(agg.roadClosure, true, 'Must report roadClosure=true if any segment is closed');
+    });
+  });
+
+  describe('4. Disk Cache Pruning: pruneDiskCache', () => {
+    it('removes expired & overflow tiles oldest-first while preserving budget.json and fresh tiles', async () => {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'jaksafe-tomtom-cache-'));
+      try {
+        const now = 1_700_000_000_000;
+        const setMtime = async (name, ageMs) => {
+          const filePath = path.join(tmpDir, name);
+          await fs.writeFile(filePath, Buffer.from([1, 2, 3]));
+          const sec = (now - ageMs) / 1000;
+          await fs.utimes(filePath, sec, sec);
+        };
+
+        await setMtime('budget.json', 100 * 60 * 60 * 1000); // Very old metadata must NEVER be deleted
+        await setMtime('fresh-active.pbf', 30_000);         // < minFreshTtlMs (180s), must survive even over cap
+        await setMtime('recent-1.png', 10 * 60 * 1000);     // Kept newest among non-fresh
+        await setMtime('older-overflow.png', 2 * 60 * 60 * 1000); // Within maxAgeMs, but overflows maxFiles=2
+        await setMtime('expired.png', 25 * 60 * 60 * 1000); // Older than maxAgeMs (24h)
+
+        const res = await pruneDiskCache({
+          cacheDir: tmpDir,
+          maxAgeMs: 24 * 60 * 60 * 1000,
+          maxFiles: 2,
+          minFreshTtlMs: 180_000,
+          now,
+        });
+
+        assert.equal(res.removedAge, 1);
+        assert.equal(res.removedOverflow, 1);
+        assert.equal(res.kept, 2);
+
+        const remaining = await fs.readdir(tmpDir);
+        assert.ok(remaining.includes('budget.json'), 'budget.json must be preserved');
+        assert.ok(remaining.includes('fresh-active.pbf'), 'Fresh tile under TTL must survive');
+        assert.ok(remaining.includes('recent-1.png'), 'Most recent tile within maxFiles must survive');
+        assert.equal(remaining.includes('older-overflow.png'), false);
+        assert.equal(remaining.includes('expired.png'), false);
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it('returns zero counts cleanly when cache directory does not exist', async () => {
+      const missingDir = path.join(os.tmpdir(), `jaksafe-missing-${Date.now()}`);
+      const res = await pruneDiskCache({ cacheDir: missingDir });
+      assert.deepEqual(res, { scanned: 0, removedAge: 0, removedOverflow: 0, kept: 0 });
     });
   });
 });

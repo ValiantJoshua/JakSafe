@@ -42,25 +42,52 @@ const SYSTEM_INSTRUCTION = [
 ].join(' ');
 
 /** Helper to summarize air quality from results */
-function summarizeAqiResults(results) {
+export function summarizeAqiResults(results) {
   if (!Array.isArray(results) || results.length === 0) return null;
   let maxPm25 = 0;
   let maxAqi = 0;
   let category = results[0]?.usAqiCategory?.label || 'Moderate';
+  let worstPmPoint = null;
+  let worstAqiPoint = null;
+  let firstValidPoint = null;
+
   for (const r of results) {
+    if (!r) continue;
+    const hasCoords = Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lon));
+    if (!firstValidPoint && hasCoords && !r.unavailable) firstValidPoint = r;
+
     const pm = Number(r.values?.pm2_5) || 0;
     const aqi = Number(r.values?.us_aqi) || 0;
-    if (pm > maxPm25) maxPm25 = Math.round(pm * 10) / 10;
+    if (pm > maxPm25) {
+      maxPm25 = Math.round(pm * 10) / 10;
+      if (hasCoords) worstPmPoint = r;
+    }
     if (aqi > maxAqi) {
       maxAqi = Math.round(aqi);
       if (r.usAqiCategory?.label) category = r.usAqiCategory.label;
+      if (hasCoords) worstAqiPoint = r;
     }
   }
+
+  const worst = worstPmPoint || worstAqiPoint || firstValidPoint || results[0];
+  const time = worst?.time || results[0]?.time || new Date().toISOString();
+  const hasWorstCoords = Number.isFinite(Number(worst?.lat)) && Number.isFinite(Number(worst?.lon));
+  const titikTerburuk = hasWorstCoords
+    ? {
+      lat: Number(worst.lat),
+      lon: Number(worst.lon),
+      time,
+      values: worst.values || null,
+      usAqiCategory: worst.usAqiCategory || null,
+    }
+    : { time };
+
   return {
     pm2_5: maxPm25,
     us_aqi: maxAqi,
     usAqiCategory: category,
-    time: results[0]?.time || new Date().toISOString(),
+    time,
+    titikTerburuk,
   };
 }
 
@@ -569,7 +596,7 @@ export async function runNavigationAgent({
         air: altAir
           ? {
             ...altAir,
-            titikTerburuk: { time: altAir.time },
+            titikTerburuk: altAir.titikTerburuk || { time: altAir.time },
           }
           : null,
         visual: altVisual,
@@ -603,7 +630,7 @@ export async function runNavigationAgent({
     air: airSummary
       ? {
         ...airSummary,
-        titikTerburuk: { time: airSummary.time },
+        titikTerburuk: airSummary.titikTerburuk || { time: airSummary.time },
       }
       : null,
     visual: visualResult,

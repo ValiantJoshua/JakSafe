@@ -16,7 +16,7 @@
 import { $, setText, show, countTo, afterPaint } from '../../utils/dom.js';
 import {
   formatJarak, formatDurasi, formatAngka, formatLama, formatJam,
-  labelKondisiJalan, labelGenangan, formatObservasi, KOSONG,
+  labelKondisiJalan, labelGenangan, formatObservasi, escapeHtml, KOSONG,
 } from '../../utils/format.js';
 import { pitaDariSkor, kunciDariLabel, kalimatArti, susunAlasan } from '../../domain/scoreLabels.js';
 import { calculateRouteScore } from '../../domain/previewScorer.js';
@@ -213,22 +213,42 @@ function gambarKamera(visual) {
   }
 
   const jarak = Number.isFinite(k.jarakM) ? `${k.jarakM} m dari rute` : 'di sekitar rute';
+  const namaAman = escapeHtml(k.nama);
+  const providerAman = k.provider ? ` · ${escapeHtml(k.provider)}` : '';
+  const lisensiAman = k.license ? `<span class="cctv__lisensi">${escapeHtml(k.license)}</span>` : '';
 
   badan.innerHTML = `
     <figure class="cctv">
       <div class="cctv__frame">
-        <img class="cctv__img" src="${urlBingkaiKamera(k.id)}" alt="Cuplikan kamera ${k.nama}"
-             loading="lazy"
-             onerror="this.closest('.cctv').dataset.gagal='1'">
+        <img class="cctv__img" src="${urlBingkaiKamera(k.id)}" alt="Cuplikan kamera ${namaAman}"
+             loading="lazy">
         <span class="cctv__gagal">${ikon('i-camera-off', 22)} Gambar kamera tidak dapat diambil</span>
       </div>
       <figcaption class="cctv__cap">
-        <span class="cctv__name">${k.nama}</span>
-        <span class="cctv__meta">${jarak}${k.provider ? ` · ${k.provider}` : ''}</span>
-        ${k.license ? `<span class="cctv__lisensi">${k.license}</span>` : ''}
+        <span class="cctv__name">${namaAman}</span>
+        <span class="cctv__meta">${jarak}${providerAman}</span>
+        ${lisensiAman}
       </figcaption>
     </figure>
     ${gambarAnalisis(analisis)}`;
+
+  const img = badan.querySelector('.cctv__img');
+  if (img) {
+    let sudahCobaUlang = false;
+    img.addEventListener('error', () => {
+      if (!sudahCobaUlang) {
+        sudahCobaUlang = true;
+        const srcAsli = urlBingkaiKamera(k.id);
+        setTimeout(() => {
+          if (!img.isConnected) return;
+          img.src = `${srcAsli}${srcAsli.includes('?') ? '&' : '?'}retry=${Date.now()}`;
+        }, 900);
+        return;
+      }
+      const figure = img.closest('.cctv');
+      if (figure) figure.dataset.gagal = '1';
+    });
+  }
 }
 
 /** Bagian hasil analisis citra, kalau ada. */
@@ -250,7 +270,7 @@ function gambarAnalisis(analisis) {
     baris.push(`Keyakinan analisis ${Math.round(analisis.confidence * 100)} persen${rendah ? ', dinilai lebih hati hati karena di bawah 40 persen' : ''}`);
   }
   if (analisis.alasan) {
-    baris.push(`<em>Catatan visual:</em> "${analisis.alasan}"`);
+    baris.push(`<em>Catatan visual:</em> "${escapeHtml(analisis.alasan)}"`);
   }
 
   return `
@@ -830,9 +850,9 @@ export function pasangPengendaliHasil() {
         label: hasil.score.label,
         color: hasil.score.color,
       },
-      distanceM: hasil.distanceM || 0,
-      durationS: hasil.durationS || 0,
-      profile: hasil.profile || 'car',
+      distanceM: hasil.route?.distanceM ?? hasil.distanceM ?? 0,
+      durationS: hasil.route?.durationS ?? hasil.durationS ?? 0,
+      profile: hasil.profil || hasil.profile || getState().profil || 'car',
     };
 
     if (tombol) tombol.style.opacity = '0.6';

@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { summarizeAqiResults } from '../src/agent/reactAgent.js';
 
 /**
  * State Transition Test for JakSafe Navigation Workflow
@@ -108,5 +109,31 @@ describe('Unit Test: Navigation State-Transition Sequence (Braude Section 5)', (
       /Invalid transition from WAITING/,
       'Must reject illegal jump from WAITING directly to ENGAGING'
     );
+  });
+
+  it('preserves worst polluted coordinates in summarizeAqiResults for map marker rendering', () => {
+    const summary = summarizeAqiResults([
+      {
+        lat: -6.1754,
+        lon: 106.8272,
+        time: '2026-11-14T10:00:00+07:00',
+        values: { pm2_5: 18.4, us_aqi: 64 },
+        usAqiCategory: { label: 'Moderate' },
+      },
+      {
+        lat: -6.2088,
+        lon: 106.8456,
+        time: '2026-11-14T10:05:00+07:00',
+        values: { pm2_5: 56.2, us_aqi: 151 },
+        usAqiCategory: { label: 'Unhealthy' },
+      },
+    ]);
+
+    assert.equal(summary.pm2_5, 56.2);
+    assert.equal(summary.us_aqi, 151);
+    assert.equal(summary.usAqiCategory, 'Unhealthy');
+    assert.equal(summary.titikTerburuk.lat, -6.2088);
+    assert.equal(summary.titikTerburuk.lon, 106.8456);
+    assert.equal(summary.titikTerburuk.values.pm2_5, 56.2);
   });
 });

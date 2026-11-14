@@ -292,8 +292,9 @@ async function jalankanPencarian() {
 
     // Nama tempat ditempelkan ke hasil supaya layar hasil tidak perlu
     // mencarinya lagi ke daftar tempat.
-    gambarHasil({ ...hasil, asal, tujuan });
-    setState({ tampilan: 'hasil', hasil: { ...hasil, asal, tujuan } });
+    const hasilLengkap = { ...hasil, asal, tujuan, profil: hasil?.profil || hasil?.profile || keadaan.profil || 'car' };
+    gambarHasil(hasilLengkap);
+    setState({ tampilan: 'hasil', hasil: hasilLengkap });
   } catch (galat) {
     if (galat?.sebab === SEBAB.DIBATALKAN || pengendaliAktif?.signal.aborted) {
       setState({ tampilan: 'siap' });

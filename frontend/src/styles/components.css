@@ -193,6 +193,85 @@
   border-color: var(--jk-blue-1);
   box-shadow: 0 0 0 3px rgba(2, 132, 255, 0.14);
 }
+.inputwrap__input[aria-invalid="true"] {
+  border-color: var(--st-hindari);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+}
+.inputwrap__pass {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.inputwrap__input--pass { padding-right: 42px; }
+.inputwrap__toggle {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-xs);
+  color: var(--text-3);
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.inputwrap__toggle:hover { color: var(--text-1); background: var(--surface-3); }
+.inputwrap__toggle:focus-visible { outline: 2px solid var(--jk-blue-1); outline-offset: 1px; }
+.inputwrap__hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: var(--s4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.auth-tab {
+  height: 34px;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-2);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+.auth-tab:hover { color: var(--text-1); }
+.auth-tab[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--text-1);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(10, 46, 107, 0.08);
+}
+.auth-alert {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-bottom: var(--s4);
+  border-radius: var(--r-sm);
+  background: var(--st-hindari-bg);
+  border: 1px solid var(--st-hindari);
+  color: var(--st-hindari);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.4;
+}
+.auth-alert[hidden] { display: none; }
+.auth-alert__action {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--st-hindari);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 
 /* CHIP MODA PERJALANAN (Radius 8px, aktif Deep Navy) */
 .chiprow { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }

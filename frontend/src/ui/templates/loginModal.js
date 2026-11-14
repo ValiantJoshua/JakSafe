@@ -1,19 +1,15 @@
 /*
-   Jendela masuk beserta perbandingan keuntungannya, dan menu akun.
+   Jendela masuk / pendaftaran akun pengguna serta menu akun.
 
-   Perlu ditegaskan sejak awal supaya tidak salah dipahami saat demo.
-   Backend JakSafe belum punya sistem akun. Tidak ada endpoint pendaftaran,
-   tidak ada endpoint masuk, dan tidak ada penyimpanan pengguna. Jadi
-   tombol Masuk di sini hanya mengubah keadaan di dalam peramban untuk
-   satu sesi, tanpa mengirim apa pun ke mana pun. Kata sandi yang diketik
-   tidak dikirim, tidak disimpan, dan tidak diperiksa.
+   Terhubung ke backend JakSafe (/api/auth/login, /api/auth/register,
+   /api/auth/me) memakai token JWT. Mode Masuk dan Daftar Akun dipisahkan
+   dengan tab eksplisit agar typo email saat masuk tidak otomatis mendaftarkan
+   akun baru tanpa sepengetahuan pengguna.
 
-   Meski begitu, satu keuntungan masuk sudah benar benar berfungsi, yaitu
-   profil kesehatan. Ketika dinyalakan, bobot polusi dalam penilaian naik
-   dari nol koma tiga lima menjadi nol koma lima, dan perubahan itu nyata
-   mempengaruhi skor yang keluar. Lihat fungsi bobotUntuk pada
-   src/domain/navigationService.js. Keuntungan lain seperti riwayat dan
-   peringatan dini masih berupa rencana dan ditandai demikian.
+   Keuntungan yang sudah aktif: profil kesehatan (mengubah bobot polusi
+   di penilaian rute dan tersimpan permanen di MongoDB) serta daftar rute
+   tersimpan per akun. Fitur berlabel "Menyusul" seperti riwayat perjalanan
+   dan peringatan dini banjir disiapkan pada tahap berikutnya.
 */
 
 import { ikon } from '../icons.js';
@@ -70,29 +66,61 @@ export function templateLoginModal() {
       <div class="modal__right">
         <div class="modal__logo">${logoMark(54, 'modal')}</div>
         <h2 class="modal__title" id="loginTitle">Masuk ke JakSafe</h2>
-        <p class="modal__sub">Gratis, cukup pakai email.</p>
+        <p class="modal__sub" id="loginSub">Masuk dengan email dan kata sandi Anda.</p>
+
+        <div class="auth-tabs" role="tablist" aria-label="Mode akun">
+          <button type="button" class="auth-tab" role="tab" id="tabLoginMode" data-auth-tab="login" aria-selected="true">
+            Masuk
+          </button>
+          <button type="button" class="auth-tab" role="tab" id="tabRegisterMode" data-auth-tab="register" aria-selected="false">
+            Daftar Akun
+          </button>
+        </div>
 
         <form id="loginForm" novalidate>
-          <label class="inputwrap">
+          <div class="auth-alert" id="authError" role="alert" hidden></div>
+
+          <div id="registerNameWrap" hidden>
+            <label class="inputwrap" for="loginName">
+              <span class="inputwrap__label">Nama Lengkap</span>
+              <input class="inputwrap__input" type="text" id="loginName" name="name"
+                     autocomplete="name" placeholder="Nama lengkap Anda">
+              <span class="inputwrap__hint">Opsional — kosongkan untuk memakai awalan email.</span>
+            </label>
+          </div>
+
+          <label class="inputwrap" for="loginEmail">
             <span class="inputwrap__label">Email</span>
-            <input class="inputwrap__input" type="email" id="loginEmail"
-                   placeholder="nama@email.com" required>
-          </label>
-          <label class="inputwrap">
-            <span class="inputwrap__label">Kata Sandi</span>
-            <input class="inputwrap__input" type="password" id="loginPass"
-                   placeholder="Minimal 8 karakter" required>
+            <input class="inputwrap__input" type="email" id="loginEmail" name="email"
+                   autocomplete="username" inputmode="email" autocapitalize="none"
+                   spellcheck="false" placeholder="nama@email.com" required>
           </label>
 
-          <label class="switchrow">
-            <input type="checkbox" id="chkSensitif" checked>
-            <span class="switchrow__teks">
-              <strong>Saya sensitif terhadap polusi udara</strong>
-              Bobot polusi dinaikkan saat rute dinilai.
-            </span>
-          </label>
+          <div class="inputwrap">
+            <label class="inputwrap__label" for="loginPass">Kata Sandi</label>
+            <div class="inputwrap__pass">
+              <input class="inputwrap__input inputwrap__input--pass" type="password" id="loginPass" name="password"
+                     autocomplete="current-password" minlength="6" spellcheck="false"
+                     placeholder="Minimal 6 karakter" required>
+              <button type="button" class="inputwrap__toggle press" id="btnTogglePass"
+                      aria-label="Tampilkan kata sandi" aria-pressed="false" aria-controls="loginPass">
+                ${ikon('i-eye', 17)}
+              </button>
+            </div>
+            <span class="inputwrap__hint" id="loginPassHint">Minimal 6 karakter.</span>
+          </div>
 
-          <button class="btn btn--primary btn--block btn--lg press" type="submit" style="margin-top:var(--s4)">
+          <div id="registerSensitifWrap" hidden>
+            <label class="switchrow" for="chkSensitif">
+              <input type="checkbox" id="chkSensitif" checked>
+              <span class="switchrow__teks">
+                <strong>Saya sensitif terhadap polusi udara</strong>
+                Bobot polusi dinaikkan saat rute dinilai.
+              </span>
+            </label>
+          </div>
+
+          <button class="btn btn--primary btn--block btn--lg press" type="submit" id="btnAuthSubmit" style="margin-top:var(--s4)">
             Masuk Sekarang
             <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>
           </button>

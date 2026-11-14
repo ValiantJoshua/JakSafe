@@ -11,9 +11,14 @@ export const MAX_TILE_ZOOM = 18;
 const MERCATOR_LAT_LIMIT = 85.05112878;
 
 const TILE_TTL_MS = 180_000; // 3 minutes
+const DISK_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DISK_MAX_FILES = 800;
+const DISK_PRUNE_INTERVAL_MS = 5 * 60 * 1000; // Prune disk cache at most once every 5 minutes
 const MEM_MAX_ENTRIES = 512;
 const UPSTREAM_TIMEOUT_MS = 15_000;
-const DEFAULT_DAILY_BUDGET = 6000; // Generous cap well under 200k/month TomTom freemium pool
+const DEFAULT_DAILY_BUDGET = 8000; // Generous cap well under 200k/month TomTom freemium pool
+let lastPruneAt = 0;
+let pruneInFlight = null;
 const RASTER_STYLES = new Set([
   'relative0',
   'relative0-dark',
@@ -143,10 +148,113 @@ async function readDiskTile(diskFile) {
   }
 }
 
+/**
+ * Remove expired and excess tile files from the disk cache directory while
+ * preserving `budget.json` and active tiles fresher than `minFreshTtlMs`.
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.cacheDir]
+ * @param {number} [opts.maxAgeMs]
+ * @param {number} [opts.maxFiles]
+ * @param {number} [opts.minFreshTtlMs]
+ * @param {number} [opts.now]
+ * @returns {Promise<{ scanned: number, removedAge: number, removedOverflow: number, kept: number }>}
+ */
+export async function pruneDiskCache({
+  cacheDir = CACHE_DIR,
+  maxAgeMs = DISK_MAX_AGE_MS,
+  maxFiles = DISK_MAX_FILES,
+  minFreshTtlMs = TILE_TTL_MS,
+  now = Date.now(),
+} = {}) {
+  let entries;
+  try {
+    entries = await fsp.readdir(cacheDir, { withFileTypes: true });
+  } catch (err) {
+    if (err?.code === 'ENOENT') {
+      return { scanned: 0, removedAge: 0, removedOverflow: 0, kept: 0 };
+    }
+    throw err;
+  }
+
+  const candidates = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || entry.name === 'budget.json') continue;
+    if (!/\.(png|pbf)$/i.test(entry.name)) continue;
+    candidates.push(path.join(cacheDir, entry.name));
+  }
+
+  const fileStats = await Promise.all(
+    candidates.map(async (filePath) => {
+      try {
+        const st = await fsp.stat(filePath);
+        return { filePath, mtimeMs: st.mtimeMs };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const tiles = fileStats.filter(Boolean);
+  const survivors = [];
+  const toDelete = [];
+  let removedAge = 0;
+  let removedOverflow = 0;
+
+  const effectiveMaxAgeMs = Math.max(maxAgeMs, minFreshTtlMs);
+  for (const item of tiles) {
+    if (now - item.mtimeMs > effectiveMaxAgeMs) {
+      toDelete.push(item.filePath);
+      removedAge += 1;
+    } else {
+      survivors.push(item);
+    }
+  }
+
+  if (Number.isFinite(maxFiles) && maxFiles >= 0 && survivors.length > maxFiles) {
+    survivors.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    const keptList = survivors.slice(0, maxFiles);
+    const overflow = survivors.slice(maxFiles);
+    for (const item of overflow) {
+      if (now - item.mtimeMs >= minFreshTtlMs) {
+        toDelete.push(item.filePath);
+        removedOverflow += 1;
+      } else {
+        keptList.push(item);
+      }
+    }
+    survivors.length = 0;
+    survivors.push(...keptList);
+  }
+
+  await Promise.all(toDelete.map((filePath) => fsp.unlink(filePath).catch(() => {})));
+
+  return {
+    scanned: tiles.length,
+    removedAge,
+    removedOverflow,
+    kept: survivors.length,
+  };
+}
+
+function scheduleDiskPrune() {
+  const now = Date.now();
+  if (pruneInFlight || now - lastPruneAt < DISK_PRUNE_INTERVAL_MS) return;
+  lastPruneAt = now;
+  pruneInFlight = pruneDiskCache({ now })
+    .catch((err) => {
+      console.warn('[tomtom] disk cache prune failed:', err?.message || err);
+    })
+    .finally(() => {
+      pruneInFlight = null;
+    });
+}
+
 async function writeDiskTile(diskFile, buf) {
   try {
     await fsp.mkdir(CACHE_DIR, { recursive: true });
     await fsp.writeFile(tileDiskPath(diskFile), buf);
+    scheduleDiskPrune();
   } catch (err) {
     console.warn(`[tomtom] tile cache write failed for ${diskFile}:`, err?.message || err);
   }
