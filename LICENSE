@@ -1,0 +1,57 @@
+MIT License
+
+Copyright (c) 2026 JakSafe
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+NOTE ON THIRD-PARTY DATA, APIS, AND ASSETS — THE MIT LICENSE ABOVE COVERS THE
+JAKSAFE SOURCE CODE ONLY.
+
+The camera metadata catalog bundled under `backend/src/data/cctvCatalog.json`
+and all spatial, atmospheric, traffic, routing, and visual streams fetched from
+third-party providers at runtime remain the property of their respective owners
+and are NOT licensed under MIT. They are integrated for research, academic, and
+situational-awareness visualization under each provider's terms:
+
+  - OpenStreetMap & OSRM (Open Source Routing Machine):
+    Road network geometry, turn-by-turn steps, and Nominatim geocoding data are
+    licensed under the Open Database License (ODbL) 1.0 by OpenStreetMap
+    Contributors (https://www.openstreetmap.org/copyright).
+
+  - Open-Meteo Air Quality API:
+    Atmospheric telemetry (PM2.5, PM10, US AQI, NO2, O3) is provided under
+    Attribution 4.0 International (CC BY 4.0) (https://open-meteo.com/).
+
+  - Public CCTV Network (DKI Jakarta / Regional Stream Providers):
+    Camera coordinates and public HLS/snapshot streams are owned by their
+    respective municipal and public-service operators. JakSafe brokers streams
+    strictly for real-time road safety & flood inspection without archiving
+    personal video feeds.
+
+  - TomTom Traffic API, Google Maps Platform (Photorealistic 3D Tiles & Places),
+    Cesium ion, and Google Gemini API:
+    Fetched at runtime using your own configured API credentials and governed
+    by each provider's respective Terms of Service, quota limits, and commercial
+    use restrictions.
+
+In short: the MIT grant applies solely to the software codebase in this
+repository and does not extend to third-party geospatial datasets, imagery,
+or live sensor streams.
