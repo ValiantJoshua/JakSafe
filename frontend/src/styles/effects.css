@@ -23,6 +23,18 @@
 }
 .slide-in { animation: slide-in var(--dur-2) var(--ease) both; }
 
+/* Materialize pop untuk menu/popover berjangkar ke tombol pemicu (§7 & §12) */
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 /* Angka tabular agar kolom sejajar */
 .counting { font-variant-numeric: tabular-nums; }
 
@@ -36,9 +48,9 @@
   border-radius: var(--r-sm);
 }
 
-/* Umpan balik tekan (Press) */
-.press { transition: transform var(--dur-1) var(--ease); }
-.press:active { transform: scale(0.98); }
+/* Umpan balik tekan instan pada pointer-down (§1) */
+.press { transition: transform 100ms ease-out; }
+.press:active { transform: scale(0.97); }
 
 /* Nonaktifkan elemen dekoratif mengapung & kilau */
 .sheen::after,
@@ -46,7 +58,27 @@
   display: none !important;
 }
 
+/* Pengurangan gerak: ganti pergeseran/putaran dengan cross-fade lembut (§14) */
 @media (prefers-reduced-motion: reduce) {
-  .rise, .slide-in { animation: none; opacity: 1; transform: none; }
-  .skeleton { animation: none; }
+  @keyframes fade-only {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .rise,
+  .slide-in,
+  .usermenu,
+  .mapcctv-popup,
+  .mappick-menu {
+    animation: fade-only 160ms ease-out both !important;
+    transform: none !important;
+  }
+  .skeleton,
+  .progress__ring,
+  .mapcctv__spinner {
+    animation: none !important;
+  }
+  .press:active,
+  .btn:active {
+    transform: none !important;
+  }
 }

@@ -25,8 +25,14 @@ ${spriteIkon()}
 <div class="app">
   ${templateTopbar()}
 
-  <div class="workspace" id="workspace" data-sidebar="open">
+  <div class="workspace" id="workspace" data-sidebar="open" data-sheet="half">
     <aside class="sidepanel" id="sidePanel" aria-label="Panel navigasi rute">
+      <!-- Handle Tarik Sheet untuk Layar Sentuh / Mobile (Apple Fluid Sheet) -->
+      <div class="sidepanel__grabber" id="sheetGrabber" role="separator"
+           aria-orientation="horizontal" aria-label="Geser panel ke atas atau ke bawah" tabindex="0">
+        <span class="sidepanel__pill" aria-hidden="true"></span>
+      </div>
+
       <div class="sidepanel__body scroll-y" id="panelBody">
         ${templateSearchView()}
         ${templateProgressView()}
