@@ -25,6 +25,10 @@ const UserSchema = new mongoose.Schema(
       default: 'user',
       index: true,
     },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+    },
     healthProfile: {
       isSensitive: {
         type: Boolean,

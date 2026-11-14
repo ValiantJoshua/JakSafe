@@ -35,21 +35,27 @@ export function catalogPath() {
     : DEFAULT_PATH;
 }
 
+const ALLOWED_CATALOG_PORTS = new Set(['', '80', '443', '8080', '8443']);
+
 function isBlockedHostLiteral(host) {
   const clean = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
   if (!clean) return true;
   if (clean === 'localhost' || clean.endsWith('.local') || clean.endsWith('.internal')) return true;
   if (net.isIPv4(clean)) {
-    const [a, b] = clean.split('.').map(Number);
-    return a === 10 || a === 127 || a === 0
+    const [a, b, c] = clean.split('.').map(Number);
+    return a === 10 || a === 127 || a === 0 || a >= 224
       || (a === 169 && b === 254)
       || (a === 172 && b >= 16 && b <= 31)
       || (a === 192 && b === 168)
-      || (a === 100 && b >= 64 && b <= 127);
+      || (a === 100 && b >= 64 && b <= 127)
+      || (a === 198 && (b === 18 || b === 19))
+      || (a === 192 && b === 0 && c === 2)
+      || (a === 198 && b === 51 && c === 100)
+      || (a === 203 && b === 0 && c === 113);
   }
   if (net.isIPv6(clean)) {
     return clean === '::1' || clean === '::' || clean.startsWith('fc') || clean.startsWith('fd')
-      || clean.startsWith('fe80') || clean.startsWith('::ffff:');
+      || clean.startsWith('fe80') || clean.startsWith('ff') || clean.startsWith('::ffff:');
   }
   return false;
 }
@@ -63,6 +69,7 @@ function isSafeHttpUrl(urlStr) {
     return false;
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+  if (!ALLOWED_CATALOG_PORTS.has(parsed.port)) return false;
   return !isBlockedHostLiteral(parsed.hostname);
 }
 

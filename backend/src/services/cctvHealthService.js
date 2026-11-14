@@ -1,6 +1,6 @@
 import { cctvHealthCache } from './cacheService.js';
 import { loadCatalog } from './cctvCatalog.js';
-import { assertPublicHttpUrl, FrameError } from './cctvFrame.js';
+import { assertPublicHttpUrl, fetchPublicUrl, FrameError } from './cctvFrame.js';
 import { isMongoActive } from '../db/storageService.js';
 import { CctvStatus } from '../db/models/CctvStatus.js';
 
@@ -187,26 +187,14 @@ export async function hydrateHealthFromMongo() {
 }
 
 async function fetchProbeResponse(urlStr, { method, timeoutMs, fetchImpl }) {
-  let currentUrl = urlStr;
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    await assertPublicHttpUrl(currentUrl);
-    const res = await fetchImpl(currentUrl, {
-      method,
-      headers: { 'User-Agent': 'jaksafe-backend/dev (academic project)', Accept: 'image/*' },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-
-    if (res.status >= 300 && res.status < 400) {
-      await res.body?.cancel().catch(() => {});
-      const loc = res.headers.get('location');
-      if (!loc) throw new Error(`redirect ${res.status} without location`);
-      currentUrl = new URL(loc, currentUrl).toString();
-      continue;
-    }
-    return res;
-  }
-  throw new Error('too many redirects');
+  const { res } = await fetchPublicUrl(urlStr, {
+    method,
+    headers: { 'User-Agent': 'jaksafe-backend/dev (academic project)', Accept: 'image/*' },
+    signal: AbortSignal.timeout(timeoutMs),
+    maxRedirects: MAX_REDIRECTS,
+    fetchImpl,
+  });
+  return res;
 }
 
 function validateImageHeaders(res) {

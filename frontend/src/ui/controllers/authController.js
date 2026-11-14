@@ -12,6 +12,7 @@ import {
   masukPengguna,
   daftarPengguna,
   ambilProfilSaya,
+  keluarPengguna,
   perbaruiProfil,
   ambilSemuaRuteTersimpan,
   hapusRute,
@@ -776,6 +777,10 @@ export async function pasangPengendaliAuth() {
 
   // Tombol Keluar (Logout)
   $('#btnLogout')?.addEventListener('click', () => {
+    const oldToken = getState().token || localStorage.getItem('jaksafe_token');
+    if (oldToken) {
+      keluarPengguna(oldToken).catch(() => {});
+    }
     localStorage.removeItem('jaksafe_token');
     localStorage.removeItem('jaksafe_user');
     setState({

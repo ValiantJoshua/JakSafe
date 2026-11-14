@@ -47,6 +47,7 @@ function sanitizeUser(user) {
   const doc = typeof user.toObject === 'function' ? user.toObject() : { ...user };
   delete doc.password;
   doc.role = doc.role === 'admin' ? 'admin' : 'user';
+  doc.tokenVersion = Number(doc.tokenVersion) || 0;
   if (doc._id) {
     doc.id = String(doc._id);
   }
@@ -113,6 +114,7 @@ export async function createUser({ name, email, password, role = 'user', healthP
       email: normEmail,
       password,
       role: safeRole,
+      tokenVersion: 0,
       healthProfile: profile,
       alertPreferences: alertsPref,
     });
@@ -135,6 +137,7 @@ export async function createUser({ name, email, password, role = 'user', healthP
     email: normEmail,
     password,
     role: safeRole,
+    tokenVersion: 0,
     healthProfile: profile,
     alertPreferences: alertsPref,
     createdAt: new Date().toISOString(),
@@ -144,6 +147,32 @@ export async function createUser({ name, email, password, role = 'user', healthP
   store.users.push(newUser);
   writeLocalStore(store);
   return sanitizeUser(newUser);
+}
+
+/**
+ * Inkrementasi tokenVersion pengguna untuk mencabut seluruh sesi JWT sebelumnya (logout / kompromi).
+ * @param {string} id
+ */
+export async function incrementUserTokenVersion(id) {
+  if (!id) return null;
+
+  if (isMongoActive()) {
+    const updated = await User.findByIdAndUpdate(
+      id,
+      { $inc: { tokenVersion: 1 } },
+      { new: true }
+    ).select('-password');
+    return sanitizeUser(updated);
+  }
+
+  const store = readLocalStore();
+  const idx = store.users.findIndex((u) => u.id === id || u._id === id);
+  if (idx === -1) return null;
+
+  store.users[idx].tokenVersion = (Number(store.users[idx].tokenVersion) || 0) + 1;
+  store.users[idx].updatedAt = new Date().toISOString();
+  writeLocalStore(store);
+  return sanitizeUser(store.users[idx]);
 }
 
 /**

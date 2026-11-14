@@ -32,10 +32,21 @@ export function templateTopbar() {
   <span class="topbar__spacer"></span>
 
   <div class="topbar__tools">
-    <div class="themeswitch" role="group" aria-label="Pilih tema tampilan">
-      <button type="button" class="themeswitch__btn" data-theme-set="terang" aria-pressed="true" title="Tampilan terang">Terang</button>
-      <button type="button" class="themeswitch__btn" data-theme-set="gelap" aria-pressed="false" title="Tampilan gelap">Gelap</button>
-    </div>
+    <button type="button" class="themeswitch" id="btnThemeToggle"
+            role="switch"
+            aria-checked="false"
+            aria-label="Mode gelap"
+            title="Ubah tema tampilan (Terang / Gelap)">
+      <span class="themeswitch__track" aria-hidden="true">
+        <span class="themeswitch__thumb"></span>
+        <span class="themeswitch__slot themeswitch__slot--sun" data-theme-set="terang" title="Tema terang">
+          ${ikon('i-sun', 17)}
+        </span>
+        <span class="themeswitch__slot themeswitch__slot--moon" data-theme-set="gelap" title="Tema gelap">
+          ${ikon('i-moon', 17)}
+        </span>
+      </span>
+    </button>
 
     <button type="button" class="btn btn--primary btn--sm press" id="btnLogin">
       ${ikon('i-user', 16)} Masuk

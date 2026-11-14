@@ -310,8 +310,8 @@ function gambarJejak(hasil) {
     <li class="logitem">
       <span class="logitem__no">${i + 1}</span>
       <span class="logitem__body">
-        <span class="logitem__judul">${r.action || r.thought || 'Langkah agen'}</span>
-        <span class="logitem__teks">${formatObservasi(r.observation)}</span>
+        <span class="logitem__judul">${pelarian(r.action || r.thought || 'Langkah agen')}</span>
+        <span class="logitem__teks">${pelarian(formatObservasi(r.observation))}</span>
       </span>
       <span class="logitem__lama">${formatLama(r.durationMs || 0)}</span>
     </li>`).join('');
@@ -320,8 +320,8 @@ function gambarJejak(hasil) {
     <li class="logitem" data-gagal="${j.berhasil ? '0' : '1'}">
       <span class="logitem__no">${i + 1}</span>
       <span class="logitem__body">
-        <span class="logitem__judul">${bacaJalur(j.jalur)}</span>
-        <span class="logitem__teks">${j.berhasil ? `Berhasil, status ${j.status}` : (j.pesan || `Gagal, status ${j.status}`)}</span>
+        <span class="logitem__judul">${pelarian(bacaJalur(j.jalur))}</span>
+        <span class="logitem__teks">${j.berhasil ? `Berhasil, status ${pelarian(j.status)}` : pelarian(j.pesan || `Gagal, status ${j.status}`)}</span>
       </span>
       <span class="logitem__lama">${formatLama(j.lamaMs)}</span>
     </li>`).join('');
@@ -503,12 +503,12 @@ function gambarPilihanRute(daftarPilihan, indeksAktif = 0) {
             <span class="routeopt__eta">Tiba ${etaTeks}</span>
             <span class="routeopt__badges">
               ${opt.isBest ? '<span class="routeopt__best">TERBAIK</span>' : ''}
-              <span class="routeopt__score" data-status="${kunciStatus}">
-                Skor ${opt.score?.totalScore ?? '-'} · ${opt.score?.label || 'AMAN'}
+              <span class="routeopt__score" data-status="${pelarian(kunciStatus)}">
+                Skor ${pelarian(opt.score?.totalScore ?? '-')} · ${pelarian(opt.score?.label || 'AMAN')}
               </span>
             </span>
           </div>
-          <p class="routeopt__via">${koridor}</p>
+          <p class="routeopt__via">${pelarian(koridor)}</p>
           <div class="routeopt__meta">
             <span class="routeopt__dist">${jarakTeks}</span>
             <span class="routeopt__sep">·</span>
