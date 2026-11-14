@@ -11,7 +11,8 @@
     "test:all": "node --test --experimental-test-coverage tests/*.test.js",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "scrape:cctv": "node scripts/scrapeAndMergeCctv.mjs"
+    "scrape:cctv": "node scripts/scrapeAndMergeCctv.mjs",
+    "admin:seed": "node src/scripts/seedAdmin.mjs"
   },
   "keywords": [],
   "author": "",

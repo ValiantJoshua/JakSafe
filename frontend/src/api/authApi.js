@@ -37,9 +37,9 @@ export async function ambilProfilSaya(token) {
 }
 
 /**
- * Memperbarui profil pengguna (nama atau status sensitif kesehatan).
+ * Memperbarui profil pengguna (nama, status sensitif kesehatan, atau preferensi peringatan).
  * @param {string} token
- * @param {{ name?: string, isHealthSensitive?: boolean, conditions?: string[] }} payload
+ * @param {{ name?: string, isHealthSensitive?: boolean, conditions?: string[], alertPreferences?: object }} payload
  */
 export async function perbaruiProfil(token, payload) {
   return await minta('/auth/profile', {
@@ -80,6 +80,55 @@ export async function simpanRute(token, rutePayload) {
  */
 export async function hapusRute(token, ruteId) {
   return await minta(`/routes/saved/${encodeURIComponent(ruteId)}`, {
+    metode: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Mengambil riwayat perjalanan pengguna dari backend.
+ * @param {string} token
+ * @param {number} [limit=30]
+ */
+export async function ambilRiwayatPerjalanan(token, limit = 30) {
+  const res = await minta('/routes/history', {
+    kueri: { limit },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.history || [];
+}
+
+/**
+ * Mencatat perjalanan ke riwayat pengguna di backend.
+ * @param {string} token
+ * @param {object} riwayatPayload
+ */
+export async function catatRiwayatPerjalanan(token, riwayatPayload) {
+  return await minta('/routes/history', {
+    metode: 'POST',
+    badan: riwayatPayload,
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Menghapus satu entri riwayat perjalanan.
+ * @param {string} token
+ * @param {string} historyId
+ */
+export async function hapusRiwayat(token, historyId) {
+  return await minta(`/routes/history/${encodeURIComponent(historyId)}`, {
+    metode: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * Mengosongkan seluruh riwayat perjalanan milik pengguna saat ini.
+ * @param {string} token
+ */
+export async function kosongkanRiwayat(token) {
+  return await minta('/routes/history', {
     metode: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });

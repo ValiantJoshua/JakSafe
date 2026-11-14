@@ -9,6 +9,9 @@
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import http from 'node:http';
 import { createApp } from '../src/app.js';
 import { calculateRouteScore, getScoreCategory } from '../src/scoring/routeScorer.js';
@@ -16,10 +19,13 @@ import { findNearest, publicView } from '../src/services/cctvCatalog.js';
 import { normalizeBudget, isOverBudget } from '../src/services/tomtom.js';
 
 describe('System Tests: 12 Types of System Testing (Kit [Ki] / Braude Chapter 9)', () => {
+  const tempStoragePath = path.join(os.tmpdir(), `jaksafe-sys-test-${process.pid}-${Date.now()}.json`);
+  const prevStoragePath = process.env.JAKSAFE_LOCAL_STORAGE_PATH;
   let server;
   let baseUrl;
 
   before(async () => {
+    process.env.JAKSAFE_LOCAL_STORAGE_PATH = tempStoragePath;
     const app = createApp();
     server = http.createServer(app);
     await new Promise((resolve) => {
@@ -34,6 +40,16 @@ describe('System Tests: 12 Types of System Testing (Kit [Ki] / Braude Chapter 9)
   after(async () => {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
+    }
+    if (prevStoragePath === undefined) {
+      delete process.env.JAKSAFE_LOCAL_STORAGE_PATH;
+    } else {
+      process.env.JAKSAFE_LOCAL_STORAGE_PATH = prevStoragePath;
+    }
+    try {
+      if (fs.existsSync(tempStoragePath)) fs.unlinkSync(tempStoragePath);
+    } catch {
+      // Abaikan cleanup error di tmp
     }
   });
 
@@ -273,5 +289,91 @@ describe('System Tests: 12 Types of System Testing (Kit [Ki] / Braude Chapter 9)
     for (const res of responses) {
       assert.equal(res.status, 200, 'Semua request konkuren harus berhasil diselesaikan');
     }
+  });
+
+  // ── 13. STEP 2 API COVERAGE (Alerts + Authenticated Trip History Lifecycle) ──
+  it('13. Alerts & Trip History Endpoints: enforces auth and exposes route hazard scanning', async () => {
+    // /api/routes/history menolak akses tanpa JWT
+    const unauthRes = await fetch(`${baseUrl}/api/routes/history`);
+    assert.equal(unauthRes.status, 401);
+
+    // Daftarkan pengguna baru lalu uji POST/GET/DELETE /api/routes/history
+    const regRes = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'System History User',
+        email: `sys_hist_${Date.now()}@jaksafe.id`,
+        password: 'passwordAman123',
+      }),
+    });
+    assert.equal(regRes.status, 201);
+    const { token } = await regRes.json();
+    assert.ok(token);
+
+    const postHist = await fetch(`${baseUrl}/api/routes/history`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        origin: { name: 'Monas', lat: -6.1754, lon: 106.8272 },
+        destination: { name: 'Semanggi', lat: -6.2238, lon: 106.8142 },
+        score: { totalScore: 80, label: 'AMAN', color: '#16a34a' },
+        distanceM: 6100,
+        durationS: 810,
+        profile: 'motor',
+        summary: 'Jl. M.H. Thamrin, Jl. Jenderal Sudirman',
+        source: 'preview',
+      }),
+    });
+    assert.equal(postHist.status, 201);
+    const postHistJson = await postHist.json();
+    assert.equal(postHistJson.entry.profile, 'motor');
+
+    const getHist = await fetch(`${baseUrl}/api/routes/history`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(getHist.status, 200);
+    const getHistJson = await getHist.json();
+    assert.equal(getHistJson.count, 1);
+
+    const clearHist = await fetch(`${baseUrl}/api/routes/history`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(clearHist.status, 200);
+
+    // /api/alerts & /api/alerts/check-route
+    const alertsRes = await fetch(`${baseUrl}/api/alerts`);
+    assert.equal(alertsRes.status, 200);
+    const alertsJson = await alertsRes.json();
+    assert.equal(alertsJson.ok, true);
+    assert.ok(Array.isArray(alertsJson.alerts));
+    assert.ok(alertsJson.alerts.length >= 8);
+
+    const badCheck = await fetch(`${baseUrl}/api/alerts/check-route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ geometry: [] }),
+    });
+    assert.equal(badCheck.status, 400);
+
+    const checkRes = await fetch(`${baseUrl}/api/alerts/check-route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        geometry: [
+          [106.8235, -6.1885],
+          [106.8142, -6.2238],
+        ],
+        radiusM: 800,
+      }),
+    });
+    assert.equal(checkRes.status, 200);
+    const checkJson = await checkRes.json();
+    assert.equal(checkJson.ok, true);
+    assert.ok(checkJson.alerts.some((a) => a.id === 'semanggi-gatot-subroto'));
   });
 });

@@ -57,11 +57,13 @@ import { toCoordParam } from '../utils/geo.js';
  * berada di dalam kabin sehingga dua metrik itu kurang menggambarkan
  * paparan yang sebenarnya.
  *
- * @param {'car'|'bike'|'foot'} profil
+ * @param {'car'|'motor'|'bike'|'foot'} profil
  * @returns {string[]}
  */
 export function metrikTambahanUntuk(profil) {
-  if (profil === 'bike' || profil === 'foot') return ['uv_index', 'nitrogen_dioxide'];
+  if (profil === 'motor' || profil === 'bike' || profil === 'foot') {
+    return ['uv_index', 'nitrogen_dioxide'];
+  }
   return [];
 }
 

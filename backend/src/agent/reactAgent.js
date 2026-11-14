@@ -17,6 +17,7 @@ import { getTrafficDeclaration, getTraffic } from './tools/getTraffic.js';
 import { calculateRouteScore, DEFAULT_WEIGHTS } from '../scoring/routeScorer.js';
 import { findNearest, publicView } from '../services/cctvCatalog.js';
 import { attachHealth, sortCandidatesByHealth } from '../services/cctvHealthService.js';
+import { recordVisionHazardObservation } from '../services/hazardAlertService.js';
 import { saveExecutionLog } from '../db/mongoClient.js';
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
@@ -42,25 +43,52 @@ const SYSTEM_INSTRUCTION = [
 ].join(' ');
 
 /** Helper to summarize air quality from results */
-function summarizeAqiResults(results) {
+export function summarizeAqiResults(results) {
   if (!Array.isArray(results) || results.length === 0) return null;
   let maxPm25 = 0;
   let maxAqi = 0;
   let category = results[0]?.usAqiCategory?.label || 'Moderate';
+  let worstPmPoint = null;
+  let worstAqiPoint = null;
+  let firstValidPoint = null;
+
   for (const r of results) {
+    if (!r) continue;
+    const hasCoords = Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lon));
+    if (!firstValidPoint && hasCoords && !r.unavailable) firstValidPoint = r;
+
     const pm = Number(r.values?.pm2_5) || 0;
     const aqi = Number(r.values?.us_aqi) || 0;
-    if (pm > maxPm25) maxPm25 = Math.round(pm * 10) / 10;
+    if (pm > maxPm25) {
+      maxPm25 = Math.round(pm * 10) / 10;
+      if (hasCoords) worstPmPoint = r;
+    }
     if (aqi > maxAqi) {
       maxAqi = Math.round(aqi);
       if (r.usAqiCategory?.label) category = r.usAqiCategory.label;
+      if (hasCoords) worstAqiPoint = r;
     }
   }
+
+  const worst = worstPmPoint || worstAqiPoint || firstValidPoint || results[0];
+  const time = worst?.time || results[0]?.time || new Date().toISOString();
+  const hasWorstCoords = Number.isFinite(Number(worst?.lat)) && Number.isFinite(Number(worst?.lon));
+  const titikTerburuk = hasWorstCoords
+    ? {
+      lat: Number(worst.lat),
+      lon: Number(worst.lon),
+      time,
+      values: worst.values || null,
+      usAqiCategory: worst.usAqiCategory || null,
+    }
+    : { time };
+
   return {
     pm2_5: maxPm25,
     us_aqi: maxAqi,
     usAqiCategory: category,
-    time: results[0]?.time || new Date().toISOString(),
+    time,
+    titikTerburuk,
   };
 }
 
@@ -167,28 +195,47 @@ function buildFallbackAgentSummary({ primaryRoute, primaryScore, trafficData, ai
 /**
  * Memanggil generateContent dengan rantai fallback model otomatis apabila model utama
  * mengembalikan 503 Service Unavailable / 429 / 404.
+ * Mengembalikan hasil berikut telemetri model & perpindahan fallback.
  */
 async function generateContentWithFallback(ai, candidateModels, toolDeclarations, contents) {
   let lastErr = null;
-  for (const modelName of candidateModels) {
+  const modelsTried = [];
+  let failedAttempts = 0;
+
+  for (let i = 0; i < candidateModels.length; i++) {
+    const modelName = candidateModels[i];
+    modelsTried.push(modelName);
     try {
       const model = ai.getGenerativeModel({
         model: modelName,
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ functionDeclarations: toolDeclarations }],
       });
-      return await model.generateContent({ contents });
+      const response = await model.generateContent({ contents });
+      return {
+        response,
+        modelUsed: modelName,
+        modelsTried,
+        fallbackUsed: i > 0,
+        failedAttempts,
+      };
     } catch (err) {
       lastErr = err;
+      failedAttempts += 1;
       const msg = String(err?.message || '');
       // Jika API key ditolak (401/403), jangan ulangi ke model lain
       if (/API key|API_KEY|permission|403|401/i.test(msg)) {
+        err.modelsTried = modelsTried;
+        err.failedAttempts = failedAttempts;
         throw err;
       }
       console.warn(`[reactAgent] Model ${modelName} busy/unavailable (${msg.slice(0, 90)}), switching to fallback model...`);
     }
   }
-  throw lastErr || new Error('All Gemini models unavailable');
+  const finalErr = lastErr || new Error('All Gemini models unavailable');
+  finalErr.modelsTried = modelsTried;
+  finalErr.failedAttempts = failedAttempts;
+  throw finalErr;
 }
 
 /**
@@ -197,7 +244,7 @@ async function generateContentWithFallback(ai, candidateModels, toolDeclarations
  * @param {object} params
  * @param {{ lat: number, lon: number }} params.origin
  * @param {{ lat: number, lon: number }} params.destination
- * @param {'car'|'bike'|'foot'} [params.profile='car']
+ * @param {'car'|'motor'|'bike'|'foot'} [params.profile='car']
  * @param {{ healthSensitive?: boolean }} [params.preferences]
  * @returns {Promise<object>} Complete navigation result conforming to JakSafe frontend contract
  */
@@ -241,12 +288,25 @@ export async function runNavigationAgent({
   const candidateModels = [...new Set([preferredModel, ...FALLBACK_MODELS])];
 
   const ai = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+  const modelsTriedSet = new Set();
+  let lastModelUsed = ai ? null : 'deterministic-fallback';
+  let totalFallbackHops = 0;
+  let modelFallbackTriggered = !ai;
+  let usedSummaryFallback = false;
+
+  const profileLabels = {
+    car: 'mobil',
+    motor: 'sepeda motor (hindari jalan tol)',
+    bike: 'sepeda kayuh',
+    foot: 'pejalan kaki',
+  };
+  const profileDesc = profileLabels[profile] || profile;
 
   // Initial user prompt for the ReAct loop
   const initialPrompt = [
     `Rencanakan rute dari koordinat asal [lat: ${origin.lat}, lon: ${origin.lon}] `,
     `ke koordinat tujuan [lat: ${destination.lat}, lon: ${destination.lon}] `,
-    `dengan moda transportasi ${profile}. `,
+    `dengan moda transportasi ${profile} (${profileDesc}). `,
     preferences.healthSensitive ? 'Pengguna sangat sensitif terhadap polusi udara (prioritaskan udara bersih). ' : '',
     'Gunakan tool yang relevan untuk memeriksa rute jalan, lalu lintas terkini, kualitas udara PM2.5, dan kondisi visual CCTV di jalan.',
   ].join('');
@@ -257,7 +317,13 @@ export async function runNavigationAgent({
     if (ai) {
       for (let step = 0; step < MAX_STEPS; step++) {
         const stepStart = Date.now();
-        const response = await generateContentWithFallback(ai, candidateModels, toolDeclarations, contents);
+        const attempt = await generateContentWithFallback(ai, candidateModels, toolDeclarations, contents);
+        const response = attempt.response;
+        for (const m of attempt.modelsTried) modelsTriedSet.add(m);
+        lastModelUsed = attempt.modelUsed;
+        totalFallbackHops += attempt.failedAttempts;
+        if (attempt.fallbackUsed) modelFallbackTriggered = true;
+
         const candidate = response.response?.candidates?.[0];
         if (!candidate) break;
 
@@ -349,6 +415,14 @@ export async function runNavigationAgent({
               if (toolResult.ok && visualResult) {
                 visualResult.analysis = toolResult.analysis;
                 visualResult.analisis = toolResult.analysis;
+                recordVisionHazardObservation({
+                  cameraId,
+                  cameraName: lastCctvSnapshot?.camera?.name || context,
+                  lat: lastCctvSnapshot?.camera?.lat,
+                  lon: lastCctvSnapshot?.camera?.lon,
+                  analysis: toolResult.analysis,
+                  observedAt: visualResult.fetchedAt,
+                });
               }
             } else {
               toolResult = { ok: false, error: 'no image base64 provided or available' };
@@ -385,6 +459,12 @@ export async function runNavigationAgent({
     }
   } catch (err) {
     console.warn('[reactAgent] ReAct reasoning loop fallback triggered:', err.message);
+    modelFallbackTriggered = true;
+    if (Array.isArray(err?.modelsTried)) {
+      for (const m of err.modelsTried) modelsTriedSet.add(m);
+    }
+    totalFallbackHops += Number(err?.failedAttempts || 1);
+    if (!lastModelUsed) lastModelUsed = 'deterministic-fallback';
     reasoning.push({
       step: stepIndex++,
       thought: 'Melanjutkan evaluasi multi-sensor secara deterministik karena antrean padat pada server model.',
@@ -393,6 +473,18 @@ export async function runNavigationAgent({
       durationMs: 0,
     });
   }
+
+  const buildTelemetry = () => ({
+    preferredModel,
+    modelUsed: lastModelUsed || 'deterministic-fallback',
+    fallbackOccurred: Boolean(modelFallbackTriggered || totalFallbackHops > 0),
+    fallbackCount: totalFallbackHops,
+    modelsTried: Array.from(modelsTriedSet),
+    aiMode: !ai
+      ? 'no-api-key'
+      : (lastModelUsed === 'deterministic-fallback' ? 'deterministic-fallback' : 'gemini-react'),
+    usedSummaryFallback,
+  });
 
   // Ensure primary route exists (Deterministic fallback if agent did not fetch it)
   if (!primaryRoute) {
@@ -408,7 +500,21 @@ export async function runNavigationAgent({
         durationMs: 0,
       });
     } else {
-      throw new Error(routeRes.error || 'Gagal menghitung rute navigasi');
+      const errMsg = routeRes.error || 'Gagal menghitung rute navigasi';
+      saveExecutionLog({
+        requestId,
+        timestamp: new Date(),
+        origin,
+        destination,
+        profile,
+        preferences,
+        reasoning,
+        modelTelemetry: buildTelemetry(),
+        totalDurationMs: Date.now() - startTime,
+        status: 'failed',
+        error: errMsg,
+      }).catch((e) => console.warn('[mongo] Background failed-log error:', e.message));
+      throw new Error(errMsg);
     }
   }
 
@@ -446,6 +552,14 @@ export async function runNavigationAgent({
     if (visionRes.ok) {
       visualResult.analysis = visionRes.analysis;
       visualResult.analisis = visionRes.analysis;
+      recordVisionHazardObservation({
+        cameraId: lastCctvSnapshot.camera?.id,
+        cameraName: lastCctvSnapshot.camera?.name,
+        lat: lastCctvSnapshot.camera?.lat,
+        lon: lastCctvSnapshot.camera?.lon,
+        analysis: visionRes.analysis,
+        observedAt: visualResult.fetchedAt,
+      });
     }
   } else if (!visualResult) {
     const bottleneckPt = trafficData?.worstSegment?.delayPercent > 0
@@ -462,10 +576,21 @@ export async function runNavigationAgent({
         context: cctvRes.camera?.name,
       });
       const cam = cctvRes.camera || {};
+      const observedAt = cam.fetchedAt || new Date().toISOString();
+      if (visionRes.ok) {
+        recordVisionHazardObservation({
+          cameraId: cam.id,
+          cameraName: cam.name,
+          lat: cam.lat,
+          lon: cam.lon,
+          analysis: visionRes.analysis,
+          observedAt,
+        });
+      }
       visualResult = {
         cameraId: cam.id,
         cameraName: cam.name,
-        fetchedAt: cam.fetchedAt || new Date().toISOString(),
+        fetchedAt: observedAt,
         analysis: visionRes.ok ? visionRes.analysis : null,
         kamera: {
           id: cam.id,
@@ -560,6 +685,7 @@ export async function runNavigationAgent({
         distanceM: alt.distanceM,
         durationS: alt.durationS,
         summary: alt.summary || `Jalur Alternatif ${idx + 2}`,
+        usesToll: Boolean(alt.usesToll),
         geometry: alt.geometry,
         steps: Array.isArray(alt.steps) ? alt.steps : [],
         totalScore: altScore.totalScore,
@@ -569,7 +695,7 @@ export async function runNavigationAgent({
         air: altAir
           ? {
             ...altAir,
-            titikTerburuk: { time: altAir.time },
+            titikTerburuk: altAir.titikTerburuk || { time: altAir.time },
           }
           : null,
         visual: altVisual,
@@ -578,6 +704,7 @@ export async function runNavigationAgent({
   );
 
   if (!agentFinalThought || !agentFinalThought.trim()) {
+    usedSummaryFallback = true;
     agentFinalThought = buildFallbackAgentSummary({
       primaryRoute,
       primaryScore,
@@ -589,13 +716,16 @@ export async function runNavigationAgent({
   }
 
   const totalDurationMs = Date.now() - startTime;
+  const modelTelemetry = buildTelemetry();
 
   const resultPayload = {
     ok: true,
+    profile,
     route: {
       distanceM: primaryRoute.distanceM,
       durationS: primaryRoute.durationS,
       summary: primaryRoute.summary || 'Jalur Utama',
+      usesToll: Boolean(primaryRoute.usesToll),
       geometry: primaryRoute.geometry,
       steps: Array.isArray(primaryRoute.steps) ? primaryRoute.steps : [],
     },
@@ -603,7 +733,7 @@ export async function runNavigationAgent({
     air: airSummary
       ? {
         ...airSummary,
-        titikTerburuk: { time: airSummary.time },
+        titikTerburuk: airSummary.titikTerburuk || { time: airSummary.time },
       }
       : null,
     visual: visualResult,
@@ -612,17 +742,32 @@ export async function runNavigationAgent({
     alternatives,
   };
 
-  // Asynchronously log to MongoDB
+  // Asynchronously log to MongoDB / fallback local store
+  const routeSteps = Array.isArray(primaryRoute.steps) ? primaryRoute.steps : [];
+  const firstStepName = routeSteps.find((s) => s?.name && String(s.name).trim())?.name || null;
+  const lastStepName = [...routeSteps].reverse().find((s) => s?.name && String(s.name).trim())?.name || null;
+  const loggedOrigin = {
+    lat: origin.lat,
+    lon: origin.lon,
+    label: origin.label || origin.name || origin.nama || firstStepName || null,
+  };
+  const loggedDestination = {
+    lat: destination.lat,
+    lon: destination.lon,
+    label: destination.label || destination.name || destination.nama || lastStepName || null,
+  };
+
   saveExecutionLog({
     requestId,
     timestamp: new Date(),
-    origin,
-    destination,
+    origin: loggedOrigin,
+    destination: loggedDestination,
     profile,
     preferences,
     reasoning,
     route: resultPayload.route,
     score: primaryScore,
+    modelTelemetry,
     air: airSummary,
     visual: visualResult,
     traffic: trafficData,

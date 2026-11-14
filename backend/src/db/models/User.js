@@ -19,6 +19,12 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+      index: true,
+    },
     healthProfile: {
       isSensitive: {
         type: Boolean,
@@ -27,6 +33,21 @@ const UserSchema = new mongoose.Schema(
       conditions: {
         type: [String],
         default: [],
+      },
+    },
+    alertPreferences: {
+      enabled: {
+        type: Boolean,
+        default: true,
+      },
+      regions: {
+        type: [String],
+        default: [],
+      },
+      minSeverity: {
+        type: String,
+        enum: ['pantau', 'waspada', 'siaga'],
+        default: 'waspada',
       },
     },
   },

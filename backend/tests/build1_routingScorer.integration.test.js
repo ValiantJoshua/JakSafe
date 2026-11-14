@@ -8,7 +8,14 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCoords, extractRouteSteps, RouteError } from '../src/services/osrm.js';
+import {
+  parseCoords,
+  extractRouteSteps,
+  routeUsesToll,
+  adjustDurationForProfile,
+  prioritizeRoutesForProfile,
+  RouteError,
+} from '../src/services/osrm.js';
 import { calculateRouteScore, getScoreCategory } from '../src/scoring/routeScorer.js';
 
 describe('Build 1 Integration: OSRM Routing & RouteScorer Subassembly', () => {
@@ -228,6 +235,46 @@ describe('Build 1 Integration: OSRM Routing & RouteScorer Subassembly', () => {
       assert.match(steps[3].instruction, /jalan keluar ke-2/);
       assert.equal(steps[4].directionKey, 'arrive');
       assert.match(steps[4].instruction, /Tiba di tujuan/);
+    });
+
+    it('detects toll roads, adjusts motor ETA, and prioritizes non-toll arterial routes for motor profile', () => {
+      const tollRoute = {
+        distance: 8400,
+        duration: 720,
+        legs: [{
+          summary: 'Jalan Tol Dalam Kota',
+          steps: [
+            { name: 'Jalan Tol Cawang–Grogol', distance: 6000, duration: 480, intersections: [{ classes: ['toll', 'motorway'] }] },
+          ],
+        }],
+      };
+      const arterialRoute = {
+        distance: 9100,
+        duration: 1000,
+        legs: [{
+          summary: 'Jl. Gatot Subroto, Jl. M.H. Thamrin',
+          steps: [
+            { name: 'Jl. Gatot Subroto', distance: 5000, duration: 540 },
+            { name: 'Jl. M.H. Thamrin', distance: 4100, duration: 460 },
+          ],
+        }],
+      };
+
+      assert.equal(routeUsesToll(tollRoute), true);
+      assert.equal(routeUsesToll(arterialRoute), false);
+
+      // Mobil mempertahankan urutan asli; Motor menempatkan rute non-tol lebih dahulu
+      const carOrder = prioritizeRoutesForProfile([tollRoute, arterialRoute], 'car');
+      assert.equal(carOrder[0], tollRoute);
+
+      const motorOrder = prioritizeRoutesForProfile([tollRoute, arterialRoute], 'motor');
+      assert.equal(motorOrder[0], arterialRoute);
+      assert.equal(motorOrder[1], tollRoute);
+
+      // Penyesuaian waktu tempuh motor lebih gesit ~15% dibandingkan estimasi dasar mobil
+      assert.equal(adjustDurationForProfile(1000, 'car'), 1000);
+      assert.equal(adjustDurationForProfile(1000, 'bike'), 1000);
+      assert.equal(adjustDurationForProfile(1000, 'motor'), 850);
     });
   });
 });

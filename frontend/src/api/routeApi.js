@@ -36,7 +36,7 @@ import { toCoordParam } from '../utils/geo.js';
  * @param {object} opsi
  * @param {{lat:number, lon:number}} opsi.asal
  * @param {{lat:number, lon:number}} opsi.tujuan
- * @param {'car'|'bike'|'foot'} [opsi.profil='car']
+ * @param {'car'|'motor'|'bike'|'foot'} [opsi.profil='car']
  * @param {boolean} [opsi.alternatif=true]  minta rute pilihan lain supaya
  *        penilaian berbagai kriteria punya pembanding
  * @param {AbortSignal} [opsi.signal]

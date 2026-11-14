@@ -193,9 +193,88 @@
   border-color: var(--jk-blue-1);
   box-shadow: 0 0 0 3px rgba(2, 132, 255, 0.14);
 }
+.inputwrap__input[aria-invalid="true"] {
+  border-color: var(--st-hindari);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+}
+.inputwrap__pass {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.inputwrap__input--pass { padding-right: 42px; }
+.inputwrap__toggle {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-xs);
+  color: var(--text-3);
+  transition: color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.inputwrap__toggle:hover { color: var(--text-1); background: var(--surface-3); }
+.inputwrap__toggle:focus-visible { outline: 2px solid var(--jk-blue-1); outline-offset: 1px; }
+.inputwrap__hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-3);
+}
 
-/* CHIP MODA PERJALANAN (Radius 8px, aktif Deep Navy) */
-.chiprow { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: var(--s4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.auth-tab {
+  height: 34px;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-2);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+}
+.auth-tab:hover { color: var(--text-1); }
+.auth-tab[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--text-1);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(10, 46, 107, 0.08);
+}
+.auth-alert {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-bottom: var(--s4);
+  border-radius: var(--r-sm);
+  background: var(--st-hindari-bg);
+  border: 1px solid var(--st-hindari);
+  color: var(--st-hindari);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.4;
+}
+.auth-alert[hidden] { display: none; }
+.auth-alert__action {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--st-hindari);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* CHIP MODA PERJALANAN (Kisi 2x2 seimbang untuk Mobil, Motor, Sepeda, Jalan Kaki) */
+.chiprow { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s2); }
 .chip {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: var(--control-h-sm); padding: 0 10px;
@@ -302,12 +381,12 @@
   background: var(--surface);
   border-color: var(--border-strong);
 }
-.saveditem__dot {
-  width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%;
-  background: var(--st-aman);
+.saveditem__ico {
+  width: 28px; height: 28px; flex: 0 0 28px; border-radius: var(--r-xs);
+  display: grid; place-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-2);
 }
-.saveditem[data-status="hati"] .saveditem__dot { background: var(--st-hati); }
-.saveditem[data-status="hindari"] .saveditem__dot { background: var(--st-hindari); }
 
 .saveditem__name { font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); }
 .saveditem__sub  { font-size: var(--fs-xs); color: var(--text-3); font-weight: 400; }
@@ -424,7 +503,7 @@
 .usermenu {
   position: fixed; z-index: var(--z-modal);
   top: 64px; right: var(--s5);
-  width: 264px; padding: var(--s2);
+  width: min(296px, calc(100vw - 24px)); padding: var(--s2);
   border-radius: var(--r-lg);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -451,12 +530,36 @@
   width: 100%; padding: 8px 12px; border-radius: var(--r-sm);
   font-size: var(--fs-sm); font-weight: 500; color: var(--text-2);
   text-align: left;
+  text-decoration: none;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
+.usermenu__item > svg { flex: 0 0 auto; }
+.usermenu__text { flex: 1; min-width: 0; white-space: nowrap; }
 .usermenu__item:hover:not(:disabled) { background: var(--surface-2); color: var(--text-1); }
 .usermenu__item:disabled { opacity: 0.5; cursor: not-allowed; }
+.usermenu__switchrow { align-items: center; padding-top: 9px; padding-bottom: 9px; }
+.usermenu__labelwrap { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.usermenu__label { display: block; color: var(--text-1); font-weight: 500; line-height: 1.25; }
+.usermenu__sub { display: block; font-size: 11px; color: var(--text-3); font-weight: 400; line-height: 1.25; }
+.jswitch {
+  position: relative;
+  width: 36px; height: 20px; flex: 0 0 36px;
+  border-radius: 10px;
+  background: var(--border-strong);
+  transition: background var(--dur-1) var(--ease);
+}
+.jswitch__thumb {
+  position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: var(--sh-1);
+  transition: transform var(--dur-1) var(--ease);
+}
+.usermenu__switchrow[aria-checked="true"] .jswitch { background: var(--st-aman); }
+.usermenu__switchrow[aria-checked="true"] .jswitch__thumb { transform: translateX(16px); }
 .usermenu__n {
-  margin-left: auto; padding: 1px 6px; border-radius: 4px;
+  margin-left: auto; padding: 2px 7px; border-radius: var(--r-xs);
+  flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums;
   background: var(--surface-2); color: var(--text-3); font-family: var(--font-mono); font-size: 11px; font-weight: 500;
 }
 .usermenu__item--out:hover { background: var(--st-hindari-bg); color: var(--st-hindari); }
@@ -475,3 +578,328 @@
   transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
 }
 .toast.is-on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* DIALOG NATIVE AKUN: RIWAYAT & PERINGATAN AREA RAWAN
+   MANDATORY (both rules): tanpa overscroll-behavior: contain & overflow: hidden
+   di backdrop, scroll di dalam/atas backdrop bisa membocorkan scroll ke belakang */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: rgba(11, 21, 38, 0.54);
+  backdrop-filter: blur(4px);
+}
+
+.jmodal {
+  margin: auto;
+  width: min(520px, calc(100vw - 24px));
+  max-height: min(82vh, 680px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text-1);
+  box-shadow: var(--sh-3);
+  overflow: hidden;
+}
+.jmodal--wide { width: min(620px, calc(100vw - 24px)); }
+.jmodal[open] {
+  display: flex;
+  flex-direction: column;
+}
+.jmodal__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.jmodal__icon {
+  width: 34px; height: 34px; flex: 0 0 34px;
+  border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  background: var(--surface-2);
+  color: var(--jk-navy);
+}
+[data-theme="gelap"] .jmodal__icon { color: var(--jk-lime); }
+.jmodal__icon--warn { background: var(--st-hati-bg); color: var(--st-hati); }
+.jmodal__titles { min-width: 0; flex: 1; }
+.jmodal__title { font-size: var(--fs-md); font-weight: 600; color: var(--text-1); }
+.jmodal__sub { font-size: var(--fs-xs); color: var(--text-3); margin-top: 2px; line-height: var(--lh-snug); }
+.jmodal__close {
+  width: 32px; height: 32px; flex: 0 0 32px;
+  border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+.jmodal__close:hover { color: var(--text-1); background: var(--border); }
+.jmodal__close:focus-visible,
+.jmodal__action:focus-visible,
+.aseg__btn:focus-visible,
+.alertsbar__refresh:focus-visible,
+.apref__sev select:focus-visible,
+.arow__mapbtn:focus-visible,
+.jitem__btn:focus-visible,
+.hazardbanner__all:focus-visible,
+.hazardbanner__btn:focus-visible {
+  outline: 2px solid var(--jk-blue-1);
+  outline-offset: 2px;
+}
+
+/* Strip kontrol terpadu untuk Peringatan Area Rawan (ringkas tanpa tumpukan border) */
+.alertsbar {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s3) var(--s5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.alertsbar__top {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  flex-wrap: wrap;
+}
+.aseg {
+  display: inline-flex; flex-wrap: wrap; gap: 4px;
+  padding: 3px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.aseg__btn {
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--text-2);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.aseg__btn:hover { color: var(--text-1); }
+.aseg__btn[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text-1);
+  font-weight: 600;
+  box-shadow: var(--sh-1);
+}
+.alertsbar__refresh {
+  padding: 5px 10px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.alertsbar__refresh:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--text-1); }
+.alertsbar__sub {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  flex-wrap: wrap;
+}
+.alertsbar__meta {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.alertsbar__pref {
+  display: flex; align-items: center; gap: var(--s3);
+  font-size: var(--fs-xs); color: var(--text-2);
+}
+.apref__chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.apref__sev { display: inline-flex; align-items: center; gap: 6px; }
+.apref__label { color: var(--text-3); }
+.apref__sev select {
+  padding: 4px 8px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+}
+.apref__sev select:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.jmodal__toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  padding: 8px var(--s5);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+.jmodal__action {
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.jmodal__action:hover { border-color: var(--border-strong); }
+.jmodal__body { padding: var(--s3) var(--s5) var(--s5); flex: 1; min-height: 0; }
+.jmodal__body--list { padding: 0 var(--s5) var(--s4); }
+.jlist { display: grid; gap: var(--s2); }
+.jempty {
+  padding: var(--s6) var(--s4);
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+
+/* Daftar koridor Peringatan Area Rawan (tanpa kartu kotak-di-dalam-kotak atau strip tebal) */
+.alist { display: grid; }
+.arow {
+  display: grid;
+  gap: var(--s1);
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.arow:last-child { border-bottom: none; }
+.arow__head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+}
+.arow__titlegroup {
+  display: flex; align-items: center; gap: var(--s2); min-width: 0; flex: 1;
+}
+.astat {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex: 0 0 auto;
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text-3);
+}
+.astat__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-3);
+}
+.astat[data-sev="siaga"] { color: var(--st-hindari); }
+.astat[data-sev="siaga"] .astat__dot { background: var(--st-hindari); }
+.astat[data-sev="waspada"] { color: var(--st-hati); }
+.astat[data-sev="waspada"] .astat__dot { background: var(--st-hati); }
+.astat[data-sev="pantau"] .astat__dot { background: var(--st-aman); }
+.arow__title {
+  font-size: var(--fs-sm); font-weight: 600; color: var(--text-1);
+  line-height: var(--lh-snug);
+}
+.arow__rain {
+  flex: 0 0 auto;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs); font-weight: 500; color: var(--text-2);
+}
+.arow__meta { font-size: var(--fs-xs); color: var(--text-3); line-height: var(--lh-snug); }
+.arow__desc { font-size: var(--fs-xs); color: var(--text-2); line-height: var(--lh-base); margin-top: 2px; }
+.arow__mit { font-size: var(--fs-xs); color: var(--text-3); line-height: var(--lh-snug); }
+.arow__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  margin-top: var(--s1);
+}
+.arow__source { font-size: 11px; color: var(--text-3); }
+.arow__mapbtn {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.arow__mapbtn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+
+.jitem {
+  display: grid;
+  gap: 6px;
+  padding: 12px var(--s4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.jitem[data-sev="siaga"] { border-left: 4px solid var(--st-hindari); }
+.jitem[data-sev="waspada"] { border-left: 4px solid var(--st-hati); }
+.jitem[data-sev="pantau"] { border-left: 4px solid var(--st-aman); }
+.jitem__top {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s2);
+}
+.jitem__title { font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); line-height: var(--lh-snug); }
+.jitem__meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); color: var(--text-3);
+}
+.jitem__desc { font-size: var(--fs-xs); color: var(--text-2); line-height: var(--lh-snug); }
+.jitem__mit { font-size: var(--fs-xs); color: var(--text-3); line-height: var(--lh-snug); }
+.jitem__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  margin-top: 2px;
+}
+.jitem__tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.jitem__tag {
+  padding: 1px 6px; border-radius: 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  font-size: 11px; color: var(--text-2);
+}
+.jitem__btns { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.jitem__btn {
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.jitem__btn--primary {
+  background: var(--jk-navy); border-color: var(--jk-navy); color: #FFFFFF;
+}
+[data-theme="gelap"] .jitem__btn--primary {
+  background: var(--jk-blue-1); border-color: var(--jk-blue-1);
+}
+.jitem__btn--del:hover { background: var(--st-hindari-bg); color: var(--st-hindari); border-color: transparent; }
+
+/* BANNER PERINGATAN AREA RAWAN DI HASIL RUTE */
+.hazardbanner {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  margin-bottom: var(--s3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--st-hati);
+  background: var(--st-hati-bg);
+}
+.hazardbanner[data-sev="siaga"] {
+  border-color: var(--st-hindari);
+  background: var(--st-hindari-bg);
+}
+.hazardbanner__head {
+  display: flex; align-items: center; gap: var(--s2);
+}
+.hazardbanner__icon { color: var(--st-hati); display: grid; place-items: center; }
+.hazardbanner[data-sev="siaga"] .hazardbanner__icon { color: var(--st-hindari); }
+.hazardbanner__title {
+  font-size: var(--fs-sm); font-weight: 700; color: var(--text-1); flex: 1;
+}
+.hazardbanner__all {
+  font-size: var(--fs-xs); font-weight: 600; color: var(--jk-blue-1);
+  padding: 2px 6px; border-radius: var(--r-xs);
+}
+.hazardbanner__list { display: grid; gap: 6px; }
+.hazardbanner__item {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: var(--fs-xs);
+}
+[data-theme="gelap"] .hazardbanner__item { background: rgba(15, 23, 42, 0.55); }
+.hazardbanner__text { min-width: 0; color: var(--text-2); line-height: var(--lh-snug); }
+.hazardbanner__text strong { color: var(--text-1); }
+.hazardbanner__btn {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-1);
+  font-size: 11px;
+  font-weight: 600;
+}

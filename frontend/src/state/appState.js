@@ -28,11 +28,12 @@
  * @property {boolean} sensitifKesehatan     profil kesehatan dinyalakan
  * @property {string} idAsal                 id tempat pada jakartaPlaces
  * @property {string} idTujuan
- * @property {'car'|'bike'|'foot'} profil
+ * @property {'car'|'motor'|'bike'|'foot'} profil
  * @property {string|null} tahapAktif        id tahap yang sedang berjalan
  * @property {object|null} hasil             HasilNavigasi terakhir
  * @property {string|null} pesanGalat
  * @property {object[]} ruteTersimpan
+ * @property {object[]} riwayatPerjalanan
  */
 
 let savedUser = null;
@@ -58,6 +59,7 @@ const keadaan = {
   hasil: null,
   pesanGalat: null,
   ruteTersimpan: [],
+  riwayatPerjalanan: [],
 };
 
 /** @type {Set<(keadaan:Keadaan, kunciBerubah:string[])=>void>} */

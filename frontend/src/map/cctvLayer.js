@@ -14,7 +14,7 @@
 
 import * as Cesium from 'cesium';
 import Hls from 'hls.js';
-import { ambilSemuaKamera, urlBingkaiKamera, urlStreamKamera, analisisKamera } from '../api/cctvApi.js';
+import { ambilSemuaKamera, cekKesehatanCctv, urlBingkaiKamera, urlStreamKamera, analisisKamera } from '../api/cctvApi.js';
 import { getViewer, flyToCoordinates } from './cesiumViewer.js';
 import { labelKondisiJalan, labelGenangan } from '../utils/format.js';
 import { ikon } from '../ui/icons.js';
@@ -40,6 +40,10 @@ let activeHls = null;
 let activeSnapTimer = null;
 /** @type {number|null} */
 let activeSnapRetryTimer = null;
+/** @type {number|null} */
+let initialSweepSyncTimer = null;
+/** @type {string|null} */
+let lastSyncedSweepAt = null;
 /** @type {boolean} */
 let autoRefreshEnabled = true;
 /** @type {'video'|'snapshot'} */
@@ -867,6 +871,60 @@ export function highlightRouteCamera(cameraId, routeGeometry = null) {
 }
 
 /**
+ * Memperbarui daftar kamera aktif di memori layer beserta koordinat Cartesian3
+ * tanpa mengganggu popup atau stream yang sedang dibuka pengguna.
+ *
+ * @param {import('../api/cctvApi.js').Kamera[]} kameraBaru
+ */
+function terapkanDaftarKamera(kameraBaru) {
+  daftarKamera = Array.isArray(kameraBaru) ? kameraBaru : [];
+  // Precompute Cartesian3 untuk optimasi hit-testing dan rendering instan
+  for (let i = 0; i < daftarKamera.length; i++) {
+    const c = daftarKamera[i];
+    if (Number.isFinite(c.lat) && Number.isFinite(c.lon)) {
+      c._cartesian = Cesium.Cartesian3.fromDegrees(c.lon, c.lat, 0);
+    }
+  }
+  renderEntitasKamera();
+  notifyListeners();
+}
+
+/**
+ * Menyinkronkan ulang status online/offline kamera apabila backend masih
+ * menjalankan initial health sweep saat halaman pertama kali dibuka.
+ */
+function jadwalkanSinkronKesehatanAwal(attempt = 0) {
+  if (initialSweepSyncTimer) {
+    clearTimeout(initialSweepSyncTimer);
+    initialSweepSyncTimer = null;
+  }
+  if (attempt >= 8) return;
+
+  initialSweepSyncTimer = window.setTimeout(async () => {
+    initialSweepSyncTimer = null;
+    try {
+      const health = await cekKesehatanCctv();
+      const currentUnknown = daftarKamera.reduce((acc, c) => acc + (c.status === 'unknown' ? 1 : 0), 0);
+
+      if (health.sweepInProgress) {
+        jadwalkanSinkronKesehatanAwal(attempt + 1);
+        return;
+      }
+
+      const sweepBaru = health.lastSweep && health.lastSweep !== lastSyncedSweepAt;
+      const statusBerubah = health.unknown !== currentUnknown;
+      if (sweepBaru || statusBerubah) {
+        lastSyncedSweepAt = health.lastSweep || lastSyncedSweepAt;
+        const terbaru = await ambilSemuaKamera();
+        terapkanDaftarKamera(terbaru);
+      }
+    } catch {
+      // Abaikan gangguan sementara saat polling status awal
+    }
+  }, attempt === 0 ? 3500 : 5000);
+}
+
+/**
  * Menginisialisasi layer CCTV dan memuat katalog kamera dari backend.
  */
 export async function initCctvLayer() {
@@ -882,16 +940,13 @@ export async function initCctvLayer() {
   }
 
   try {
-    daftarKamera = await ambilSemuaKamera();
-    // Precompute Cartesian3 untuk optimasi hit-testing dan rendering instan
-    for (let i = 0; i < daftarKamera.length; i++) {
-      const c = daftarKamera[i];
-      if (Number.isFinite(c.lat) && Number.isFinite(c.lon)) {
-        c._cartesian = Cesium.Cartesian3.fromDegrees(c.lon, c.lat, 0);
-      }
+    const kameraAwal = await ambilSemuaKamera();
+    terapkanDaftarKamera(kameraAwal);
+
+    const hasUnknown = daftarKamera.some((c) => c.status === 'unknown');
+    if (hasUnknown) {
+      jadwalkanSinkronKesehatanAwal(0);
     }
-    renderEntitasKamera();
-    notifyListeners();
   } catch (err) {
     console.warn('[JakSafe CCTV Layer] Gagal memuat daftar kamera:', err?.message || err);
   }

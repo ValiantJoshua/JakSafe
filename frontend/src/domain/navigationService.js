@@ -94,7 +94,7 @@ export function bobotUntuk(sensitifKesehatan) {
  * @param {object} opsi
  * @param {{lat:number, lon:number, nama?:string}} opsi.asal
  * @param {{lat:number, lon:number, nama?:string}} opsi.tujuan
- * @param {'car'|'bike'|'foot'} opsi.profil
+ * @param {'car'|'motor'|'bike'|'foot'} opsi.profil
  * @param {boolean} [opsi.sensitifKesehatan=false]
  * @param {AbortSignal} [opsi.signal]
  * @param {(idTahap:string)=>void} [opsi.saatTahap] dipanggil tiap tahap dimulai
@@ -242,6 +242,7 @@ async function rangkaiPratinjau({
       distanceM: r.distanceM,
       durationS: r.durationS,
       summary: r.summary || `Jalur Alternatif ${idx + 2}`,
+      usesToll: Boolean(r.usesToll),
       geometry: r.geometry,
       steps: Array.isArray(r.steps) ? r.steps : [],
       totalScore: s.totalScore,

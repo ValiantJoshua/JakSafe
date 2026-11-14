@@ -117,7 +117,193 @@
       },
       "createdAt": "2026-11-13T18:03:24.907Z",
       "updatedAt": "2026-11-13T18:03:25.158Z"
+    },
+    {
+      "id": "1e383301-713f-4d62-83c9-fc2aba70c0a7",
+      "_id": "97cb4c4b-5e8d-4509-8a3c-0839fdf800bc",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794605614589@jaksafe.id",
+      "password": "$2b$10$iDkRodEeyNFfQGAThXchIeu6moz/4gJnPpMOf5FSgfysLTojFFk3m",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "createdAt": "2026-11-13T21:33:34.864Z",
+      "updatedAt": "2026-11-13T21:33:35.329Z"
+    },
+    {
+      "id": "d7d33607-86df-4888-b6cf-118888f907e0",
+      "_id": "4aa1c533-a1d5-4de0-9a45-cce2fa4666b5",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794638941959@jaksafe.id",
+      "password": "$2b$10$Km2YnIdLb/GuqCdkERLMmeWmrmieHAFshdVBNFgliIxd4.w1Y3yrq",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "createdAt": "2026-11-14T06:49:02.278Z",
+      "updatedAt": "2026-11-14T06:49:02.733Z"
+    },
+    {
+      "id": "0ba2c0e9-b7a3-4618-ae37-7f9f5bd68e3a",
+      "_id": "92dd5086-5df5-4baa-a341-30266214ac9d",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794642413050@jaksafe.id",
+      "password": "$2b$10$kAVPm1QS.eZGtZSKxbyvkuROgH3M.vNTZFG1SdK.w8FRKNDY3VNFm",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "alertPreferences": {
+        "enabled": true,
+        "regions": [
+          "Jakarta Selatan",
+          "Jakarta Barat"
+        ],
+        "minSeverity": "siaga"
+      },
+      "createdAt": "2026-11-14T07:46:53.373Z",
+      "updatedAt": "2026-11-14T07:46:53.955Z"
+    },
+    {
+      "id": "1d635571-3ac1-48d7-9858-2a01bfd47ece",
+      "_id": "ad016e0b-6eca-487b-8209-ca36e5a6c9be",
+      "name": "System History User",
+      "email": "sys_hist_1794642414858@jaksafe.id",
+      "password": "$2b$10$8H2rYWz1LwWdnD4JWUhCv.rBu/IXQnfQNoQhzAhjthVOsWsdl0z.i",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": []
+      },
+      "alertPreferences": {
+        "enabled": true,
+        "regions": [],
+        "minSeverity": "waspada"
+      },
+      "createdAt": "2026-11-14T07:46:55.061Z",
+      "updatedAt": "2026-11-14T07:46:55.061Z"
+    },
+    {
+      "id": "acd752f7-4585-4634-8ea2-561218bc9c48",
+      "_id": "2d18bae6-9078-4422-b713-8faf35d3a433",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794642880353@jaksafe.id",
+      "password": "$2b$10$mI5RUa7g505lvI3wnTSiie/kw/C3WeomIA1jukRLUtIF14G/MXpcm",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "alertPreferences": {
+        "enabled": true,
+        "regions": [
+          "Jakarta Selatan",
+          "Jakarta Barat"
+        ],
+        "minSeverity": "siaga"
+      },
+      "createdAt": "2026-11-14T07:54:40.626Z",
+      "updatedAt": "2026-11-14T07:54:41.139Z"
+    },
+    {
+      "id": "1ba2809f-2820-4f8e-a650-d42bb8162015",
+      "_id": "30e3d00f-a66e-4fe4-8ebe-c09aa58e808b",
+      "name": "System History User",
+      "email": "sys_hist_1794642882080@jaksafe.id",
+      "password": "$2b$10$9PuZq0pIY5pt//duF/F1HO7I.Ur8eo3d7rKAOR2/3MigqyIu6RA4G",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": []
+      },
+      "alertPreferences": {
+        "enabled": true,
+        "regions": [],
+        "minSeverity": "waspada"
+      },
+      "createdAt": "2026-11-14T07:54:42.289Z",
+      "updatedAt": "2026-11-14T07:54:42.289Z"
+    },
+    {
+      "id": "c767d45c-133c-4d85-a711-e6d8b4549bc9",
+      "_id": "428c95a4-3b24-4330-8979-5930477b72a4",
+      "name": "Budi Santoso S.T.",
+      "email": "tester_1794646577903@jaksafe.id",
+      "password": "$2b$10$.03xx51l.AFiyMHMimrRYOZZ4CSRho1JcuZ1LwtxtvnvbsPYdVqEW",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": [
+          "asma"
+        ]
+      },
+      "alertPreferences": {
+        "enabled": true,
+        "regions": [
+          "Jakarta Selatan",
+          "Jakarta Barat"
+        ],
+        "minSeverity": "siaga"
+      },
+      "createdAt": "2026-11-14T08:56:18.202Z",
+      "updatedAt": "2026-11-14T08:56:18.755Z"
+    },
+    {
+      "id": "196cedd4-1659-4a3e-9fbc-8eea0ab9f49f",
+      "_id": "f033436a-16bc-4981-9a82-f498b69add10",
+      "name": "System History User",
+      "email": "sys_hist_1794646579570@jaksafe.id",
+      "password": "$2b$10$WpRx9HUjWB24OqVGYru1nOWEXMwiSeQ6yStxLLMwo.lolrGYkJjL6",
+      "healthProfile": {
+        "isSensitive": false,
+        "conditions": []
+      },
+      "alertPreferences": {
+        "enabled": true,
+        "regions": [],
+        "minSeverity": "waspada"
+      },
+      "createdAt": "2026-11-14T08:56:19.789Z",
+      "updatedAt": "2026-11-14T08:56:19.789Z"
     }
   ],
-  "savedRoutes": []
+  "savedRoutes": [],
+  "tripHistory": [
+    {
+      "userId": "428c95a4-3b24-4330-8979-5930477b72a4",
+      "origin": {
+        "id": null,
+        "name": "Monas",
+        "area": "",
+        "lat": -6.1754,
+        "lon": 106.8272
+      },
+      "destination": {
+        "id": null,
+        "name": "Senayan",
+        "area": "",
+        "lat": -6.218,
+        "lon": 106.802
+      },
+      "score": {
+        "totalScore": 76,
+        "label": "AMAN",
+        "color": "#16a34a"
+      },
+      "distanceM": 0,
+      "durationS": 0,
+      "profile": "bike",
+      "summary": "",
+      "source": "preview",
+      "id": "98c24a27-04f5-4bf5-af4b-b2d1aa0f820c",
+      "_id": "98c24a27-04f5-4bf5-af4b-b2d1aa0f820c",
+      "createdAt": "2026-11-14T08:56:18.767Z",
+      "updatedAt": "2026-11-14T08:56:18.767Z"
+    }
+  ]
 }

@@ -61,7 +61,7 @@ import { TIMEOUT_MS } from '../config/constants.js';
  * @param {object} opsi
  * @param {{lat:number, lon:number}} opsi.asal
  * @param {{lat:number, lon:number}} opsi.tujuan
- * @param {'car'|'bike'|'foot'} opsi.profil
+ * @param {'car'|'motor'|'bike'|'foot'} opsi.profil
  * @param {boolean} [opsi.sensitifKesehatan=false]
  * @param {AbortSignal} [opsi.signal]
  * @returns {Promise<object>} balasan agen apa adanya
@@ -77,8 +77,16 @@ export async function mintaNavigasi({
   return minta('/navigate', {
     metode: 'POST',
     badan: {
-      origin: { lat: asal.lat, lon: asal.lon },
-      destination: { lat: tujuan.lat, lon: tujuan.lon },
+      origin: {
+        lat: asal.lat,
+        lon: asal.lon,
+        label: asal.nama || asal.label || asal.name || null,
+      },
+      destination: {
+        lat: tujuan.lat,
+        lon: tujuan.lon,
+        label: tujuan.nama || tujuan.label || tujuan.name || null,
+      },
       profile: profil,
       preferences: { healthSensitive: sensitifKesehatan },
     },

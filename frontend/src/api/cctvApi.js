@@ -145,3 +145,21 @@ export async function analisisKamera(idKamera, signal) {
     cached: Boolean(data.cached),
   };
 }
+
+/**
+ * Mengambil ringkasan status kesehatan kamera CCTV dan status initial sweep backend.
+ *
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<{online:number, offline:number, unknown:number, total:number, sweepInProgress:boolean, lastSweep:string|null}>}
+ */
+export async function cekKesehatanCctv(signal) {
+  const data = await minta('/cctv/health', { signal });
+  return {
+    online: Number(data.online) || 0,
+    offline: Number(data.offline) || 0,
+    unknown: Number(data.unknown) || 0,
+    total: Number(data.total) || 0,
+    sweepInProgress: Boolean(data.sweepInProgress),
+    lastSweep: data.lastSweep || null,
+  };
+}

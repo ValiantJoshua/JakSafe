@@ -12,6 +12,21 @@
 export const KOSONG = '–';
 
 /**
+ * Mengamankan teks dinamis sebelum disisipkan ke dalam template HTML.
+ *
+ * @param {unknown} teks
+ * @returns {string}
+ */
+export function escapeHtml(teks) {
+  return String(teks ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+/**
  * Jarak dari meter menjadi teks siap tampil.
  * Di bawah satu kilometer tetap ditulis dalam meter karena membulatkan
  * 400 meter menjadi 0,4 km justru lebih susah dibayangkan pengguna.

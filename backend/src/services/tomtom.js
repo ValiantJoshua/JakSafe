@@ -11,9 +11,14 @@ export const MAX_TILE_ZOOM = 18;
 const MERCATOR_LAT_LIMIT = 85.05112878;
 
 const TILE_TTL_MS = 180_000; // 3 minutes
+const DISK_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DISK_MAX_FILES = 800;
+const DISK_PRUNE_INTERVAL_MS = 5 * 60 * 1000; // Prune disk cache at most once every 5 minutes
 const MEM_MAX_ENTRIES = 512;
 const UPSTREAM_TIMEOUT_MS = 15_000;
-const DEFAULT_DAILY_BUDGET = 6000; // Generous cap well under 200k/month TomTom freemium pool
+const DEFAULT_DAILY_BUDGET = 8000; // Generous cap well under 200k/month TomTom freemium pool
+let lastPruneAt = 0;
+let pruneInFlight = null;
 const RASTER_STYLES = new Set([
   'relative0',
   'relative0-dark',
@@ -39,6 +44,7 @@ const tileInflight = new Map();
 const segmentMemCache = new Map();
 
 let budgetState = null;
+let budgetHistory = {};
 let budgetLoaded = false;
 
 // ── Tile Math & Validation (Adapted from GEV tomtomTiles.js) ──
@@ -77,7 +83,41 @@ export function normalizeBudget(state, dayKey) {
     && state.date === dayKey
     && Number.isFinite(state.count)
     && state.count >= 0;
-  return valid ? state : { date: dayKey, count: 0 };
+  return {
+    date: dayKey,
+    count: valid ? Number(state.count) : 0,
+  };
+}
+
+function mergeBudgetHistory(source, current) {
+  const merged = {};
+  if (current && typeof current === 'object') {
+    for (const [k, v] of Object.entries(current)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v >= 0) {
+        merged[k] = Number(v);
+      }
+    }
+  }
+  if (source && typeof source.history === 'object' && source.history !== null) {
+    for (const [k, v] of Object.entries(source.history)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v >= 0) {
+        merged[k] = Math.max(merged[k] || 0, Number(v));
+      }
+    }
+  }
+  if (
+    source
+    && typeof source.date === 'string'
+    && /^\d{4}-\d{2}-\d{2}$/.test(source.date)
+    && Number.isFinite(source.count)
+    && source.count >= 0
+  ) {
+    merged[source.date] = Math.max(merged[source.date] || 0, Number(source.count));
+  }
+  const trimmedDates = Object.keys(merged).sort().slice(-14);
+  const compact = {};
+  for (const d of trimmedDates) compact[d] = merged[d];
+  return compact;
 }
 
 export function isOverBudget(budget, limit) {
@@ -99,6 +139,7 @@ async function loadBudgetOnce() {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.date === 'string' && Number.isFinite(parsed.count)) {
       budgetState = parsed;
+      budgetHistory = mergeBudgetHistory(parsed, budgetHistory);
     }
   } catch {
     // Budget file does not exist yet
@@ -108,7 +149,10 @@ async function loadBudgetOnce() {
 async function persistBudget() {
   try {
     await fsp.mkdir(CACHE_DIR, { recursive: true });
-    await fsp.writeFile(BUDGET_PATH, JSON.stringify(budgetState), 'utf8');
+    const payload = budgetState
+      ? { date: budgetState.date, count: budgetState.count, history: budgetHistory }
+      : { date: utcDayKey(), count: 0, history: budgetHistory };
+    await fsp.writeFile(BUDGET_PATH, JSON.stringify(payload), 'utf8');
   } catch (err) {
     console.warn('[tomtom] budget write failed:', err?.message || err);
   }
@@ -117,13 +161,75 @@ async function persistBudget() {
 export async function getCurrentBudget() {
   await loadBudgetOnce();
   budgetState = normalizeBudget(budgetState, utcDayKey());
+  budgetHistory = mergeBudgetHistory(budgetState, budgetHistory);
   return budgetState;
 }
 
 async function recordUpstreamFetch() {
   const b = await getCurrentBudget();
   b.count += 1;
+  budgetHistory[b.date] = b.count;
+  budgetHistory = mergeBudgetHistory(null, budgetHistory);
   void persistBudget();
+}
+
+/**
+ * Statistik TomTom lengkap khusus halaman Admin Monitoring:
+ * kuota harian, riwayat 7 hari, serta ukuran cache tile di RAM dan disk.
+ */
+export async function getTomTomAdminStats() {
+  const budget = await getCurrentBudget();
+  const limit = getDailyBudgetLimit();
+  const count = Number(budget.count || 0);
+  const remaining = Math.max(0, limit - count);
+  const usagePercent = limit > 0 ? Math.min(100, Math.round((count / limit) * 1000) / 10) : 0;
+
+  let diskTileFiles = 0;
+  let diskSizeBytes = 0;
+  try {
+    const entries = await fsp.readdir(CACHE_DIR, { withFileTypes: true });
+    for (const ent of entries) {
+      if (!ent.isFile() || ent.name === 'budget.json' || ent.name.endsWith('.tmp')) continue;
+      diskTileFiles += 1;
+      try {
+        const st = await fsp.stat(path.join(CACHE_DIR, ent.name));
+        diskSizeBytes += st.size || 0;
+      } catch {
+        // Lewati jika file terhapus bersamaan
+      }
+    }
+  } catch {
+    // Direktori cache belum ada
+  }
+
+  // Bangun seri 7 hari terakhir (kronologis) dari riwayat budget yang tersimpan
+  const histMap = budgetHistory || {};
+  const todayMs = Date.now();
+  const dailyHistory = [];
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const day = utcDayKey(todayMs - offset * 86_400_000);
+    const hasRecord = Object.prototype.hasOwnProperty.call(histMap, day);
+    dailyHistory.push({
+      date: day,
+      count: hasRecord ? Number(histMap[day] || 0) : (day === budget.date ? count : 0),
+      limit,
+      recorded: hasRecord || day === budget.date,
+    });
+  }
+
+  return {
+    hasKey: Boolean(process.env.TOMTOM_API_KEY),
+    date: budget.date,
+    dailyCount: count,
+    budgetLimit: limit,
+    remaining,
+    usagePercent,
+    memCacheEntries: tileMemCache.size,
+    segmentCacheEntries: segmentMemCache.size,
+    diskTileFiles,
+    diskSizeBytes,
+    dailyHistory,
+  };
 }
 
 // ── Disk Tile Cache ──
@@ -143,10 +249,113 @@ async function readDiskTile(diskFile) {
   }
 }
 
+/**
+ * Remove expired and excess tile files from the disk cache directory while
+ * preserving `budget.json` and active tiles fresher than `minFreshTtlMs`.
+ *
+ * @param {object} [opts]
+ * @param {string} [opts.cacheDir]
+ * @param {number} [opts.maxAgeMs]
+ * @param {number} [opts.maxFiles]
+ * @param {number} [opts.minFreshTtlMs]
+ * @param {number} [opts.now]
+ * @returns {Promise<{ scanned: number, removedAge: number, removedOverflow: number, kept: number }>}
+ */
+export async function pruneDiskCache({
+  cacheDir = CACHE_DIR,
+  maxAgeMs = DISK_MAX_AGE_MS,
+  maxFiles = DISK_MAX_FILES,
+  minFreshTtlMs = TILE_TTL_MS,
+  now = Date.now(),
+} = {}) {
+  let entries;
+  try {
+    entries = await fsp.readdir(cacheDir, { withFileTypes: true });
+  } catch (err) {
+    if (err?.code === 'ENOENT') {
+      return { scanned: 0, removedAge: 0, removedOverflow: 0, kept: 0 };
+    }
+    throw err;
+  }
+
+  const candidates = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || entry.name === 'budget.json') continue;
+    if (!/\.(png|pbf)$/i.test(entry.name)) continue;
+    candidates.push(path.join(cacheDir, entry.name));
+  }
+
+  const fileStats = await Promise.all(
+    candidates.map(async (filePath) => {
+      try {
+        const st = await fsp.stat(filePath);
+        return { filePath, mtimeMs: st.mtimeMs };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const tiles = fileStats.filter(Boolean);
+  const survivors = [];
+  const toDelete = [];
+  let removedAge = 0;
+  let removedOverflow = 0;
+
+  const effectiveMaxAgeMs = Math.max(maxAgeMs, minFreshTtlMs);
+  for (const item of tiles) {
+    if (now - item.mtimeMs > effectiveMaxAgeMs) {
+      toDelete.push(item.filePath);
+      removedAge += 1;
+    } else {
+      survivors.push(item);
+    }
+  }
+
+  if (Number.isFinite(maxFiles) && maxFiles >= 0 && survivors.length > maxFiles) {
+    survivors.sort((a, b) => b.mtimeMs - a.mtimeMs);
+    const keptList = survivors.slice(0, maxFiles);
+    const overflow = survivors.slice(maxFiles);
+    for (const item of overflow) {
+      if (now - item.mtimeMs >= minFreshTtlMs) {
+        toDelete.push(item.filePath);
+        removedOverflow += 1;
+      } else {
+        keptList.push(item);
+      }
+    }
+    survivors.length = 0;
+    survivors.push(...keptList);
+  }
+
+  await Promise.all(toDelete.map((filePath) => fsp.unlink(filePath).catch(() => {})));
+
+  return {
+    scanned: tiles.length,
+    removedAge,
+    removedOverflow,
+    kept: survivors.length,
+  };
+}
+
+function scheduleDiskPrune() {
+  const now = Date.now();
+  if (pruneInFlight || now - lastPruneAt < DISK_PRUNE_INTERVAL_MS) return;
+  lastPruneAt = now;
+  pruneInFlight = pruneDiskCache({ now })
+    .catch((err) => {
+      console.warn('[tomtom] disk cache prune failed:', err?.message || err);
+    })
+    .finally(() => {
+      pruneInFlight = null;
+    });
+}
+
 async function writeDiskTile(diskFile, buf) {
   try {
     await fsp.mkdir(CACHE_DIR, { recursive: true });
     await fsp.writeFile(tileDiskPath(diskFile), buf);
+    scheduleDiskPrune();
   } catch (err) {
     console.warn(`[tomtom] tile cache write failed for ${diskFile}:`, err?.message || err);
   }

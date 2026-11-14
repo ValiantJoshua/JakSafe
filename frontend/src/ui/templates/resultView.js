@@ -50,6 +50,16 @@ export function templateResultView() {
     <div class="routeselect__list" id="routeOptionsList" role="listbox" aria-label="Pilihan rute perjalanan"></div>
   </div>
 
+  <!-- Peringatan Area Rawan Banjir / Genangan & Catatan Tol Motor di Sepanjang Rute -->
+  <div class="hazardbanner rise rise-1" id="routeHazardAlert" hidden>
+    <div class="hazardbanner__head">
+      <span class="hazardbanner__icon">${ikon('i-alert', 16)}</span>
+      <span class="hazardbanner__title" id="routeHazardTitle">Peringatan Area Rawan di Rute</span>
+      <button type="button" class="hazardbanner__all press" id="btnViewAllAlerts">Lihat semua</button>
+    </div>
+    <ul class="hazardbanner__list" id="routeHazardList"></ul>
+  </div>
+
   <div class="scorecard rise rise-2" id="scoreCard" data-status="hati">
     <p class="scorecard__route">
       <span id="sRouteFrom"></span>
