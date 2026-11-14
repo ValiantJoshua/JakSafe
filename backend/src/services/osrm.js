@@ -12,18 +12,74 @@ const CACHE_MAX = 200;
 const TIMEOUT_MS = 6_500;
 
 const PROFILE_ALIASES = {
-  car: 'car', driving: 'car',
-  bike: 'bike', cycling: 'bike', bicycle: 'bike',
-  foot: 'foot', walking: 'foot', walk: 'foot',
+  car: 'car', driving: 'car', mobil: 'car',
+  motor: 'motor', motorcycle: 'motor', motorbike: 'motor', scooter: 'motor', sepeda_motor: 'motor',
+  bike: 'bike', cycling: 'bike', bicycle: 'bike', sepeda: 'bike',
+  foot: 'foot', walking: 'foot', walk: 'foot', jalan_kaki: 'foot',
 };
-const OSRM_PROFILE = { car: 'driving', bike: 'bike', foot: 'foot' };
+const OSRM_ROUTED_SEGMENT = {
+  car: 'car',
+  motor: 'car', // Sepeda motor menggunakan jaringan jalan bermotor, lalu menghindari ruas tol
+  bike: 'bike', // Sepeda kayuh menggunakan profil routing sepeda khusus
+  foot: 'foot',
+};
+const OSRM_PROFILE = { car: 'driving', motor: 'driving', bike: 'bike', foot: 'foot' };
 
 // Kecepatan rata-rata perkotaan Jakarta (m/s) untuk fallback deterministik saat server OSRM publik gangguan
 const FALLBACK_SPEED_MPS = {
-  car: 7.5,  // ~27 km/j
-  bike: 5.0, // ~18 km/j
+  car: 7.5,   // ~27 km/j
+  motor: 9.0, // ~32 km/j (lebih gesit bermanuver di lalu lintas arteri Jakarta)
+  bike: 5.0,  // ~18 km/j (sepeda kayuh)
   foot: 1.35, // ~4.8 km/j
 };
+
+const TOLL_KEYWORD_RE = /\b(tol|toll|motorway|freeway)\b/i;
+
+/**
+ * Periksa apakah sebuah objek rute mentah OSRM melewati ruas jalan tol.
+ */
+export function routeUsesToll(route) {
+  if (!route) return false;
+  if (typeof route.usesToll === 'boolean') return route.usesToll;
+  const legs = Array.isArray(route.legs) ? route.legs : [];
+  for (const leg of legs) {
+    if (TOLL_KEYWORD_RE.test(String(leg?.summary || ''))) return true;
+    const steps = Array.isArray(leg?.steps) ? leg.steps : [];
+    for (const step of steps) {
+      const fields = [step?.name, step?.ref, step?.destinations].filter(Boolean).join(' ');
+      if (TOLL_KEYWORD_RE.test(fields)) return true;
+      const intersections = Array.isArray(step?.intersections) ? step.intersections : [];
+      for (const ix of intersections) {
+        if (Array.isArray(ix?.classes) && (ix.classes.includes('toll') || ix.classes.includes('motorway'))) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Sesuaikan estimasi durasi berdasarkan karakteristik kecepatan moda transportasi di Jakarta.
+ */
+export function adjustDurationForProfile(durationS, profile) {
+  const base = Math.round(Number(durationS) || 0);
+  if (profile === 'motor' && base > 0) {
+    return Math.max(60, Math.round(base * 0.85));
+  }
+  return base;
+}
+
+/**
+ * Urutkan kandidat rute agar moda sepeda motor selalu mendahulukan jalur arteri non-tol.
+ */
+export function prioritizeRoutesForProfile(routes = [], profile = 'car') {
+  if (!Array.isArray(routes) || routes.length <= 1) return routes;
+  if (profile !== 'motor') return routes;
+  const nonToll = routes.filter((r) => !routeUsesToll(r));
+  const withToll = routes.filter((r) => routeUsesToll(r));
+  return [...nonToll, ...withToll];
+}
 
 const JAKARTA_CORRIDORS = [
   { name: 'Jl. Jenderal Sudirman, Jl. M.H. Thamrin', lat: -6.2020, lon: 106.8225 },
@@ -377,9 +433,11 @@ async function fetchOsrmRaw(p, coordList, { alternatives = false, timeoutMs = TI
   const altParam = alternatives ? '3' : 'false';
   const querySuffix = `?overview=full&geometries=geojson&alternatives=${altParam}&steps=true`;
 
+  const routedSeg = OSRM_ROUTED_SEGMENT[p] || 'car';
+  const osrmProf = OSRM_PROFILE[p] || 'driving';
   const urls = [
-    `${OSRM_DE_BASE}/routed-${p}/route/v1/${OSRM_PROFILE[p]}/${coordStr}${querySuffix}`,
-    `${OSRM_PROJECT_BASE}/route/v1/${OSRM_PROFILE[p]}/${coordStr}${querySuffix}`,
+    `${OSRM_DE_BASE}/routed-${routedSeg}/route/v1/${osrmProf}/${coordStr}${querySuffix}`,
+    `${OSRM_PROJECT_BASE}/route/v1/${osrmProf}/${coordStr}${querySuffix}`,
   ];
 
   const controllers = urls.map(() => new AbortController());
@@ -529,6 +587,7 @@ function buildUrbanCorridorFallback(p, coords, alternatives = false) {
       distanceM,
       durationS,
       summary,
+      usesToll: TOLL_KEYWORD_RE.test(summary),
       geometry,
       steps: fallbackSteps,
     };
@@ -540,7 +599,7 @@ function buildUrbanCorridorFallback(p, coords, alternatives = false) {
 /**
  * Fetch route(s) from OSRM with multi-mirror racing and resilient urban fallback.
  * @param {object} opts
- * @param {string} [opts.profile='car']  car | bike | foot
+ * @param {string} [opts.profile='car']  car | motor | bike | foot
  * @param {number[][]} opts.coords       [[lon, lat], ...]
  * @param {boolean} [opts.alternatives]  request alternative routes (for multi-criteria comparison)
  * @returns {Promise<{profile: string, routes: {distanceM: number, durationS: number, summary: string, geometry: number[][], steps: object[]}[]}>}
@@ -614,13 +673,15 @@ export async function getRoutes({ profile = 'car', coords, alternatives = false 
     }
   }
 
+  const orderedRoutes = prioritizeRoutesForProfile(rawRoutes, p);
   const usedSummaries = new Set();
   const payload = {
     profile: p,
-    routes: rawRoutes.slice(0, 3).map((r, idx) => ({
+    routes: orderedRoutes.slice(0, 3).map((r, idx) => ({
       distanceM: Math.round(r.distance),
-      durationS: Math.round(r.duration),
+      durationS: adjustDurationForProfile(r.duration, p),
       summary: extractRouteSummary(r, idx, usedSummaries),
+      usesToll: routeUsesToll(r),
       geometry: r.geometry.coordinates,
       steps: extractRouteSteps(r),
     })),

@@ -4,8 +4,16 @@ import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { User } from './models/User.js';
 import { SavedRoute } from './models/SavedRoute.js';
+import { TripHistory } from './models/TripHistory.js';
 
-const LOCAL_STORAGE_PATH = path.resolve(process.cwd(), 'src', 'data', 'jaksafe_local_storage.json');
+const DEFAULT_LOCAL_STORAGE_PATH = path.resolve(process.cwd(), 'src', 'data', 'jaksafe_local_storage.json');
+const MAX_LOCAL_HISTORY_PER_USER = 60;
+
+function getLocalStoragePath() {
+  return process.env.JAKSAFE_LOCAL_STORAGE_PATH
+    ? path.resolve(process.env.JAKSAFE_LOCAL_STORAGE_PATH)
+    : DEFAULT_LOCAL_STORAGE_PATH;
+}
 
 /**
  * Cek apakah koneksi MongoDB aktif dan siap menerima operasi database.
@@ -19,34 +27,55 @@ export function isMongoActive() {
 // MANAJEMEN PENYIMPANAN LOKAL (FALLBACK JIKA MONGODB TIDAK JALAN)
 // -------------------------------------------------------------
 function readLocalStore() {
+  const storagePath = getLocalStoragePath();
   try {
-    if (!fs.existsSync(LOCAL_STORAGE_PATH)) {
-      const initial = { users: [], savedRoutes: [] };
-      fs.writeFileSync(LOCAL_STORAGE_PATH, JSON.stringify(initial, null, 2), 'utf8');
+    if (!fs.existsSync(storagePath)) {
+      const initial = { users: [], savedRoutes: [], tripHistory: [] };
+      const dir = path.dirname(storagePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(storagePath, JSON.stringify(initial, null, 2), 'utf8');
       return initial;
     }
-    const raw = fs.readFileSync(LOCAL_STORAGE_PATH, 'utf8');
+    const raw = fs.readFileSync(storagePath, 'utf8');
     const parsed = JSON.parse(raw);
     return {
       users: Array.isArray(parsed?.users) ? parsed.users : [],
       savedRoutes: Array.isArray(parsed?.savedRoutes) ? parsed.savedRoutes : [],
+      tripHistory: Array.isArray(parsed?.tripHistory) ? parsed.tripHistory : [],
     };
   } catch (err) {
     console.warn('[Storage] Gagal membaca storage lokal fallback, menginisialisasi baru:', err.message);
-    return { users: [], savedRoutes: [] };
+    return { users: [], savedRoutes: [], tripHistory: [] };
   }
 }
 
 function writeLocalStore(data) {
+  const storagePath = getLocalStoragePath();
+  const tmpPath = `${storagePath}.tmp.${process.pid}.${crypto.randomUUID()}`;
+  const payload = JSON.stringify(data, null, 2);
   try {
-    const dir = path.dirname(LOCAL_STORAGE_PATH);
+    const dir = path.dirname(storagePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    // Tulis atomik lewat file sementara
-    const tmpPath = `${LOCAL_STORAGE_PATH}.tmp.${Date.now()}`;
-    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-    fs.renameSync(tmpPath, LOCAL_STORAGE_PATH);
+    // Tulis atomik lewat file sementara unik per proses
+    fs.writeFileSync(tmpPath, payload, 'utf8');
+    try {
+      fs.renameSync(tmpPath, storagePath);
+    } catch (renameErr) {
+      // Pada Windows/OneDrive renameSync dapat terkena EPERM/EBUSY sementara; fallback tulis langsung
+      if (renameErr?.code === 'EPERM' || renameErr?.code === 'EBUSY' || renameErr?.code === 'EACCES') {
+        fs.writeFileSync(storagePath, payload, 'utf8');
+      } else {
+        throw renameErr;
+      }
+    }
   } catch (err) {
     console.error('[Storage] Gagal menyimpan ke storage lokal fallback:', err.message);
+  } finally {
+    try {
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    } catch {
+      // Abaikan kegagalan pembersihan file temp
+    }
   }
 }
 
@@ -97,13 +126,20 @@ export async function findUserById(id) {
   return sanitizeUser(found);
 }
 
-export async function createUser({ name, email, password, healthProfile = {} }) {
+export async function createUser({ name, email, password, healthProfile = {}, alertPreferences = {} }) {
   const normEmail = String(email || '').trim().toLowerCase();
   const safeName = String(name || '').trim();
 
   const profile = {
     isSensitive: Boolean(healthProfile?.isSensitive),
     conditions: Array.isArray(healthProfile?.conditions) ? healthProfile.conditions : [],
+  };
+  const alertsPref = {
+    enabled: alertPreferences?.enabled !== undefined ? Boolean(alertPreferences.enabled) : true,
+    regions: Array.isArray(alertPreferences?.regions) ? alertPreferences.regions : [],
+    minSeverity: ['pantau', 'waspada', 'siaga'].includes(alertPreferences?.minSeverity)
+      ? alertPreferences.minSeverity
+      : 'waspada',
   };
 
   if (isMongoActive()) {
@@ -112,6 +148,7 @@ export async function createUser({ name, email, password, healthProfile = {} }) 
       email: normEmail,
       password,
       healthProfile: profile,
+      alertPreferences: alertsPref,
     });
     return sanitizeUser(doc);
   }
@@ -131,6 +168,7 @@ export async function createUser({ name, email, password, healthProfile = {} }) 
     email: normEmail,
     password,
     healthProfile: profile,
+    alertPreferences: alertsPref,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -140,18 +178,31 @@ export async function createUser({ name, email, password, healthProfile = {} }) 
   return sanitizeUser(newUser);
 }
 
-export async function updateUserProfile(id, { name, healthProfile }) {
+export async function updateUserProfile(id, { name, healthProfile, alertPreferences }) {
   if (!id) return null;
+
+  const normHealth = healthProfile !== undefined
+    ? {
+      isSensitive: Boolean(healthProfile.isSensitive),
+      conditions: Array.isArray(healthProfile.conditions) ? healthProfile.conditions : [],
+    }
+    : undefined;
+
+  const normAlerts = alertPreferences !== undefined
+    ? {
+      enabled: alertPreferences.enabled !== undefined ? Boolean(alertPreferences.enabled) : true,
+      regions: Array.isArray(alertPreferences.regions) ? alertPreferences.regions : [],
+      minSeverity: ['pantau', 'waspada', 'siaga'].includes(alertPreferences.minSeverity)
+        ? alertPreferences.minSeverity
+        : 'waspada',
+    }
+    : undefined;
 
   if (isMongoActive()) {
     const update = {};
     if (name !== undefined) update.name = String(name).trim();
-    if (healthProfile !== undefined) {
-      update.healthProfile = {
-        isSensitive: Boolean(healthProfile.isSensitive),
-        conditions: Array.isArray(healthProfile.conditions) ? healthProfile.conditions : [],
-      };
-    }
+    if (normHealth !== undefined) update.healthProfile = normHealth;
+    if (normAlerts !== undefined) update.alertPreferences = normAlerts;
     const updated = await User.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true }).select('-password');
     return sanitizeUser(updated);
   }
@@ -161,20 +212,52 @@ export async function updateUserProfile(id, { name, healthProfile }) {
   if (idx === -1) return null;
 
   if (name !== undefined) store.users[idx].name = String(name).trim();
-  if (healthProfile !== undefined) {
-    store.users[idx].healthProfile = {
-      isSensitive: Boolean(healthProfile.isSensitive),
-      conditions: Array.isArray(healthProfile.conditions) ? healthProfile.conditions : [],
-    };
-  }
+  if (normHealth !== undefined) store.users[idx].healthProfile = normHealth;
+  if (normAlerts !== undefined) store.users[idx].alertPreferences = normAlerts;
   store.users[idx].updatedAt = new Date().toISOString();
   writeLocalStore(store);
   return sanitizeUser(store.users[idx]);
 }
 
 // -------------------------------------------------------------
-// OPERASI RUTE TERSIMPAN (SAVED ROUTES)
+// OPERASI RUTE TERSIMPAN (SAVED ROUTES) & RIWAYAT PERJALANAN
 // -------------------------------------------------------------
+function normalizeRouteEndpointPayload({
+  userId,
+  origin,
+  destination,
+  score,
+  distanceM = 0,
+  durationS = 0,
+  profile = 'car',
+}) {
+  return {
+    userId,
+    origin: {
+      id: origin?.id || null,
+      name: origin?.name || 'Titik Awal',
+      area: origin?.area || '',
+      lat: Number(origin?.lat) || 0,
+      lon: Number(origin?.lon) || 0,
+    },
+    destination: {
+      id: destination?.id || null,
+      name: destination?.name || 'Tujuan',
+      area: destination?.area || '',
+      lat: Number(destination?.lat) || 0,
+      lon: Number(destination?.lon) || 0,
+    },
+    score: {
+      totalScore: Number(score?.totalScore ?? score ?? 0),
+      label: String(score?.label || 'AMAN'),
+      color: String(score?.color || '#16a34a'),
+    },
+    distanceM: Number(distanceM) || 0,
+    durationS: Number(durationS) || 0,
+    profile: String(profile || 'car'),
+  };
+}
+
 export async function getSavedRoutesByUser(userId) {
   if (!userId) return [];
 
@@ -205,30 +288,8 @@ export async function createSavedRoute({
   if (!userId) throw new Error('userId is required');
 
   const routeItem = {
-    userId,
     title: title || `${origin?.name || 'Titik Awal'} -> ${destination?.name || 'Tujuan'}`,
-    origin: {
-      id: origin?.id || null,
-      name: origin?.name || 'Titik Awal',
-      area: origin?.area || '',
-      lat: Number(origin?.lat) || 0,
-      lon: Number(origin?.lon) || 0,
-    },
-    destination: {
-      id: destination?.id || null,
-      name: destination?.name || 'Tujuan',
-      area: destination?.area || '',
-      lat: Number(destination?.lat) || 0,
-      lon: Number(destination?.lon) || 0,
-    },
-    score: {
-      totalScore: Number(score?.totalScore ?? score ?? 0),
-      label: String(score?.label || 'AMAN'),
-      color: String(score?.color || '#16a34a'),
-    },
-    distanceM: Number(distanceM) || 0,
-    durationS: Number(durationS) || 0,
-    profile: String(profile || 'car'),
+    ...normalizeRouteEndpointPayload({ userId, origin, destination, score, distanceM, durationS, profile }),
   };
 
   if (isMongoActive()) {
@@ -272,5 +333,112 @@ export async function deleteSavedRoute(routeId, userId) {
     writeLocalStore(store);
   }
   return changed;
+}
+
+export async function getTripHistoryByUser(userId, { limit = 30 } = {}) {
+  if (!userId) return [];
+  const cap = Math.max(1, Math.min(Number(limit) || 30, 100));
+
+  if (isMongoActive()) {
+    const list = await TripHistory.find({ userId }).sort({ createdAt: -1 }).limit(cap).lean().exec();
+    return list.map((entry) => ({
+      ...entry,
+      id: String(entry._id),
+    }));
+  }
+
+  const store = readLocalStore();
+  return store.tripHistory
+    .filter((entry) => String(entry.userId) === String(userId))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, cap);
+}
+
+export async function createTripHistory({
+  userId,
+  origin,
+  destination,
+  score,
+  distanceM = 0,
+  durationS = 0,
+  profile = 'car',
+  summary = '',
+  source = 'preview',
+}) {
+  if (!userId) throw new Error('userId is required');
+
+  const historyItem = {
+    ...normalizeRouteEndpointPayload({ userId, origin, destination, score, distanceM, durationS, profile }),
+    summary: String(summary || ''),
+    source: String(source || 'preview'),
+  };
+
+  if (isMongoActive()) {
+    const doc = await TripHistory.create(historyItem);
+    const obj = doc.toObject();
+    obj.id = String(obj._id);
+    return obj;
+  }
+
+  const store = readLocalStore();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const entry = {
+    ...historyItem,
+    id,
+    _id: id,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  store.tripHistory.unshift(entry);
+  // Batasi entri riwayat lokal per pengguna agar berkas tetap ringan
+  let userCount = 0;
+  store.tripHistory = store.tripHistory.filter((item) => {
+    if (String(item.userId) !== String(userId)) return true;
+    userCount += 1;
+    return userCount <= MAX_LOCAL_HISTORY_PER_USER;
+  });
+  writeLocalStore(store);
+  return entry;
+}
+
+export async function deleteTripHistory(historyId, userId) {
+  if (!historyId || !userId) return false;
+
+  if (isMongoActive()) {
+    const res = await TripHistory.findOneAndDelete({ _id: historyId, userId });
+    return Boolean(res);
+  }
+
+  const store = readLocalStore();
+  const initLen = store.tripHistory.length;
+  store.tripHistory = store.tripHistory.filter(
+    (entry) => !(String(entry.id || entry._id) === String(historyId) && String(entry.userId) === String(userId))
+  );
+
+  const changed = store.tripHistory.length !== initLen;
+  if (changed) {
+    writeLocalStore(store);
+  }
+  return changed;
+}
+
+export async function clearTripHistoryByUser(userId) {
+  if (!userId) return 0;
+
+  if (isMongoActive()) {
+    const res = await TripHistory.deleteMany({ userId });
+    return Number(res?.deletedCount || 0);
+  }
+
+  const store = readLocalStore();
+  const initLen = store.tripHistory.length;
+  store.tripHistory = store.tripHistory.filter((entry) => String(entry.userId) !== String(userId));
+  const deletedCount = initLen - store.tripHistory.length;
+  if (deletedCount > 0) {
+    writeLocalStore(store);
+  }
+  return deletedCount;
 }
 

@@ -33,8 +33,8 @@ export const getRouteDeclaration = {
       },
       profile: {
         type: 'STRING',
-        description: 'Travel profile: car (default), bike, or foot',
-        enum: ['car', 'bike', 'foot'],
+        description: 'Travel profile: car (default), motor (motorcycle avoiding toll roads), bike (bicycle ~18km/h), or foot',
+        enum: ['car', 'motor', 'bike', 'foot'],
       },
       alternatives: {
         type: 'BOOLEAN',

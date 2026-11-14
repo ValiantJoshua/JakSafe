@@ -4,6 +4,7 @@ import { fetchFrame, FrameError, assertPublicHttpUrl } from '../services/cctvFra
 import { parseCoords, RouteError } from '../services/osrm.js';
 import { analyzeRoadImage, VisionError } from '../services/geminiVision.js';
 import { cctvVisionCache } from '../services/cacheService.js';
+import { recordVisionHazardObservation } from '../services/hazardAlertService.js';
 import {
   attachHealth,
   getHealthSummary,
@@ -238,6 +239,14 @@ router.get('/analyze/:id', async (req, res) => {
       mimeType: contentType,
       context: camera.name,
       cacheKey: `img:${camera.id}`,
+    });
+    recordVisionHazardObservation({
+      cameraId: camera.id,
+      cameraName: camera.name,
+      lat: camera.lat,
+      lon: camera.lon,
+      analysis,
+      observedAt: fetchedAt,
     });
     const payload = { camera: attachHealth(publicView(camera)), fetchedAt, analysis };
     cctvVisionCache.set(cacheKey, payload);

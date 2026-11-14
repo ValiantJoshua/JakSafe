@@ -16,6 +16,7 @@ import {
   DEFAULT_TRIP,
 } from '../../config/jakartaPlaces.js';
 import { cariRute } from '../../domain/navigationService.js';
+import { catatRiwayatPerjalanan } from '../../api/authApi.js';
 import { SEBAB } from '../../api/httpClient.js';
 import { SUMBER_HASIL } from '../../config/constants.js';
 import { resetTahap, tandaiTahapBerjalan, tutupSemuaTahap, modeAgen } from './progressController.js';
@@ -295,6 +296,46 @@ async function jalankanPencarian() {
     const hasilLengkap = { ...hasil, asal, tujuan, profil: hasil?.profil || hasil?.profile || keadaan.profil || 'car' };
     gambarHasil(hasilLengkap);
     setState({ tampilan: 'hasil', hasil: hasilLengkap });
+
+    // Catat riwayat perjalanan secara non-blocking bila pengguna sudah masuk
+    const saatIni = getState();
+    if (saatIni.masuk && saatIni.token && hasilLengkap?.score) {
+      catatRiwayatPerjalanan(saatIni.token, {
+        origin: {
+          id: asal.id || null,
+          name: asal.nama,
+          area: asal.area || '',
+          lat: Number(asal.lat) || 0,
+          lon: Number(asal.lon) || 0,
+        },
+        destination: {
+          id: tujuan.id || null,
+          name: tujuan.nama,
+          area: tujuan.area || '',
+          lat: Number(tujuan.lat) || 0,
+          lon: Number(tujuan.lon) || 0,
+        },
+        score: {
+          totalScore: Number(hasilLengkap.score.totalScore) || 0,
+          label: String(hasilLengkap.score.label || 'AMAN'),
+          color: String(hasilLengkap.score.color || '#16a34a'),
+        },
+        distanceM: Number(hasilLengkap.route?.distanceM) || 0,
+        durationS: Number(hasilLengkap.route?.durationS) || 0,
+        profile: hasilLengkap.profil,
+        summary: String(hasilLengkap.route?.summary || ''),
+        source: String(hasilLengkap.sumber || 'preview'),
+      })
+        .then((res) => {
+          if (res?.entry) {
+            const terkini = getState().riwayatPerjalanan || [];
+            setState({ riwayatPerjalanan: [res.entry, ...terkini].slice(0, 60) });
+          }
+        })
+        .catch((histErr) => {
+          console.warn('[history] Gagal mencatat riwayat perjalanan:', histErr?.message);
+        });
+    }
   } catch (galat) {
     if (galat?.sebab === SEBAB.DIBATALKAN || pengendaliAktif?.signal.aborted) {
       setState({ tampilan: 'siap' });

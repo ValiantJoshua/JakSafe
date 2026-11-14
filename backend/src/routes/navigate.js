@@ -22,7 +22,7 @@ router.post('/', async (req, res) => {
     });
   }
 
-  const validProfiles = ['car', 'bike', 'foot'];
+  const validProfiles = ['car', 'motor', 'bike', 'foot'];
   const sanitizedProfile = validProfiles.includes(profile) ? profile : 'car';
   const isHealthSensitive = Boolean(preferences.healthSensitive);
 

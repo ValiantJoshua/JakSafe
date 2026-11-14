@@ -9,6 +9,8 @@ import navigateRouter from './routes/navigate.js';
 import geocodeRouter from './routes/geocode.js';
 import authRouter from './routes/auth.js';
 import savedRoutesRouter from './routes/savedRoutes.js';
+import historyRouter from './routes/history.js';
+import alertsRouter from './routes/alerts.js';
 import { getAllCacheStats } from './services/cacheService.js';
 
 // Utamakan IPv4 untuk mencegah galat "fetch failed" / ETIMEDOUT pada jaringan ISP Indonesia
@@ -53,6 +55,8 @@ export function createApp() {
   app.use('/api/geocode', geocodeRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/routes/saved', savedRoutesRouter);
+  app.use('/api/routes/history', historyRouter);
+  app.use('/api/alerts', alertsRouter);
 
   return app;
 }

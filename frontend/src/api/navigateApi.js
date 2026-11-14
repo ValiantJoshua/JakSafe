@@ -61,7 +61,7 @@ import { TIMEOUT_MS } from '../config/constants.js';
  * @param {object} opsi
  * @param {{lat:number, lon:number}} opsi.asal
  * @param {{lat:number, lon:number}} opsi.tujuan
- * @param {'car'|'bike'|'foot'} opsi.profil
+ * @param {'car'|'motor'|'bike'|'foot'} opsi.profil
  * @param {boolean} [opsi.sensitifKesehatan=false]
  * @param {AbortSignal} [opsi.signal]
  * @returns {Promise<object>} balasan agen apa adanya

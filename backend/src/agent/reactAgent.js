@@ -17,6 +17,7 @@ import { getTrafficDeclaration, getTraffic } from './tools/getTraffic.js';
 import { calculateRouteScore, DEFAULT_WEIGHTS } from '../scoring/routeScorer.js';
 import { findNearest, publicView } from '../services/cctvCatalog.js';
 import { attachHealth, sortCandidatesByHealth } from '../services/cctvHealthService.js';
+import { recordVisionHazardObservation } from '../services/hazardAlertService.js';
 import { saveExecutionLog } from '../db/mongoClient.js';
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
@@ -224,7 +225,7 @@ async function generateContentWithFallback(ai, candidateModels, toolDeclarations
  * @param {object} params
  * @param {{ lat: number, lon: number }} params.origin
  * @param {{ lat: number, lon: number }} params.destination
- * @param {'car'|'bike'|'foot'} [params.profile='car']
+ * @param {'car'|'motor'|'bike'|'foot'} [params.profile='car']
  * @param {{ healthSensitive?: boolean }} [params.preferences]
  * @returns {Promise<object>} Complete navigation result conforming to JakSafe frontend contract
  */
@@ -269,11 +270,19 @@ export async function runNavigationAgent({
 
   const ai = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
+  const profileLabels = {
+    car: 'mobil',
+    motor: 'sepeda motor (hindari jalan tol)',
+    bike: 'sepeda kayuh',
+    foot: 'pejalan kaki',
+  };
+  const profileDesc = profileLabels[profile] || profile;
+
   // Initial user prompt for the ReAct loop
   const initialPrompt = [
     `Rencanakan rute dari koordinat asal [lat: ${origin.lat}, lon: ${origin.lon}] `,
     `ke koordinat tujuan [lat: ${destination.lat}, lon: ${destination.lon}] `,
-    `dengan moda transportasi ${profile}. `,
+    `dengan moda transportasi ${profile} (${profileDesc}). `,
     preferences.healthSensitive ? 'Pengguna sangat sensitif terhadap polusi udara (prioritaskan udara bersih). ' : '',
     'Gunakan tool yang relevan untuk memeriksa rute jalan, lalu lintas terkini, kualitas udara PM2.5, dan kondisi visual CCTV di jalan.',
   ].join('');
@@ -376,6 +385,14 @@ export async function runNavigationAgent({
               if (toolResult.ok && visualResult) {
                 visualResult.analysis = toolResult.analysis;
                 visualResult.analisis = toolResult.analysis;
+                recordVisionHazardObservation({
+                  cameraId,
+                  cameraName: lastCctvSnapshot?.camera?.name || context,
+                  lat: lastCctvSnapshot?.camera?.lat,
+                  lon: lastCctvSnapshot?.camera?.lon,
+                  analysis: toolResult.analysis,
+                  observedAt: visualResult.fetchedAt,
+                });
               }
             } else {
               toolResult = { ok: false, error: 'no image base64 provided or available' };
@@ -473,6 +490,14 @@ export async function runNavigationAgent({
     if (visionRes.ok) {
       visualResult.analysis = visionRes.analysis;
       visualResult.analisis = visionRes.analysis;
+      recordVisionHazardObservation({
+        cameraId: lastCctvSnapshot.camera?.id,
+        cameraName: lastCctvSnapshot.camera?.name,
+        lat: lastCctvSnapshot.camera?.lat,
+        lon: lastCctvSnapshot.camera?.lon,
+        analysis: visionRes.analysis,
+        observedAt: visualResult.fetchedAt,
+      });
     }
   } else if (!visualResult) {
     const bottleneckPt = trafficData?.worstSegment?.delayPercent > 0
@@ -489,10 +514,21 @@ export async function runNavigationAgent({
         context: cctvRes.camera?.name,
       });
       const cam = cctvRes.camera || {};
+      const observedAt = cam.fetchedAt || new Date().toISOString();
+      if (visionRes.ok) {
+        recordVisionHazardObservation({
+          cameraId: cam.id,
+          cameraName: cam.name,
+          lat: cam.lat,
+          lon: cam.lon,
+          analysis: visionRes.analysis,
+          observedAt,
+        });
+      }
       visualResult = {
         cameraId: cam.id,
         cameraName: cam.name,
-        fetchedAt: cam.fetchedAt || new Date().toISOString(),
+        fetchedAt: observedAt,
         analysis: visionRes.ok ? visionRes.analysis : null,
         kamera: {
           id: cam.id,
@@ -587,6 +623,7 @@ export async function runNavigationAgent({
         distanceM: alt.distanceM,
         durationS: alt.durationS,
         summary: alt.summary || `Jalur Alternatif ${idx + 2}`,
+        usesToll: Boolean(alt.usesToll),
         geometry: alt.geometry,
         steps: Array.isArray(alt.steps) ? alt.steps : [],
         totalScore: altScore.totalScore,
@@ -619,10 +656,12 @@ export async function runNavigationAgent({
 
   const resultPayload = {
     ok: true,
+    profile,
     route: {
       distanceM: primaryRoute.distanceM,
       durationS: primaryRoute.durationS,
       summary: primaryRoute.summary || 'Jalur Utama',
+      usesToll: Boolean(primaryRoute.usesToll),
       geometry: primaryRoute.geometry,
       steps: Array.isArray(primaryRoute.steps) ? primaryRoute.steps : [],
     },

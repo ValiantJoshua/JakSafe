@@ -97,7 +97,8 @@ export const SAMPLING = {
 /** Moda perjalanan yang dikenal backend, lihat PROFILE_ALIASES pada osrm.js. */
 export const PROFILES = [
   { key: 'car', nama: 'Mobil', ikon: 'i-car' },
-  { key: 'bike', nama: 'Motor', ikon: 'i-bike' },
+  { key: 'motor', nama: 'Motor', ikon: 'i-motor' },
+  { key: 'bike', nama: 'Sepeda', ikon: 'i-bike' },
   { key: 'foot', nama: 'Jalan Kaki', ikon: 'i-walk' },
 ];
 

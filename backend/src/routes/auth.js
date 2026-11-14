@@ -57,11 +57,16 @@ router.get('/me', requireAuth, (req, res) => {
   });
 });
 
-// PUT /api/auth/profile -> perbarui profil pengguna & status sensitif kesehatan
+// PUT /api/auth/profile -> perbarui profil pengguna, status sensitif kesehatan, & preferensi peringatan
 router.put('/profile', requireAuth, async (req, res) => {
-  const { name, isHealthSensitive, conditions } = req.body || {};
+  const { name, isHealthSensitive, conditions, alertPreferences } = req.body || {};
   try {
-    const updated = await updateProfile(req.user.id, { name, isHealthSensitive, conditions });
+    const updated = await updateProfile(req.user.id, {
+      name,
+      isHealthSensitive,
+      conditions,
+      alertPreferences,
+    });
     res.json({
       ok: true,
       message: 'Profil pengguna berhasil diperbarui',

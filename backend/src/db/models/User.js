@@ -29,6 +29,21 @@ const UserSchema = new mongoose.Schema(
         default: [],
       },
     },
+    alertPreferences: {
+      enabled: {
+        type: Boolean,
+        default: true,
+      },
+      regions: {
+        type: [String],
+        default: [],
+      },
+      minSeverity: {
+        type: String,
+        enum: ['pantau', 'waspada', 'siaga'],
+        default: 'waspada',
+      },
+    },
   },
   {
     timestamps: true,

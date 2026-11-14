@@ -10,7 +10,7 @@ import { templateProgressView } from './templates/progressView.js';
 import { templateResultView } from './templates/resultView.js';
 import { templateErrorView } from './templates/errorView.js';
 import { templateStage } from './templates/stageView.js';
-import { templateLoginModal, templateUserMenu } from './templates/loginModal.js';
+import { templateLoginModal, templateUserMenu, templateAccountDialogs } from './templates/loginModal.js';
 import { ikon } from './icons.js';
 
 /**
@@ -48,6 +48,7 @@ ${spriteIkon()}
 
 ${templateLoginModal()}
 ${templateUserMenu()}
+${templateAccountDialogs()}
 
 <div class="toast" id="toast" hidden><span id="toastText"></span></div>
 `;

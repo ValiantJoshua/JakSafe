@@ -45,6 +45,7 @@ export function templateLoginModal() {
               ${baris('Lihat bukti kamera CCTV')}
               ${baris('Rute tersimpan', { aktif: false })}
               ${baris('Riwayat perjalanan', { aktif: false })}
+              ${baris('Peringatan dini area rawan banjir', { aktif: false })}
               ${baris('Profil kesehatan', { aktif: false })}
             </ul>
           </div>
@@ -55,8 +56,8 @@ export function templateLoginModal() {
               ${baris('Semua fitur tanpa masuk')}
               ${baris('Profil kesehatan, tersimpan permanen di database', { sorot: true, ikonNama: 'i-wind' })}
               ${baris('Simpan rute favorit permanen ke database', { sorot: true, ikonNama: 'i-star' })}
-              ${baris('Akses rute tersimpan kapan saja', { sorot: true, ikonNama: 'i-clock' })}
-              ${baris('Peringatan dini area rawan banjir, menyusul', { sorot: true, ikonNama: 'i-bell' })}
+              ${baris('Riwayat perjalanan otomatis & muat ulang cepat', { sorot: true, ikonNama: 'i-clock' })}
+              ${baris('Peringatan dini area rawan banjir & hujan', { sorot: true, ikonNama: 'i-bell' })}
             </ul>
           </div>
 
@@ -161,15 +162,22 @@ export function templateUserMenu() {
     Profil kesehatan aktif, bobot polusi dinaikkan
   </div>
 
-  <button class="usermenu__item" id="btnToggleSensitif">
-    ${ikon('i-wind', 17)} Profil Kesehatan
-    <span class="usermenu__n" id="menuSensitifStat">Aktif</span>
+  <button type="button" class="usermenu__item usermenu__switchrow" id="btnToggleSensitif"
+          role="switch" aria-checked="false" aria-describedby="menuSensitifSub">
+    ${ikon('i-wind', 17)}
+    <span class="usermenu__labelwrap">
+      <span class="usermenu__label">Profil Kesehatan</span>
+      <span class="usermenu__sub" id="menuSensitifSub">Prioritaskan udara bersih</span>
+    </span>
+    <span class="jswitch" aria-hidden="true"><span class="jswitch__thumb"></span></span>
   </button>
-  <button class="usermenu__item" disabled title="Menyusul setelah backend punya basis data">
-    ${ikon('i-clock', 17)} Riwayat Perjalanan <span class="usermenu__n">Menyusul</span>
+  <button type="button" class="usermenu__item" id="btnOpenHistory">
+    ${ikon('i-clock', 17)} <span class="usermenu__text">Riwayat Perjalanan</span>
+    <span class="usermenu__n" id="menuHistoryCount">0</span>
   </button>
-  <button class="usermenu__item" disabled title="Menyusul">
-    ${ikon('i-bell', 17)} Peringatan Area Rawan <span class="usermenu__n">Menyusul</span>
+  <button type="button" class="usermenu__item" id="btnOpenAlerts">
+    ${ikon('i-bell', 17)} <span class="usermenu__text">Peringatan Area Rawan</span>
+    <span class="usermenu__n" id="menuAlertCount">Pantau</span>
   </button>
 
   <div class="divider" style="margin:var(--s2) 0"></div>
@@ -178,4 +186,85 @@ export function templateUserMenu() {
     ${ikon('i-logout', 17)} Keluar
   </button>
 </div>`;
+}
+
+/**
+ * Dialog semantik native untuk Riwayat Perjalanan dan Peringatan Area Rawan.
+ * Mematuhi standar dialog HTML modern (`closedby="any"` tanpa `role="dialog"` atau `aria-modal` tambahan).
+ * @returns {string}
+ */
+export function templateAccountDialogs() {
+  return `
+<dialog class="jmodal" id="historyDialog" closedby="any" aria-labelledby="historyTitle">
+  <div class="jmodal__head">
+    <span class="jmodal__icon">${ikon('i-clock', 17)}</span>
+    <div class="jmodal__titles">
+      <h2 class="jmodal__title" id="historyTitle">Riwayat Perjalanan</h2>
+      <p class="jmodal__sub">Pencarian rute terbaru yang tersimpan ke akun Anda</p>
+    </div>
+    <button type="button" class="jmodal__close press" data-close-dialog="historyDialog" aria-label="Tutup dialog riwayat">
+      ${ikon('i-x', 17)}
+    </button>
+  </div>
+
+  <div class="jmodal__toolbar">
+    <span class="jmodal__count" id="historySummaryText">Memuat riwayat</span>
+    <button type="button" class="jmodal__action press" id="btnClearHistory" hidden>
+      Kosongkan Riwayat
+    </button>
+  </div>
+
+  <div class="jmodal__body scroll-y">
+    <ul class="jlist" id="historyList" aria-label="Daftar riwayat perjalanan"></ul>
+  </div>
+</dialog>
+
+<dialog class="jmodal jmodal--wide" id="alertsDialog" closedby="any" aria-labelledby="alertsTitle">
+  <div class="jmodal__head">
+    <span class="jmodal__icon">${ikon('i-bell', 17)}</span>
+    <div class="jmodal__titles">
+      <h2 class="jmodal__title" id="alertsTitle">Peringatan Area Rawan</h2>
+      <p class="jmodal__sub">Pantauan koridor genangan Jakarta berdasarkan curah hujan dan CCTV terkini</p>
+    </div>
+    <button type="button" class="jmodal__close press" data-close-dialog="alertsDialog" aria-label="Tutup dialog area rawan">
+      ${ikon('i-x', 17)}
+    </button>
+  </div>
+
+  <div class="alertsbar">
+    <div class="alertsbar__top">
+      <div class="aseg" id="alertRegionChips" role="group" aria-label="Filter wilayah DKI Jakarta">
+        <button type="button" class="aseg__btn" data-region="semua" aria-pressed="true">Semua</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Pusat" aria-pressed="false">Jakpus</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Selatan" aria-pressed="false">Jaksel</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Barat" aria-pressed="false">Jakbar</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Timur" aria-pressed="false">Jaktim</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Utara" aria-pressed="false">Jakut</button>
+      </div>
+      <button type="button" class="alertsbar__refresh press" id="btnRefreshAlerts">Muat ulang</button>
+    </div>
+
+    <div class="alertsbar__sub">
+      <span class="alertsbar__meta" id="alertsMetaText">Memeriksa kondisi koridor Jakarta</span>
+      <div class="alertsbar__pref" id="alertPrefBar">
+        <label class="apref__chk">
+          <input type="checkbox" id="chkAlertRouteAuto" checked>
+          <span>Peringatan di rute</span>
+        </label>
+        <label class="apref__sev" for="selAlertSeverity">
+          <span class="apref__label">Ambang</span>
+          <select id="selAlertSeverity">
+            <option value="pantau">Pantau+</option>
+            <option value="waspada">Waspada+</option>
+            <option value="siaga">Hanya Siaga</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="jmodal__body jmodal__body--list scroll-y">
+    <ul class="alist" id="alertsList" aria-label="Daftar peringatan area rawan Jakarta"></ul>
+  </div>
+</dialog>`;
 }

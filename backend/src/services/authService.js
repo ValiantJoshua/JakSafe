@@ -118,10 +118,30 @@ export async function getCurrentUser(userId) {
   return user;
 }
 
+const VALID_SEVERITIES = ['pantau', 'waspada', 'siaga'];
+
 /**
- * Memperbarui profil pengguna (nama atau profil kesehatan).
+ * Normalisasi dan validasi preferensi peringatan area rawan milik pengguna.
  */
-export async function updateProfile(userId, { name, isHealthSensitive, conditions }) {
+export function normalizeAlertPreferences(raw, fallback = {}) {
+  if (!raw || typeof raw !== 'object') return null;
+  const minSev = VALID_SEVERITIES.includes(raw.minSeverity)
+    ? raw.minSeverity
+    : (VALID_SEVERITIES.includes(fallback.minSeverity) ? fallback.minSeverity : 'waspada');
+  const regions = Array.isArray(raw.regions)
+    ? [...new Set(raw.regions.map((r) => String(r || '').trim()).filter(Boolean))].slice(0, 10)
+    : (Array.isArray(fallback.regions) ? fallback.regions : []);
+  return {
+    enabled: raw.enabled !== undefined ? Boolean(raw.enabled) : (fallback.enabled ?? true),
+    regions,
+    minSeverity: minSev,
+  };
+}
+
+/**
+ * Memperbarui profil pengguna (nama, profil kesehatan, atau preferensi peringatan area rawan).
+ */
+export async function updateProfile(userId, { name, isHealthSensitive, conditions, alertPreferences }) {
   const updatePayload = {};
   if (name !== undefined) updatePayload.name = name;
   if (isHealthSensitive !== undefined || conditions !== undefined) {
@@ -129,6 +149,11 @@ export async function updateProfile(userId, { name, isHealthSensitive, condition
       isSensitive: Boolean(isHealthSensitive),
       conditions: Array.isArray(conditions) ? conditions : [],
     };
+  }
+  if (alertPreferences !== undefined) {
+    const existing = await findUserById(userId);
+    const normalized = normalizeAlertPreferences(alertPreferences, existing?.alertPreferences || {});
+    if (normalized) updatePayload.alertPreferences = normalized;
   }
 
   const updated = await updateUserProfile(userId, updatePayload);

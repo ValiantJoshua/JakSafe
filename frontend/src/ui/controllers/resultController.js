@@ -23,10 +23,15 @@ import { calculateRouteScore } from '../../domain/previewScorer.js';
 import { PM25_BANDS, SUMBER_HASIL, DEFAULT_WEIGHTS, PROFILES } from '../../config/constants.js';
 import { urlBingkaiKamera } from '../../api/cctvApi.js';
 import { simpanRute } from '../../api/authApi.js';
+import { cekPeringatanRute } from '../../api/alertsApi.js';
 import { ikon } from '../icons.js';
 import { getState, setState } from '../../state/appState.js';
 import { toast } from '../toast.js';
 import { focusStepOnMap } from '../../map/routeLayer.js';
+import { flyToCoordinates } from '../../map/cesiumViewer.js';
+
+let pengendaliCekRuteRawan = null;
+let hasilRuteRawanTersimpan = [];
 
 /** Menuliskan lencana sumber hasil di kartu skor. */
 function gambarSumber(sumber) {
@@ -392,6 +397,7 @@ export function susunDaftarPilihanRute(hasil) {
       distanceM: hasil.route?.distanceM ?? 0,
       durationS: hasil.route?.durationS ?? 0,
       summary: hasil.route?.summary || 'Jalur Utama Rekomendasi',
+      usesToll: Boolean(hasil.route?.usesToll),
       geometry: hasil.route?.geometry || [],
       steps: Array.isArray(hasil.route?.steps) ? hasil.route.steps : [],
     },
@@ -421,6 +427,7 @@ export function susunDaftarPilihanRute(hasil) {
         distanceM: alt.distanceM ?? 0,
         durationS: alt.durationS ?? 0,
         summary: alt.summary || `Jalur Alternatif ${i + 2}`,
+        usesToll: Boolean(alt.usesToll),
         geometry: alt.geometry || [],
         steps: Array.isArray(alt.steps) ? alt.steps : [],
       },
@@ -686,6 +693,83 @@ export function pilihRuteByIndex(index) {
   setState({ hasil: hasilBaru });
 }
 
+/** Memeriksa dan menampilkan peringatan area rawan banjir/genangan + catatan tol motor di sepanjang rute. */
+async function renderPeringatanRute(aktifOpt, hasil) {
+  const banner = $('#routeHazardAlert');
+  const listEl = $('#routeHazardList');
+  const titleEl = $('#routeHazardTitle');
+  if (!banner || !listEl) return;
+
+  pengendaliCekRuteRawan?.abort();
+  pengendaliCekRuteRawan = new AbortController();
+
+  const profil = hasil?.profil || getState().profil || 'car';
+  const motorTollNotice = profil === 'motor' && Boolean(aktifOpt?.route?.usesToll);
+  const { pengguna } = getState();
+  const alertPref = pengguna?.alertPreferences || { enabled: true, minSeverity: 'waspada' };
+  const autoEnabled = alertPref.enabled !== false;
+
+  const renderBanner = (alerts = []) => {
+    hasilRuteRawanTersimpan = alerts;
+    if (!alerts.length && !motorTollNotice) {
+      banner.hidden = true;
+      listEl.innerHTML = '';
+      return;
+    }
+
+    const hasSiaga = alerts.some((a) => a.severity === 'siaga');
+    banner.dataset.sev = hasSiaga ? 'siaga' : 'waspada';
+    if (titleEl) {
+      titleEl.textContent = alerts.length > 0
+        ? `${alerts.length} Area Rawan di Sekitar Rute`
+        : 'Catatan Rute Sepeda Motor';
+    }
+
+    const itemsHtml = alerts.map((a, idx) => `
+      <li class="hazardbanner__item">
+        <span class="hazardbanner__text">
+          <strong>[${escapeHtml(a.severityLabel || 'Waspada')}] ${escapeHtml(a.corridor)}</strong>
+          · ${escapeHtml(a.summary)}
+        </span>
+        <button type="button" class="hazardbanner__btn press" data-focus-hazard="${idx}">Lihat di Peta</button>
+      </li>`).join('');
+
+    const tollHtml = motorTollNotice
+      ? `<li class="hazardbanner__item">
+           <span class="hazardbanner__text">
+             <strong>[Info Motor] Segmen Tol Terdeteksi</strong>
+             · Server peta hanya mengembalikan rute berbayar tol untuk koridor ini; pilih opsi arteri lain bila tersedia.
+           </span>
+         </li>`
+      : '';
+
+    listEl.innerHTML = `${tollHtml}${itemsHtml}`;
+    banner.hidden = false;
+  };
+
+  if (!autoEnabled || !Array.isArray(aktifOpt?.route?.geometry) || aktifOpt.route.geometry.length === 0) {
+    renderBanner([]);
+    return;
+  }
+
+  renderBanner([]);
+  try {
+    const res = await cekPeringatanRute({
+      geometry: aktifOpt.route.geometry,
+      radiusM: 900,
+      minSeverity: alertPref.minSeverity || 'waspada',
+      signal: pengendaliCekRuteRawan.signal,
+    });
+    if (Array.isArray(res?.alerts)) {
+      renderBanner(res.alerts);
+    }
+  } catch (err) {
+    if (err?.name !== 'AbortError') {
+      console.warn('[alerts] Pemeriksaan rute rawan dilewati:', err?.message);
+    }
+  }
+}
+
 /**
  * Menggambar seluruh layar hasil dari satu objek hasil navigasi.
  * @param {object} hasil
@@ -743,6 +827,7 @@ export function gambarHasil(hasil) {
   gambarUdara(aktifOpt.air, aktifOpt.score);
   gambarKamera(aktifOpt.visual);
   gambarJejak(hasil);
+  renderPeringatanRute(aktifOpt, hasil);
 
   // Tombol simpan dikembalikan ke keadaan awal tiap hasil baru.
   setText($('#saveLabel'), 'Simpan rute');
@@ -761,6 +846,20 @@ export function pasangPengendaliHasil() {
     if (Number.isInteger(idx)) {
       pilihRuteByIndex(idx);
     }
+  });
+
+  // Klik "Lihat di Peta" pada banner peringatan area rawan di rute
+  $('#routeHazardList')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-focus-hazard]');
+    if (!btn) return;
+    const item = hasilRuteRawanTersimpan[Number(btn.dataset.focusHazard)];
+    if (!item || !Number.isFinite(Number(item.lat)) || !Number.isFinite(Number(item.lon))) return;
+    flyToCoordinates({ lon: Number(item.lon), lat: Number(item.lat), height: 950 });
+    toast(`Fokus peta ke koridor ${item.corridor}`);
+  });
+
+  $('#btnViewAllAlerts')?.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('jaksafe:open-alerts'));
   });
 
   // Klik pada salah satu baris manuver di Panduan Langkah Rute (#stepsList)
