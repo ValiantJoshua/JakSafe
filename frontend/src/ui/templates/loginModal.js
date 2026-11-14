@@ -180,6 +180,10 @@ export function templateUserMenu() {
     <span class="usermenu__n" id="menuAlertCount">Pantau</span>
   </button>
 
+  <a class="usermenu__item" id="btnOpenAdmin" href="/admin.html" hidden>
+    ${ikon('i-shield', 17)} <span class="usermenu__text">Dashboard Admin</span>
+  </a>
+
   <div class="divider" style="margin:var(--s2) 0"></div>
 
   <button class="usermenu__item usermenu__item--out" id="btnLogout">

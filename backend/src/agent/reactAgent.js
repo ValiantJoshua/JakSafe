@@ -195,28 +195,47 @@ function buildFallbackAgentSummary({ primaryRoute, primaryScore, trafficData, ai
 /**
  * Memanggil generateContent dengan rantai fallback model otomatis apabila model utama
  * mengembalikan 503 Service Unavailable / 429 / 404.
+ * Mengembalikan hasil berikut telemetri model & perpindahan fallback.
  */
 async function generateContentWithFallback(ai, candidateModels, toolDeclarations, contents) {
   let lastErr = null;
-  for (const modelName of candidateModels) {
+  const modelsTried = [];
+  let failedAttempts = 0;
+
+  for (let i = 0; i < candidateModels.length; i++) {
+    const modelName = candidateModels[i];
+    modelsTried.push(modelName);
     try {
       const model = ai.getGenerativeModel({
         model: modelName,
         systemInstruction: SYSTEM_INSTRUCTION,
         tools: [{ functionDeclarations: toolDeclarations }],
       });
-      return await model.generateContent({ contents });
+      const response = await model.generateContent({ contents });
+      return {
+        response,
+        modelUsed: modelName,
+        modelsTried,
+        fallbackUsed: i > 0,
+        failedAttempts,
+      };
     } catch (err) {
       lastErr = err;
+      failedAttempts += 1;
       const msg = String(err?.message || '');
       // Jika API key ditolak (401/403), jangan ulangi ke model lain
       if (/API key|API_KEY|permission|403|401/i.test(msg)) {
+        err.modelsTried = modelsTried;
+        err.failedAttempts = failedAttempts;
         throw err;
       }
       console.warn(`[reactAgent] Model ${modelName} busy/unavailable (${msg.slice(0, 90)}), switching to fallback model...`);
     }
   }
-  throw lastErr || new Error('All Gemini models unavailable');
+  const finalErr = lastErr || new Error('All Gemini models unavailable');
+  finalErr.modelsTried = modelsTried;
+  finalErr.failedAttempts = failedAttempts;
+  throw finalErr;
 }
 
 /**
@@ -269,6 +288,11 @@ export async function runNavigationAgent({
   const candidateModels = [...new Set([preferredModel, ...FALLBACK_MODELS])];
 
   const ai = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+  const modelsTriedSet = new Set();
+  let lastModelUsed = ai ? null : 'deterministic-fallback';
+  let totalFallbackHops = 0;
+  let modelFallbackTriggered = !ai;
+  let usedSummaryFallback = false;
 
   const profileLabels = {
     car: 'mobil',
@@ -293,7 +317,13 @@ export async function runNavigationAgent({
     if (ai) {
       for (let step = 0; step < MAX_STEPS; step++) {
         const stepStart = Date.now();
-        const response = await generateContentWithFallback(ai, candidateModels, toolDeclarations, contents);
+        const attempt = await generateContentWithFallback(ai, candidateModels, toolDeclarations, contents);
+        const response = attempt.response;
+        for (const m of attempt.modelsTried) modelsTriedSet.add(m);
+        lastModelUsed = attempt.modelUsed;
+        totalFallbackHops += attempt.failedAttempts;
+        if (attempt.fallbackUsed) modelFallbackTriggered = true;
+
         const candidate = response.response?.candidates?.[0];
         if (!candidate) break;
 
@@ -429,6 +459,12 @@ export async function runNavigationAgent({
     }
   } catch (err) {
     console.warn('[reactAgent] ReAct reasoning loop fallback triggered:', err.message);
+    modelFallbackTriggered = true;
+    if (Array.isArray(err?.modelsTried)) {
+      for (const m of err.modelsTried) modelsTriedSet.add(m);
+    }
+    totalFallbackHops += Number(err?.failedAttempts || 1);
+    if (!lastModelUsed) lastModelUsed = 'deterministic-fallback';
     reasoning.push({
       step: stepIndex++,
       thought: 'Melanjutkan evaluasi multi-sensor secara deterministik karena antrean padat pada server model.',
@@ -437,6 +473,18 @@ export async function runNavigationAgent({
       durationMs: 0,
     });
   }
+
+  const buildTelemetry = () => ({
+    preferredModel,
+    modelUsed: lastModelUsed || 'deterministic-fallback',
+    fallbackOccurred: Boolean(modelFallbackTriggered || totalFallbackHops > 0),
+    fallbackCount: totalFallbackHops,
+    modelsTried: Array.from(modelsTriedSet),
+    aiMode: !ai
+      ? 'no-api-key'
+      : (lastModelUsed === 'deterministic-fallback' ? 'deterministic-fallback' : 'gemini-react'),
+    usedSummaryFallback,
+  });
 
   // Ensure primary route exists (Deterministic fallback if agent did not fetch it)
   if (!primaryRoute) {
@@ -452,7 +500,21 @@ export async function runNavigationAgent({
         durationMs: 0,
       });
     } else {
-      throw new Error(routeRes.error || 'Gagal menghitung rute navigasi');
+      const errMsg = routeRes.error || 'Gagal menghitung rute navigasi';
+      saveExecutionLog({
+        requestId,
+        timestamp: new Date(),
+        origin,
+        destination,
+        profile,
+        preferences,
+        reasoning,
+        modelTelemetry: buildTelemetry(),
+        totalDurationMs: Date.now() - startTime,
+        status: 'failed',
+        error: errMsg,
+      }).catch((e) => console.warn('[mongo] Background failed-log error:', e.message));
+      throw new Error(errMsg);
     }
   }
 
@@ -642,6 +704,7 @@ export async function runNavigationAgent({
   );
 
   if (!agentFinalThought || !agentFinalThought.trim()) {
+    usedSummaryFallback = true;
     agentFinalThought = buildFallbackAgentSummary({
       primaryRoute,
       primaryScore,
@@ -653,6 +716,7 @@ export async function runNavigationAgent({
   }
 
   const totalDurationMs = Date.now() - startTime;
+  const modelTelemetry = buildTelemetry();
 
   const resultPayload = {
     ok: true,
@@ -678,17 +742,32 @@ export async function runNavigationAgent({
     alternatives,
   };
 
-  // Asynchronously log to MongoDB
+  // Asynchronously log to MongoDB / fallback local store
+  const routeSteps = Array.isArray(primaryRoute.steps) ? primaryRoute.steps : [];
+  const firstStepName = routeSteps.find((s) => s?.name && String(s.name).trim())?.name || null;
+  const lastStepName = [...routeSteps].reverse().find((s) => s?.name && String(s.name).trim())?.name || null;
+  const loggedOrigin = {
+    lat: origin.lat,
+    lon: origin.lon,
+    label: origin.label || origin.name || origin.nama || firstStepName || null,
+  };
+  const loggedDestination = {
+    lat: destination.lat,
+    lon: destination.lon,
+    label: destination.label || destination.name || destination.nama || lastStepName || null,
+  };
+
   saveExecutionLog({
     requestId,
     timestamp: new Date(),
-    origin,
-    destination,
+    origin: loggedOrigin,
+    destination: loggedDestination,
     profile,
     preferences,
     reasoning,
     route: resultPayload.route,
     score: primaryScore,
+    modelTelemetry,
     air: airSummary,
     visual: visualResult,
     traffic: trafficData,

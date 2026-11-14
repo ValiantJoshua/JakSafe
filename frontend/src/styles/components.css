@@ -530,6 +530,7 @@
   width: 100%; padding: 8px 12px; border-radius: var(--r-sm);
   font-size: var(--fs-sm); font-weight: 500; color: var(--text-2);
   text-align: left;
+  text-decoration: none;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
 .usermenu__item > svg { flex: 0 0 auto; }

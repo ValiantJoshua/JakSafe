@@ -77,8 +77,16 @@ export async function mintaNavigasi({
   return minta('/navigate', {
     metode: 'POST',
     badan: {
-      origin: { lat: asal.lat, lon: asal.lon },
-      destination: { lat: tujuan.lat, lon: tujuan.lon },
+      origin: {
+        lat: asal.lat,
+        lon: asal.lon,
+        label: asal.nama || asal.label || asal.name || null,
+      },
+      destination: {
+        lat: tujuan.lat,
+        lon: tujuan.lon,
+        label: tujuan.nama || tujuan.label || tujuan.name || null,
+      },
       profile: profil,
       preferences: { healthSensitive: sensitifKesehatan },
     },

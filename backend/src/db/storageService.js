@@ -1,10 +1,10 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { User } from './models/User.js';
 import { SavedRoute } from './models/SavedRoute.js';
 import { TripHistory } from './models/TripHistory.js';
+import { readJsonFile, writeJsonFileAtomic } from '../utils/atomicJson.js';
 
 const DEFAULT_LOCAL_STORAGE_PATH = path.resolve(process.cwd(), 'src', 'data', 'jaksafe_local_storage.json');
 const MAX_LOCAL_HISTORY_PER_USER = 60;
@@ -27,62 +27,26 @@ export function isMongoActive() {
 // MANAJEMEN PENYIMPANAN LOKAL (FALLBACK JIKA MONGODB TIDAK JALAN)
 // -------------------------------------------------------------
 function readLocalStore() {
-  const storagePath = getLocalStoragePath();
-  try {
-    if (!fs.existsSync(storagePath)) {
-      const initial = { users: [], savedRoutes: [], tripHistory: [] };
-      const dir = path.dirname(storagePath);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(storagePath, JSON.stringify(initial, null, 2), 'utf8');
-      return initial;
-    }
-    const raw = fs.readFileSync(storagePath, 'utf8');
-    const parsed = JSON.parse(raw);
-    return {
-      users: Array.isArray(parsed?.users) ? parsed.users : [],
-      savedRoutes: Array.isArray(parsed?.savedRoutes) ? parsed.savedRoutes : [],
-      tripHistory: Array.isArray(parsed?.tripHistory) ? parsed.tripHistory : [],
-    };
-  } catch (err) {
-    console.warn('[Storage] Gagal membaca storage lokal fallback, menginisialisasi baru:', err.message);
-    return { users: [], savedRoutes: [], tripHistory: [] };
-  }
+  const parsed = readJsonFile(
+    getLocalStoragePath(),
+    () => ({ users: [], savedRoutes: [], tripHistory: [] })
+  );
+  return {
+    users: Array.isArray(parsed?.users) ? parsed.users : [],
+    savedRoutes: Array.isArray(parsed?.savedRoutes) ? parsed.savedRoutes : [],
+    tripHistory: Array.isArray(parsed?.tripHistory) ? parsed.tripHistory : [],
+  };
 }
 
 function writeLocalStore(data) {
-  const storagePath = getLocalStoragePath();
-  const tmpPath = `${storagePath}.tmp.${process.pid}.${crypto.randomUUID()}`;
-  const payload = JSON.stringify(data, null, 2);
-  try {
-    const dir = path.dirname(storagePath);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    // Tulis atomik lewat file sementara unik per proses
-    fs.writeFileSync(tmpPath, payload, 'utf8');
-    try {
-      fs.renameSync(tmpPath, storagePath);
-    } catch (renameErr) {
-      // Pada Windows/OneDrive renameSync dapat terkena EPERM/EBUSY sementara; fallback tulis langsung
-      if (renameErr?.code === 'EPERM' || renameErr?.code === 'EBUSY' || renameErr?.code === 'EACCES') {
-        fs.writeFileSync(storagePath, payload, 'utf8');
-      } else {
-        throw renameErr;
-      }
-    }
-  } catch (err) {
-    console.error('[Storage] Gagal menyimpan ke storage lokal fallback:', err.message);
-  } finally {
-    try {
-      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-    } catch {
-      // Abaikan kegagalan pembersihan file temp
-    }
-  }
+  writeJsonFileAtomic(getLocalStoragePath(), data);
 }
 
 function sanitizeUser(user) {
   if (!user) return null;
   const doc = typeof user.toObject === 'function' ? user.toObject() : { ...user };
   delete doc.password;
+  doc.role = doc.role === 'admin' ? 'admin' : 'user';
   if (doc._id) {
     doc.id = String(doc._id);
   }
@@ -126,9 +90,10 @@ export async function findUserById(id) {
   return sanitizeUser(found);
 }
 
-export async function createUser({ name, email, password, healthProfile = {}, alertPreferences = {} }) {
+export async function createUser({ name, email, password, role = 'user', healthProfile = {}, alertPreferences = {} }) {
   const normEmail = String(email || '').trim().toLowerCase();
   const safeName = String(name || '').trim();
+  const safeRole = role === 'admin' ? 'admin' : 'user';
 
   const profile = {
     isSensitive: Boolean(healthProfile?.isSensitive),
@@ -147,6 +112,7 @@ export async function createUser({ name, email, password, healthProfile = {}, al
       name: safeName,
       email: normEmail,
       password,
+      role: safeRole,
       healthProfile: profile,
       alertPreferences: alertsPref,
     });
@@ -161,12 +127,14 @@ export async function createUser({ name, email, password, healthProfile = {}, al
     throw err;
   }
 
+  const generatedId = crypto.randomUUID();
   const newUser = {
-    id: crypto.randomUUID(),
-    _id: crypto.randomUUID(),
+    id: generatedId,
+    _id: generatedId,
     name: safeName,
     email: normEmail,
     password,
+    role: safeRole,
     healthProfile: profile,
     alertPreferences: alertsPref,
     createdAt: new Date().toISOString(),
@@ -176,6 +144,34 @@ export async function createUser({ name, email, password, healthProfile = {}, al
   store.users.push(newUser);
   writeLocalStore(store);
   return sanitizeUser(newUser);
+}
+
+/**
+ * Perbarui peran pengguna secara eksplisit (hanya untuk admin seeding / konfigurasi server).
+ * @param {string} id
+ * @param {'user'|'admin'} role
+ */
+export async function updateUserRole(id, role) {
+  if (!id) return null;
+  const safeRole = role === 'admin' ? 'admin' : 'user';
+
+  if (isMongoActive()) {
+    const updated = await User.findByIdAndUpdate(
+      id,
+      { $set: { role: safeRole } },
+      { new: true, runValidators: true }
+    ).select('-password');
+    return sanitizeUser(updated);
+  }
+
+  const store = readLocalStore();
+  const idx = store.users.findIndex((u) => u.id === id || u._id === id);
+  if (idx === -1) return null;
+
+  store.users[idx].role = safeRole;
+  store.users[idx].updatedAt = new Date().toISOString();
+  writeLocalStore(store);
+  return sanitizeUser(store.users[idx]);
 }
 
 export async function updateUserProfile(id, { name, healthProfile, alertPreferences }) {

@@ -178,6 +178,7 @@ function gambarKeadaanMasuk(keadaan) {
   }
 
   show($('#menuBadgeSensitif'), masuk && sensitifKesehatan);
+  show($('#btnOpenAdmin'), masuk && pengguna?.role === 'admin');
   const toggleEl = $('#btnToggleSensitif');
   if (toggleEl) {
     toggleEl.setAttribute('aria-checked', String(Boolean(sensitifKesehatan)));

@@ -46,6 +46,12 @@ function arahkanRootKeEntry() {
         res.end();
         return;
       }
+      if (req.url === '/admin' || req.url === '/admin/') {
+        res.statusCode = 302;
+        res.setHeader('Location', '/admin.html');
+        res.end();
+        return;
+      }
       next();
     });
   };
@@ -111,7 +117,7 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1600,
       rollupOptions: {
         // Karena tidak ada index.html, berkas masuk harus disebutkan manual.
-        input: { app: ENTRY_HTML },
+        input: { app: ENTRY_HTML, admin: 'admin.html' },
       },
     },
   };

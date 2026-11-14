@@ -245,6 +245,65 @@ export function getAllCacheStats() {
 }
 
 /**
+ * Ringkasan agregat seluruh store cache (total hits, misses, ukuran, dan hit rate gabungan).
+ */
+export function getCacheAggregateSummary() {
+  const all = Object.values(getAllCacheStats());
+  let totalSize = 0;
+  let totalMax = 0;
+  let totalHits = 0;
+  let totalMisses = 0;
+  let totalEvictions = 0;
+
+  for (const s of all) {
+    totalSize += Number(s.size || 0);
+    totalMax += Number(s.max || 0);
+    totalHits += Number(s.hits || 0);
+    totalMisses += Number(s.misses || 0);
+    totalEvictions += Number(s.evictions || 0);
+  }
+
+  const totalRequests = totalHits + totalMisses;
+  const overallHitRate = totalRequests > 0
+    ? ((totalHits / totalRequests) * 100).toFixed(1) + '%'
+    : '0.0%';
+
+  return {
+    storeCount: all.length,
+    totalSize,
+    totalMax,
+    totalHits,
+    totalMisses,
+    totalEvictions,
+    totalRequests,
+    overallHitRate,
+  };
+}
+
+/**
+ * Bersihkan store cache tertentu berdasarkan kuncinya (atau 'all' untuk semuanya).
+ * @param {string} target
+ * @returns {{ cleared: string[] }}
+ */
+export function clearCacheByName(target = 'all') {
+  const map = {
+    cctvVision: cctvVisionCache,
+    cctvHealth: cctvHealthCache,
+    routeGeometry: routeGeometryCache,
+    navigation: navigationCache,
+    geocoding: geocodeCache,
+  };
+  if (target === 'all') {
+    clearAllCaches();
+    return { cleared: Object.keys(map) };
+  }
+  const store = map[target];
+  if (!store) return { cleared: [] };
+  store.clear();
+  return { cleared: [target] };
+}
+
+/**
  * Clear all registered caches.
  */
 export function clearAllCaches() {

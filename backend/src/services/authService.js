@@ -5,6 +5,7 @@ import {
   findUserById,
   createUser,
   updateUserProfile,
+  updateUserRole,
 } from '../db/storageService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'jaksafe-dev-secret-key-2026';
@@ -14,6 +15,23 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
 const JWT_EXPIRES_IN = '7d';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function getConfiguredAdminEmails() {
+  const raw = [process.env.ADMIN_EMAIL, process.env.ADMIN_EMAILS]
+    .filter(Boolean)
+    .join(',');
+  return new Set(
+    raw
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+export function isConfiguredAdminEmail(email) {
+  const norm = String(email || '').trim().toLowerCase();
+  return Boolean(norm) && getConfiguredAdminEmails().has(norm);
+}
 
 export class AuthError extends Error {
   constructor(message, status = 400) {
@@ -30,6 +48,7 @@ export function generateToken(user) {
   const payload = {
     id: user.id || user._id,
     email: user.email,
+    role: user.role === 'admin' ? 'admin' : 'user',
   };
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
@@ -64,11 +83,13 @@ export async function register({ email, password, name, isHealthSensitive = fals
 
   const displayName = String(name || email.split('@')[0] || 'Pengguna JakSafe').trim();
   const hashedPassword = await bcrypt.hash(password, 10);
+  const role = isConfiguredAdminEmail(email) ? 'admin' : 'user';
 
   const newUser = await createUser({
     name: displayName,
     email,
     password: hashedPassword,
+    role,
     healthProfile: {
       isSensitive: Boolean(isHealthSensitive),
       conditions: Array.isArray(conditions) ? conditions : [],
@@ -99,12 +120,53 @@ export async function login({ email, password }) {
     throw new AuthError('Kata sandi salah. Silakan coba lagi.', 401);
   }
 
-  const safeUser = { ...user };
+  let safeUser = { ...user };
   delete safeUser.password;
   if (safeUser._id) safeUser.id = String(safeUser._id);
+  safeUser.role = safeUser.role === 'admin' ? 'admin' : 'user';
+
+  if (safeUser.role !== 'admin' && isConfiguredAdminEmail(safeUser.email)) {
+    const promoted = await updateUserRole(safeUser.id, 'admin');
+    if (promoted) safeUser = promoted;
+  }
 
   const token = generateToken(safeUser);
   return { user: safeUser, token };
+}
+
+/**
+ * Pastikan akun admin dari environment (`ADMIN_EMAIL`/`ADMIN_PASSWORD` & `ADMIN_EMAILS`) siap saat startup.
+ */
+export async function bootstrapAdminFromEnv() {
+  const adminEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+  const adminPassword = String(process.env.ADMIN_PASSWORD || '');
+  const adminName = String(process.env.ADMIN_NAME || 'Administrator JakSafe').trim();
+
+  if (adminEmail && EMAIL_REGEX.test(adminEmail) && adminPassword.length >= 6) {
+    const existing = await findUserByEmail(adminEmail);
+    if (!existing) {
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      await createUser({
+        name: adminName,
+        email: adminEmail,
+        password: hashedPassword,
+        role: 'admin',
+      });
+      console.log(`[auth] Akun admin awal dibuat untuk ${adminEmail}.`);
+    } else if (existing.role !== 'admin') {
+      await updateUserRole(existing.id, 'admin');
+      console.log(`[auth] Hak akses admin diaktifkan untuk ${adminEmail}.`);
+    }
+  }
+
+  for (const email of getConfiguredAdminEmails()) {
+    if (email === adminEmail) continue;
+    const existing = await findUserByEmail(email);
+    if (existing && existing.role !== 'admin') {
+      await updateUserRole(existing.id, 'admin');
+      console.log(`[auth] Hak akses admin disinkronkan dari ADMIN_EMAILS untuk ${email}.`);
+    }
+  }
 }
 
 /**

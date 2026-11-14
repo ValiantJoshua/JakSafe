@@ -30,6 +30,8 @@ router.post('/', async (req, res) => {
   const originLon = Number(origin.lon);
   const destLat = Number(destination.lat);
   const destLon = Number(destination.lon);
+  const originLabel = String(origin.label || origin.name || origin.nama || '').trim().slice(0, 160) || null;
+  const destLabel = String(destination.label || destination.name || destination.nama || '').trim().slice(0, 160) || null;
 
   const cacheKey = `nav:${sanitizedProfile}:${originLat.toFixed(4)},${originLon.toFixed(4)}->${destLat.toFixed(4)},${destLon.toFixed(4)}:hs=${isHealthSensitive}`;
 
@@ -44,8 +46,8 @@ router.post('/', async (req, res) => {
 
   try {
     const result = await runNavigationAgent({
-      origin: { lat: originLat, lon: originLon },
-      destination: { lat: destLat, lon: destLon },
+      origin: { lat: originLat, lon: originLon, label: originLabel },
+      destination: { lat: destLat, lon: destLon, label: destLabel },
       profile: sanitizedProfile,
       preferences: {
         healthSensitive: isHealthSensitive,

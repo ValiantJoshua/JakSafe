@@ -46,25 +46,37 @@ export function attachHealth(publicCam) {
     ...publicCam,
     status: health.status,
     statusReason: health.reason,
+    latencyMs: Number.isFinite(health.latencyMs) ? health.latencyMs : null,
     lastCheckedAt: health.checkedAt,
   };
 }
 
 /**
  * Compute aggregate camera health counts from the in-memory cache.
- * @param {Array<{id: string}>} [cameras]
+ * @param {Array<{id: string, enabled?: boolean}>} [cameras]
  * @returns {object}
  */
 export function getHealthSummary(cameras = loadCatalog()) {
   let online = 0;
   let offline = 0;
   let unknown = 0;
+  let disabled = 0;
+  let latencySum = 0;
+  let latencyCount = 0;
 
   for (const cam of cameras) {
-    const { status } = getCameraHealth(cam.id);
+    if (cam.enabled === false) {
+      disabled += 1;
+    }
+    const { status, latencyMs } = getCameraHealth(cam.id);
     if (status === 'online') online += 1;
     else if (status === 'offline') offline += 1;
     else unknown += 1;
+
+    if (Number.isFinite(latencyMs)) {
+      latencySum += latencyMs;
+      latencyCount += 1;
+    }
   }
 
   return {
@@ -72,6 +84,8 @@ export function getHealthSummary(cameras = loadCatalog()) {
     online,
     offline,
     unknown,
+    disabled,
+    avgLatencyMs: latencyCount > 0 ? Math.round(latencySum / latencyCount) : null,
     sweepInProgress: Boolean(sweepPromise),
     hydratedFromDb: hydratedCount,
     lastSweep: lastSweepStats,

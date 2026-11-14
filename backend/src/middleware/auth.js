@@ -34,3 +34,24 @@ export async function requireAuth(req, res, next) {
   }
 }
 
+/**
+ * Middleware otorisasi khusus administrator.
+ * Wajib dipanggil setelah `requireAuth`.
+ */
+export function requireAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      ok: false,
+      error: 'Otentikasi diperlukan untuk mengakses sumber daya admin.',
+    });
+  }
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      ok: false,
+      error: 'Akses ditolak. Diperlukan hak akses administrator.',
+    });
+  }
+  return next();
+}
+
+

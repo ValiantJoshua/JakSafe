@@ -44,6 +44,7 @@ const tileInflight = new Map();
 const segmentMemCache = new Map();
 
 let budgetState = null;
+let budgetHistory = {};
 let budgetLoaded = false;
 
 // ── Tile Math & Validation (Adapted from GEV tomtomTiles.js) ──
@@ -82,7 +83,41 @@ export function normalizeBudget(state, dayKey) {
     && state.date === dayKey
     && Number.isFinite(state.count)
     && state.count >= 0;
-  return valid ? state : { date: dayKey, count: 0 };
+  return {
+    date: dayKey,
+    count: valid ? Number(state.count) : 0,
+  };
+}
+
+function mergeBudgetHistory(source, current) {
+  const merged = {};
+  if (current && typeof current === 'object') {
+    for (const [k, v] of Object.entries(current)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v >= 0) {
+        merged[k] = Number(v);
+      }
+    }
+  }
+  if (source && typeof source.history === 'object' && source.history !== null) {
+    for (const [k, v] of Object.entries(source.history)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v >= 0) {
+        merged[k] = Math.max(merged[k] || 0, Number(v));
+      }
+    }
+  }
+  if (
+    source
+    && typeof source.date === 'string'
+    && /^\d{4}-\d{2}-\d{2}$/.test(source.date)
+    && Number.isFinite(source.count)
+    && source.count >= 0
+  ) {
+    merged[source.date] = Math.max(merged[source.date] || 0, Number(source.count));
+  }
+  const trimmedDates = Object.keys(merged).sort().slice(-14);
+  const compact = {};
+  for (const d of trimmedDates) compact[d] = merged[d];
+  return compact;
 }
 
 export function isOverBudget(budget, limit) {
@@ -104,6 +139,7 @@ async function loadBudgetOnce() {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.date === 'string' && Number.isFinite(parsed.count)) {
       budgetState = parsed;
+      budgetHistory = mergeBudgetHistory(parsed, budgetHistory);
     }
   } catch {
     // Budget file does not exist yet
@@ -113,7 +149,10 @@ async function loadBudgetOnce() {
 async function persistBudget() {
   try {
     await fsp.mkdir(CACHE_DIR, { recursive: true });
-    await fsp.writeFile(BUDGET_PATH, JSON.stringify(budgetState), 'utf8');
+    const payload = budgetState
+      ? { date: budgetState.date, count: budgetState.count, history: budgetHistory }
+      : { date: utcDayKey(), count: 0, history: budgetHistory };
+    await fsp.writeFile(BUDGET_PATH, JSON.stringify(payload), 'utf8');
   } catch (err) {
     console.warn('[tomtom] budget write failed:', err?.message || err);
   }
@@ -122,13 +161,75 @@ async function persistBudget() {
 export async function getCurrentBudget() {
   await loadBudgetOnce();
   budgetState = normalizeBudget(budgetState, utcDayKey());
+  budgetHistory = mergeBudgetHistory(budgetState, budgetHistory);
   return budgetState;
 }
 
 async function recordUpstreamFetch() {
   const b = await getCurrentBudget();
   b.count += 1;
+  budgetHistory[b.date] = b.count;
+  budgetHistory = mergeBudgetHistory(null, budgetHistory);
   void persistBudget();
+}
+
+/**
+ * Statistik TomTom lengkap khusus halaman Admin Monitoring:
+ * kuota harian, riwayat 7 hari, serta ukuran cache tile di RAM dan disk.
+ */
+export async function getTomTomAdminStats() {
+  const budget = await getCurrentBudget();
+  const limit = getDailyBudgetLimit();
+  const count = Number(budget.count || 0);
+  const remaining = Math.max(0, limit - count);
+  const usagePercent = limit > 0 ? Math.min(100, Math.round((count / limit) * 1000) / 10) : 0;
+
+  let diskTileFiles = 0;
+  let diskSizeBytes = 0;
+  try {
+    const entries = await fsp.readdir(CACHE_DIR, { withFileTypes: true });
+    for (const ent of entries) {
+      if (!ent.isFile() || ent.name === 'budget.json' || ent.name.endsWith('.tmp')) continue;
+      diskTileFiles += 1;
+      try {
+        const st = await fsp.stat(path.join(CACHE_DIR, ent.name));
+        diskSizeBytes += st.size || 0;
+      } catch {
+        // Lewati jika file terhapus bersamaan
+      }
+    }
+  } catch {
+    // Direktori cache belum ada
+  }
+
+  // Bangun seri 7 hari terakhir (kronologis) dari riwayat budget yang tersimpan
+  const histMap = budgetHistory || {};
+  const todayMs = Date.now();
+  const dailyHistory = [];
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const day = utcDayKey(todayMs - offset * 86_400_000);
+    const hasRecord = Object.prototype.hasOwnProperty.call(histMap, day);
+    dailyHistory.push({
+      date: day,
+      count: hasRecord ? Number(histMap[day] || 0) : (day === budget.date ? count : 0),
+      limit,
+      recorded: hasRecord || day === budget.date,
+    });
+  }
+
+  return {
+    hasKey: Boolean(process.env.TOMTOM_API_KEY),
+    date: budget.date,
+    dailyCount: count,
+    budgetLimit: limit,
+    remaining,
+    usagePercent,
+    memCacheEntries: tileMemCache.size,
+    segmentCacheEntries: segmentMemCache.size,
+    diskTileFiles,
+    diskSizeBytes,
+    dailyHistory,
+  };
 }
 
 // ── Disk Tile Cache ──
