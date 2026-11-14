@@ -308,8 +308,8 @@ export function createAdminRouter({ getRateLimitStats = () => [] } = {}) {
     try {
       const data = await getExecutionLogsForAdmin({
         limit: req.query.limit,
-        status: req.query.status || 'all',
-        scoreLabel: req.query.scoreLabel || 'all',
+        status: typeof req.query.status === 'string' ? req.query.status : 'all',
+        scoreLabel: typeof req.query.scoreLabel === 'string' ? req.query.scoreLabel : 'all',
         fallbackOnly: req.query.fallbackOnly === 'true' || req.query.fallbackOnly === '1',
       });
       return res.json({ ok: true, ...data });

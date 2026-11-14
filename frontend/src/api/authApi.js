@@ -37,6 +37,17 @@ export async function ambilProfilSaya(token) {
 }
 
 /**
+ * Mencabut sesi token aktif di server saat pengguna keluar (logout).
+ * @param {string} token
+ */
+export async function keluarPengguna(token) {
+  return await minta('/auth/logout', {
+    metode: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
  * Memperbarui profil pengguna (nama, status sensitif kesehatan, atau preferensi peringatan).
  * @param {string} token
  * @param {{ name?: string, isHealthSensitive?: boolean, conditions?: string[], alertPreferences?: object }} payload

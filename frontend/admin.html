@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Konsol Admin · JakSafe</title>
 <meta name="description" content="Konsol operasional administrator JakSafe untuk pemantauan kesehatan CCTV, kuota TomTom, cache layanan, dan audit performa agen.">
+<meta name="color-scheme" content="light dark">
+<script>
+  try {
+    const t = localStorage.getItem('jaksafe.tema');
+    if (t === 'gelap' || (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.setAttribute('data-theme', 'gelap');
+    }
+  } catch {}
+</script>
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='17' fill='%230A2E6B'/%3E%3Cpath d='M12 54 C24 44 34 40 44 32 C52 25 55 18 57 12' stroke='%23A3E635' stroke-width='9' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
 

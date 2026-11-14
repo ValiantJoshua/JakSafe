@@ -5,15 +5,13 @@
  */
 
 /**
- * Normalisasi alamat IP klien agar konsisten antara IPv4 dan IPv6-mapped.
+ * Normalisasi alamat IP klien berdasarkan `req.ip` (yang menghormati konfigurasi `trust proxy` Express)
+ * tanpa mempercayai header `X-Forwarded-For` mentah secara langsung.
  * @param {import('express').Request} req
  * @returns {string}
  */
 export function normalizeClientIp(req) {
-  const forwarded = req.headers?.['x-forwarded-for'];
-  const raw = typeof forwarded === 'string' && forwarded.length > 0
-    ? forwarded.split(',')[0].trim()
-    : (req.ip || req.socket?.remoteAddress || 'unknown');
+  const raw = req.ip || req.socket?.remoteAddress || 'unknown';
   return String(raw).replace(/^::ffff:/i, '');
 }
 

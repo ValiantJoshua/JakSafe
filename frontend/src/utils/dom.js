@@ -108,3 +108,18 @@ export function countTo(simpul, target, durasiMs = 900) {
   };
   requestAnimationFrame(langkah);
 }
+
+/**
+ * Meloloskan karakter khusus HTML untuk mencegah injeksi DOM XSS pada template literal.
+ * @param {unknown} teks
+ * @returns {string}
+ */
+export function escapeHtml(teks) {
+  if (teks === null || teks === undefined) return '';
+  return String(teks)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}

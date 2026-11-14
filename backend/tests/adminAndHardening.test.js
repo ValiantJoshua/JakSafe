@@ -8,7 +8,9 @@ import http from 'node:http';
 import { createApp } from '../src/app.js';
 import { requireAdmin } from '../src/middleware/auth.js';
 import { createRateLimiter } from '../src/middleware/rateLimit.js';
-import { bootstrapAdminFromEnv } from '../src/services/authService.js';
+import { bootstrapAdminFromEnv, register } from '../src/services/authService.js';
+import { updateUserRole } from '../src/db/storageService.js';
+import { assertPublicHttpUrl } from '../src/services/cctvFrame.js';
 import { loadCatalog, findNearest, publicView, adminView } from '../src/services/cctvCatalog.js';
 import { resetCatalogOverridesCache } from '../src/db/cctvCatalogStore.js';
 import { getTomTomAdminStats } from '../src/services/tomtom.js';
@@ -210,6 +212,46 @@ describe('Admin System, CCTV Management, Telemetry & Security Hardening', () => 
       assert.equal(adminCache.body?.ok, true);
       assert.ok(adminCache.body?.cache?.cctvHealth);
       assert.ok(adminCache.body?.summary?.overallHitRate);
+    });
+
+    it('defaults registration to role user even if email is in ADMIN_EMAILS, supports manual DB promotion, and revokes token on logout', async () => {
+      process.env.ADMIN_EMAILS = `claimed.admin.${stamp}@jaksafe.id`;
+      const reg = await register({
+        email: `claimed.admin.${stamp}@jaksafe.id`,
+        password: 'ValidPassword123',
+        name: 'Claimed Admin',
+      });
+      assert.equal(reg.user.role, 'user', 'Public registration must always default to role user');
+
+      // Manual DB promotion to admin immediately takes effect on requireAdmin endpoints
+      await updateUserRole(reg.user.id, 'admin');
+      const promotedCheck = await requestJson(baseUrl, '/api/cache/stats', {
+        headers: { Authorization: `Bearer ${reg.token}` },
+      });
+      assert.equal(promotedCheck.status, 200);
+
+      // Logout revokes token via tokenVersion++
+      const logoutRes = await requestJson(baseUrl, '/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${reg.token}` },
+      });
+      assert.equal(logoutRes.status, 200);
+
+      const afterLogout = await requestJson(baseUrl, '/api/auth/me', {
+        headers: { Authorization: `Bearer ${reg.token}` },
+      });
+      assert.equal(afterLogout.status, 401);
+    });
+
+    it('assertPublicHttpUrl blocks non-standard ports and multicast/reserved IPs', async () => {
+      await assert.rejects(
+        () => assertPublicHttpUrl('http://8.8.8.8:6379/internal'),
+        /blocked port/i
+      );
+      await assert.rejects(
+        () => assertPublicHttpUrl('http://224.0.0.1/multicast'),
+        /blocked address/i
+      );
     });
   });
 

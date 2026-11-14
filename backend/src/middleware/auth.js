@@ -23,6 +23,11 @@ export async function requireAuth(req, res, next) {
   try {
     const decoded = verifyToken(token);
     const user = await getCurrentUser(decoded.id);
+    const tokenVer = Number(decoded.tokenVersion) || 0;
+    const userVer = Number(user.tokenVersion) || 0;
+    if (tokenVer !== userVer) {
+      throw new AuthError('Sesi otentikasi telah berakhir atau dicabut. Silakan masuk kembali.', 401);
+    }
     req.user = user;
     next();
   } catch (err) {

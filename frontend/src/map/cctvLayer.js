@@ -17,6 +17,7 @@ import Hls from 'hls.js';
 import { ambilSemuaKamera, cekKesehatanCctv, urlBingkaiKamera, urlStreamKamera, analisisKamera } from '../api/cctvApi.js';
 import { getViewer, flyToCoordinates } from './cesiumViewer.js';
 import { labelKondisiJalan, labelGenangan } from '../utils/format.js';
+import { escapeHtml } from '../utils/dom.js';
 import { ikon } from '../ui/icons.js';
 
 /** @type {Cesium.CustomDataSource|null} */
@@ -821,15 +822,15 @@ function pasangTombolPopupKamera() {
         const conf = Number.isFinite(a.confidence) ? `${Math.round(a.confidence * 100)}%` : '-';
         aiBox.innerHTML = `
           <div class="mapcctv__ai">
-            <div class="mapcctv__airow"><span>Genangan:</span><strong>${genanganTeks}</strong></div>
-            <div class="mapcctv__airow"><span>Arus Jalan:</span><strong>${jalanTeks}</strong></div>
-            <div class="mapcctv__airow"><span>Keyakinan AI:</span><strong>${conf}</strong></div>
-            ${a.alasan ? `<p class="mapcctv__aireason">"${a.alasan}"</p>` : ''}
+            <div class="mapcctv__airow"><span>Genangan:</span><strong>${escapeHtml(genanganTeks)}</strong></div>
+            <div class="mapcctv__airow"><span>Arus Jalan:</span><strong>${escapeHtml(jalanTeks)}</strong></div>
+            <div class="mapcctv__airow"><span>Keyakinan AI:</span><strong>${escapeHtml(conf)}</strong></div>
+            ${a.alasan ? `<p class="mapcctv__aireason">"${escapeHtml(a.alasan)}"</p>` : ''}
           </div>
         `;
       }
     } catch (err) {
-      aiBox.innerHTML = `<p class="mapcctv__err">Gagal menganalisis kamera: ${err?.message || 'Terjadi kesalahan'}</p>`;
+      aiBox.innerHTML = `<p class="mapcctv__err">Gagal menganalisis kamera: ${escapeHtml(err?.message || 'Terjadi kesalahan')}</p>`;
     } finally {
       if (btn) {
         btn.disabled = false;

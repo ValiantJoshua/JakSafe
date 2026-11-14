@@ -67,34 +67,109 @@
 .topbar__spacer { flex: 1; }
 .topbar__tools { display: flex; align-items: center; gap: var(--s2); }
 
-/* PEMILIH TEMA (Nested Radius: 8px container -> 6px button) */
+/* PEMILIH TEMA KAPSUL (Capsule Toggle: Sun & Moon) */
 .themeswitch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 66px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 9999px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.themeswitch:focus-visible {
+  outline: 2px solid var(--jk-blue-1);
+  outline-offset: 3px;
+}
+
+.themeswitch__track {
+  position: relative;
   display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 3px;
+  box-sizing: border-box;
+  border-radius: 9999px;
+  background-color: #F1F5F9;
   border: 1px solid var(--border);
+  transition: background-color var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
 }
-.themeswitch__btn {
-  padding: 5px 10px;
-  border-radius: var(--r-xs);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  color: var(--text-3);
-  white-space: nowrap;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+
+.themeswitch:hover .themeswitch__track {
+  border-color: var(--border-strong);
 }
-.themeswitch__btn:hover { color: var(--text-1); }
-.themeswitch__btn[aria-pressed="true"] {
-  background: var(--surface);
-  color: var(--text-1);
-  font-weight: 600;
-  box-shadow: var(--sh-1);
+
+[data-theme="gelap"] .themeswitch__track {
+  background-color: #060A14;
+  border-color: rgba(255, 255, 255, 0.12);
 }
-[data-theme="gelap"] .themeswitch__btn[aria-pressed="true"] {
-  background: var(--surface-3);
-  color: var(--text-1);
+
+[data-theme="gelap"] .themeswitch:hover .themeswitch__track {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.themeswitch__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 29px;
+  height: 26px;
+  border-radius: 9999px;
+  background-color: #E2E8F0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transform: translateX(0);
+  transition: transform var(--dur-2) var(--ease), background-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+  z-index: 1;
+  pointer-events: none;
+}
+
+[data-theme="gelap"] .themeswitch__thumb {
+  background-color: #243048;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  transform: translateX(29px);
+}
+
+.themeswitch__slot {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 26px;
+  border-radius: 9999px;
+  transition: color var(--dur-2) var(--ease);
+}
+
+.themeswitch__slot svg {
+  display: block;
+}
+
+/* Slot Matahari */
+.themeswitch__slot--sun {
+  color: #0F172A;
+}
+
+[data-theme="gelap"] .themeswitch__slot--sun {
+  color: #64748B;
+}
+
+/* Slot Bulan */
+.themeswitch__slot--moon {
+  color: #94A3B8;
+}
+
+[data-theme="gelap"] .themeswitch__slot--moon {
+  color: #FFFFFF;
 }
 
 /* CHIP AKUN */

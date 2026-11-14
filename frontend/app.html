@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JakSafe, Rute Lebih Aman untuk Jakarta</title>
 <meta name="description" content="Navigasi Jakarta yang menimbang kualitas udara dan kondisi jalan, bukan hanya waktu tempuh.">
+<meta name="color-scheme" content="light dark">
+<script>
+  try {
+    const t = localStorage.getItem('jaksafe.tema');
+    if (t === 'gelap' || (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.setAttribute('data-theme', 'gelap');
+    }
+  } catch {}
+</script>
 
 <!--
   Berkas ini sengaja dibiarkan kosong dari sisi tampilan.

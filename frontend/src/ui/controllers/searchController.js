@@ -6,7 +6,7 @@
    serta alur navigasi di domain/navigationService.js.
 */
 
-import { $, $$, show, setPressed, setText } from '../../utils/dom.js';
+import { $, $$, show, setPressed, setText, escapeHtml } from '../../utils/dom.js';
 import { getState, setState } from '../../state/appState.js';
 import {
   findPlaceById,
@@ -73,13 +73,13 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
       daftar.innerHTML = '<p class="saran__kosong">Lokasi tidak ditemukan. Coba ketik nama jalan, perumahan, blok/nomor, atau koordinat.</p>';
     } else {
       daftar.innerHTML = hasil.map((p) => {
-        const headline = p.headline || p.nama || '';
-        const subtitle = p.subtitle || p.area || '';
+        const headline = escapeHtml(p.headline || p.nama || '');
+        const subtitle = escapeHtml(p.subtitle || p.area || '');
         const unitTag = p.unit
-          ? `<span class="saran__unit">${p.unit}</span>`
+          ? `<span class="saran__unit">${escapeHtml(p.unit)}</span>`
           : '';
         return `
-        <button type="button" class="saran__item" role="option" data-tempat="${p.id}">
+        <button type="button" class="saran__item" role="option" data-tempat="${escapeHtml(p.id)}">
           <span class="saran__top">
             <span class="saran__nama">${headline}</span>
             ${unitTag}

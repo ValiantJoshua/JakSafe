@@ -26,7 +26,10 @@ dns.setDefaultResultOrder('ipv4first');
  */
 export function createApp(options = {}) {
   const app = express();
-  app.set('trust proxy', 1);
+  const trustProxy = options.trustProxy !== undefined
+    ? options.trustProxy
+    : (process.env.TRUST_PROXY ? (Number(process.env.TRUST_PROXY) || true) : false);
+  app.set('trust proxy', trustProxy);
 
   const rlOpts = options.rateLimit || {};
   const apiWindowMs = Number(rlOpts.apiWindowMs || process.env.RATE_LIMIT_WINDOW_MS || 60_000);
@@ -78,7 +81,11 @@ export function createApp(options = {}) {
   const allLimiters = [apiLimiter, authLimiter, heavyLimiter, tileLimiter, adminLimiter];
   const getRateLimitStats = () => allLimiters.map((lim) => lim.getStats());
 
-  app.use(cors());
+  const configuredOrigins = String(process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.use(cors(configuredOrigins.length > 0 ? { origin: configuredOrigins } : undefined));
   app.use(express.json());
   app.use('/api', apiLimiter);
 

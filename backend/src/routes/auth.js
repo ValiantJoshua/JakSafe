@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   register,
   login,
+  logout,
   updateProfile,
   AuthError,
 } from '../services/authService.js';
@@ -55,6 +56,23 @@ router.get('/me', requireAuth, (req, res) => {
     ok: true,
     user: req.user,
   });
+});
+
+// POST /api/auth/logout -> cabut seluruh token aktif pengguna (tokenVersion++)
+router.post('/logout', requireAuth, async (req, res) => {
+  try {
+    await logout(req.user.id);
+    res.json({
+      ok: true,
+      message: 'Berhasil keluar dan sesi telah dicabut',
+    });
+  } catch (err) {
+    const status = err instanceof AuthError ? err.status : 500;
+    res.status(status).json({
+      ok: false,
+      error: err.message || 'Gagal mencabut sesi',
+    });
+  }
 });
 
 // PUT /api/auth/profile -> perbarui profil pengguna, status sensitif kesehatan, & preferensi peringatan

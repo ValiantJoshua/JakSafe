@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import {
@@ -6,13 +7,29 @@ import {
   createUser,
   updateUserProfile,
   updateUserRole,
+  incrementUserTokenVersion,
 } from '../db/storageService.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'jaksafe-dev-secret-key-2026';
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.warn('[authService] PERINGATAN: JWT_SECRET tidak diatur pada environment production; menggunakan fallback dev.');
+const EPHEMERAL_DEV_SECRET = crypto.randomBytes(32).toString('hex');
+const DUMMY_BCRYPT_HASH = '$2b$10$CwTycUXWue0Thq9StjUM0uJ8p4R2X9z3s8m5K1v7L9q2W4e6R8t0y';
+
+function getJwtSecret() {
+  const envSecret = typeof process.env.JWT_SECRET === 'string' ? process.env.JWT_SECRET.trim() : '';
+  if (process.env.NODE_ENV === 'production') {
+    if (envSecret.length < 32) {
+      throw new Error('[authService] FATAL: JWT_SECRET wajib diatur minimal 32 karakter pada environment production.');
+    }
+    return envSecret;
+  }
+  return envSecret || EPHEMERAL_DEV_SECRET;
 }
-const JWT_EXPIRES_IN = '7d';
+
+if (process.env.NODE_ENV === 'production') {
+  getJwtSecret();
+}
+
+const JWT_EXPIRES_IN = '24h';
+const MAX_PASSWORD_BYTES = 72;
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -49,8 +66,9 @@ export function generateToken(user) {
     id: user.id || user._id,
     email: user.email,
     role: user.role === 'admin' ? 'admin' : 'user',
+    tokenVersion: Number(user.tokenVersion) || 0,
   };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 }
 
 /**
@@ -58,7 +76,7 @@ export function generateToken(user) {
  */
 export function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, getJwtSecret());
   } catch (err) {
     throw new AuthError('Token otentikasi tidak valid atau telah kedaluwarsa', 401);
   }
@@ -66,14 +84,19 @@ export function verifyToken(token) {
 
 /**
  * Registrasi pengguna baru.
+ * Secara default seluruh registrasi publik mendapatkan role 'user'.
  */
 export async function register({ email, password, name, isHealthSensitive = false, conditions = [] }) {
-  if (!email || !EMAIL_REGEX.test(email)) {
+  if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email)) {
     throw new AuthError('Format email tidak valid', 400);
   }
 
   if (!password || typeof password !== 'string' || password.length < 6) {
     throw new AuthError('Kata sandi minimal 6 karakter', 400);
+  }
+
+  if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) {
+    throw new AuthError('Kata sandi maksimal 72 karakter', 400);
   }
 
   const existing = await findUserByEmail(email);
@@ -83,7 +106,7 @@ export async function register({ email, password, name, isHealthSensitive = fals
 
   const displayName = String(name || email.split('@')[0] || 'Pengguna JakSafe').trim();
   const hashedPassword = await bcrypt.hash(password, 10);
-  const role = isConfiguredAdminEmail(email) ? 'admin' : 'user';
+  const role = 'user';
 
   const newUser = await createUser({
     name: displayName,
@@ -102,16 +125,19 @@ export async function register({ email, password, name, isHealthSensitive = fals
 
 /**
  * Masuk (Login) pengguna.
- * Jika pengguna belum terdaftar dan memasukkan kredensial valid, kita bisa mendukung seamless auto-provisioning
- * atau mengembalikan pesan yang jelas.
  */
 export async function login({ email, password }) {
-  if (!email || !password) {
+  if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
     throw new AuthError('Email dan kata sandi wajib diisi', 400);
+  }
+
+  if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) {
+    throw new AuthError('Kata sandi salah. Silakan coba lagi.', 401);
   }
 
   const user = await findUserByEmail(email, { includePassword: true });
   if (!user) {
+    await bcrypt.compare(password, DUMMY_BCRYPT_HASH).catch(() => {});
     throw new AuthError('Akun dengan email ini belum terdaftar', 404);
   }
 
@@ -120,22 +146,27 @@ export async function login({ email, password }) {
     throw new AuthError('Kata sandi salah. Silakan coba lagi.', 401);
   }
 
-  let safeUser = { ...user };
+  const safeUser = { ...user };
   delete safeUser.password;
   if (safeUser._id) safeUser.id = String(safeUser._id);
   safeUser.role = safeUser.role === 'admin' ? 'admin' : 'user';
-
-  if (safeUser.role !== 'admin' && isConfiguredAdminEmail(safeUser.email)) {
-    const promoted = await updateUserRole(safeUser.id, 'admin');
-    if (promoted) safeUser = promoted;
-  }
+  safeUser.tokenVersion = Number(safeUser.tokenVersion) || 0;
 
   const token = generateToken(safeUser);
   return { user: safeUser, token };
 }
 
 /**
- * Pastikan akun admin dari environment (`ADMIN_EMAIL`/`ADMIN_PASSWORD` & `ADMIN_EMAILS`) siap saat startup.
+ * Cabut seluruh token aktif pengguna dengan menaikkan tokenVersion di penyimpanan.
+ */
+export async function logout(userId) {
+  if (!userId) throw new AuthError('Pengguna tidak ditemukan', 404);
+  await incrementUserTokenVersion(userId);
+  return { ok: true };
+}
+
+/**
+ * Pastikan akun admin dari environment (`ADMIN_EMAIL` + `ADMIN_PASSWORD`) siap saat eksplisit dipanggil.
  */
 export async function bootstrapAdminFromEnv() {
   const adminEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
@@ -156,15 +187,6 @@ export async function bootstrapAdminFromEnv() {
     } else if (existing.role !== 'admin') {
       await updateUserRole(existing.id, 'admin');
       console.log(`[auth] Hak akses admin diaktifkan untuk ${adminEmail}.`);
-    }
-  }
-
-  for (const email of getConfiguredAdminEmails()) {
-    if (email === adminEmail) continue;
-    const existing = await findUserByEmail(email);
-    if (existing && existing.role !== 'admin') {
-      await updateUserRole(existing.id, 'admin');
-      console.log(`[auth] Hak akses admin disinkronkan dari ADMIN_EMAILS untuk ${email}.`);
     }
   }
 }
