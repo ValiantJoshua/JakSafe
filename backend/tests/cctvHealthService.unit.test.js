@@ -6,13 +6,17 @@ import {
   getAllCacheStats,
 } from '../src/services/cacheService.js';
 import {
+  DEFAULT_SWEEP_INTERVAL_MS,
   attachHealth,
   checkCameraEndpoint,
   getCameraHealth,
   getHealthSummary,
   recordCameraHealth,
+  resolveSweepIntervalMs,
   runHealthSweep,
   sortCandidatesByHealth,
+  startCctvHealthScheduler,
+  stopCctvHealthScheduler,
 } from '../src/services/cctvHealthService.js';
 import { CctvStatus } from '../src/db/models/CctvStatus.js';
 import { findNearest } from '../src/services/cctvCatalog.js';
@@ -222,6 +226,21 @@ describe('Unit Test: Hybrid CCTV Health Checker Service', () => {
     assert.equal(fetchCalled, 0);
     assert.equal(res.ok, false);
     assert.equal(res.skippedOfflineCount, nearby.length);
+  });
+
+  it('resolveSweepIntervalMs parses CCTV_SWEEP_INTERVAL_MINUTES, disable flags, and defaults', () => {
+    assert.equal(resolveSweepIntervalMs({}), DEFAULT_SWEEP_INTERVAL_MS);
+    assert.equal(resolveSweepIntervalMs({ CCTV_SWEEP_INTERVAL_MINUTES: '360' }), 360 * 60 * 1000);
+    assert.equal(resolveSweepIntervalMs({ CCTV_SWEEP_INTERVAL_MINUTES: '0' }), 0);
+    assert.equal(resolveSweepIntervalMs({ CCTV_SWEEP_INTERVAL_MINUTES: 'off' }), 0);
+    assert.equal(resolveSweepIntervalMs({ CCTV_SWEEP_INTERVAL_MS: '45000' }), 45000);
+  });
+
+  it('startCctvHealthScheduler skips initial sweep and timer when intervalMs is 0', async () => {
+    await startCctvHealthScheduler({ intervalMs: 0 });
+    const summary = getHealthSummary();
+    assert.equal(summary.sweepInProgress, false);
+    stopCctvHealthScheduler();
   });
 });
 
