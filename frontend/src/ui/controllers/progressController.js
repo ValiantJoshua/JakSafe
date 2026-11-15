@@ -1,80 +1,120 @@
 /*
-   Pengendali layar proses.
+   Pengendali layar proses (Shimmer Skeleton + Live Status Capsule).
 
-   Tiap baris tahap punya tiga keadaan yang ditulis pada atribut data-state,
-   yaitu wait untuk belum dimulai, run untuk sedang berjalan, dan done untuk
-   selesai. CSS yang menerjemahkannya menjadi warna bulatan dan denyut.
-
-   Lama tiap tahap diukur dengan performance.now, bukan dikira kira. Angka
-   yang muncul di sebelah kanan baris adalah waktu nyata yang dibutuhkan
-   panggilan itu. Karena diukur sungguhan, angkanya juga berguna saat
-   menelusuri tahap mana yang menjadi penyebab pencarian terasa lambat.
-
-   Untuk jalur agen, lihat catatan di templates/progressView.js. Backend
-   mengerjakan semuanya dalam satu panggilan sehingga frontend tidak punya
-   informasi per tahap. Dalam keadaan itu seluruh baris ditandai berjalan
-   sekaligus dan keterangannya diganti, bukan dipalsukan satu per satu.
+   Mengelola progres tahap pada kapsul status translusen dan 5 segmented pips.
+   Karena panggilan utama /api/navigate berjalan sebagai satu request atomik ke
+   backend AI agent, pengendali menjalankan siklus status progresif hingga
+   tahap ke-5 (tanpa mengulang/loop) agar antarmuka terasa hidup, dan langsung
+   berhenti atau mengikuti tahap nyata jika fallback pratinjau berjalan.
 */
 
 import { $, $$, setText } from '../../utils/dom.js';
-import { formatLama } from '../../utils/format.js';
 
-/** Penanda waktu mulai tiap tahap. */
-let waktuMulai = {};
+const STAGE_MESSAGES = [
+  { id: 'rute', label: 'Calculating road corridors…' },
+  { id: 'lalulintas', label: 'Checking live traffic & flooding…' },
+  { id: 'udara', label: 'Sampling route air quality (AQI)…' },
+  { id: 'cctv', label: 'Scanning nearby CCTV cameras…' },
+  { id: 'skor', label: 'Scoring safety & AI recommendation…' },
+];
 
-/** Mengembalikan semua baris tahap ke keadaan awal. */
-export function resetTahap() {
-  waktuMulai = {};
-  for (const baris of $$('.stage')) {
-    baris.dataset.state = 'wait';
-    setText(baris.querySelector('.stage__time'), '');
+const STAGE_INDEX = Object.fromEntries(STAGE_MESSAGES.map((s, idx) => [s.id, idx]));
+
+let timerSiklus = null;
+let timerCrossfade = null;
+let indeksAktif = 0;
+
+function hentikanSiklus() {
+  if (timerSiklus) {
+    clearInterval(timerSiklus);
+    timerSiklus = null;
   }
-  setText($('#progressSub'), 'Mengambil data dari backend JakSafe');
+  if (timerCrossfade) {
+    clearTimeout(timerCrossfade);
+    timerCrossfade = null;
+  }
+}
+
+/** Memperbarui teks status dengan transisi opacity lembut (§15/§16). */
+function setStatusTeks(teks, immediate = false) {
+  const el = $('#progressSub');
+  if (!el) return;
+  if (immediate || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+    el.classList.remove('is-swapping');
+    setText(el, teks);
+    return;
+  }
+  el.classList.add('is-swapping');
+  if (timerCrossfade) clearTimeout(timerCrossfade);
+  timerCrossfade = setTimeout(() => {
+    setText(el, teks);
+    el.classList.remove('is-swapping');
+  }, 130);
+}
+
+/** Menyorot pip aktif & pip selesai sesuai indeks 0..4. */
+function terapkanPip(index, allDone = false) {
+  const pipsWrap = $('#progressPips');
+  if (pipsWrap) {
+    pipsWrap.setAttribute('aria-valuenow', String(allDone ? STAGE_MESSAGES.length : index + 1));
+  }
+  for (const pip of $$('#progressPips .progresspip')) {
+    const i = Number(pip.dataset.pip);
+    pip.classList.toggle('is-done', allDone || i < index);
+    pip.classList.toggle('is-active', !allDone && i === index);
+  }
+}
+
+/** Mengembalikan layar proses ke kondisi awal dan memulai siklus status. */
+export function resetTahap() {
+  hentikanSiklus();
+  indeksAktif = 0;
+  terapkanPip(0, false);
+  setStatusTeks(STAGE_MESSAGES[0].label, true);
+
+  timerSiklus = setInterval(() => {
+    const view = $('#viewProgress');
+    if (!view || view.hidden) {
+      hentikanSiklus();
+      return;
+    }
+    if (indeksAktif >= STAGE_MESSAGES.length - 1) {
+      hentikanSiklus();
+      return;
+    }
+    indeksAktif += 1;
+    terapkanPip(indeksAktif, false);
+    setStatusTeks(STAGE_MESSAGES[indeksAktif].label, false);
+  }, 1500);
 }
 
 /**
- * Menandai satu tahap sedang berjalan, sekaligus menutup tahap sebelumnya.
- *
- * Penutupan tahap sebelumnya dikerjakan di sini, bukan dipanggil terpisah,
- * supaya pemanggil cukup mengabarkan "sekarang masuk tahap ini" dan tidak
- * perlu mengingat tahap mana yang tadi dibuka.
+ * Menandai tahap spesifik (dipakai ketika fallback rangkaiPratinjau() aktif).
+ * Menghentikan timer otomatis agar status mencerminkan tahap nyata 1:1.
  *
  * @param {string} idTahap
  */
 export function tandaiTahapBerjalan(idTahap) {
-  const sekarang = performance.now();
-
-  for (const baris of $$('.stage')) {
-    if (baris.dataset.state !== 'run') continue;
-    baris.dataset.state = 'done';
-    const mulai = waktuMulai[baris.dataset.stage];
-    if (mulai) setText(baris.querySelector('.stage__time'), formatLama(sekarang - mulai));
+  if (timerSiklus) {
+    clearInterval(timerSiklus);
+    timerSiklus = null;
   }
-
-  const target = $(`.stage[data-stage="${idTahap}"]`);
-  if (target) {
-    target.dataset.state = 'run';
-    waktuMulai[idTahap] = sekarang;
-  }
+  const idx = STAGE_INDEX[idTahap];
+  if (!Number.isInteger(idx)) return;
+  indeksAktif = idx;
+  terapkanPip(idx, false);
+  setStatusTeks(STAGE_MESSAGES[idx].label, false);
 }
 
-/** Menutup seluruh tahap, dipanggil saat hasil sudah siap. */
+/** Menutup seluruh tahap dan membersihkan timer saat selesai, batal, atau galat. */
 export function tutupSemuaTahap() {
-  const sekarang = performance.now();
-  for (const baris of $$('.stage')) {
-    if (baris.dataset.state === 'run') {
-      const mulai = waktuMulai[baris.dataset.stage];
-      if (mulai) setText(baris.querySelector('.stage__time'), formatLama(sekarang - mulai));
-    }
-    baris.dataset.state = 'done';
-  }
+  hentikanSiklus();
+  terapkanPip(STAGE_MESSAGES.length - 1, true);
 }
 
-/**
- * Mengubah tampilan menjadi mode agen, yaitu satu panggilan panjang ke
- * backend tanpa kabar kemajuan per tahap.
- */
+/** Dipanggil saat respons agen diterima. */
 export function modeAgen() {
-  for (const baris of $$('.stage')) baris.dataset.state = 'run';
-  setText($('#progressSub'), 'Agen di backend sedang memanggil tool dan menilai rute');
+  hentikanSiklus();
+  terapkanPip(STAGE_MESSAGES.length - 1, true);
+  setStatusTeks('Route analysis ready', true);
 }

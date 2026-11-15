@@ -34,8 +34,8 @@ function gambarPenanda(hidup, laluLintas) {
 
   if (!hidup) {
     penanda.dataset.status = 'mati';
-    setText($('#konStatTeks'), 'Backend tidak aktif');
-    penanda.title = 'Jalankan npm run dev pada folder backend, porta 3001.';
+    setText($('#konStatTeks'), 'Backend offline');
+    penanda.title = 'Run npm run dev in the backend folder on port 3001.';
     return;
   }
 
@@ -44,16 +44,16 @@ function gambarPenanda(hidup, laluLintas) {
     // warnanya supaya terlihat bahwa ini bukan kegagalan, hanya data
     // tambahan yang belum ada.
     penanda.dataset.status = 'sebagian';
-    setText($('#konStatTeks'), 'Backend aktif, TomTom mati');
+    setText($('#konStatTeks'), 'Backend active, TomTom offline');
     penanda.title = laluLintas.adaKunci
-      ? 'Kunci TomTom terpasang tetapi kuota harian sudah habis. Penilaian memakai waktu dasar OSRM.'
-      : 'Kunci TomTom belum dipasang di backend/.env. Penilaian memakai waktu dasar OSRM.';
+      ? 'TomTom key is configured, but the daily quota is exhausted. Scoring uses OSRM base travel time.'
+      : 'TomTom key is not configured in backend/.env. Scoring uses OSRM base travel time.';
     return;
   }
 
   penanda.dataset.status = 'hidup';
-  setText($('#konStatTeks'), 'Backend aktif');
-  penanda.title = `Sambungan normal. Pemakaian kuota TomTom hari ini ${laluLintas.terpakai} dari ${laluLintas.kuota}.`;
+  setText($('#konStatTeks'), 'Backend connected');
+  penanda.title = `Connection healthy. Today's TomTom quota usage: ${laluLintas.terpakai} of ${laluLintas.kuota}.`;
 }
 
 /** Menjalankan satu putaran pemeriksaan. */

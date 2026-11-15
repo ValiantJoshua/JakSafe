@@ -59,7 +59,7 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
 
   const gambarSaran = async () => {
     const val = kotak.value.trim();
-    daftar.innerHTML = '<p class="saran__kosong" style="color:var(--text-3, #94a3b8)">Mencari alamat presisi...</p>';
+    daftar.innerHTML = '<p class="saran__kosong" style="color:var(--text-3, #94a3b8)">Searching exact address...</p>';
     daftar.hidden = false;
     kotak.setAttribute('aria-expanded', 'true');
 
@@ -70,7 +70,7 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
     if (ctrl.signal.aborted) return;
 
     if (hasil.length === 0) {
-      daftar.innerHTML = '<p class="saran__kosong">Lokasi tidak ditemukan. Coba ketik nama jalan, perumahan, blok/nomor, atau koordinat.</p>';
+      daftar.innerHTML = '<p class="saran__kosong">Location not found. Try typing a street name, neighborhood, building, or coordinates.</p>';
     } else {
       daftar.innerHTML = hasil.map((p) => {
         const headline = escapeHtml(p.headline || p.nama || '');
@@ -174,12 +174,12 @@ function pasangDeteksiGpsAsal() {
     e.stopPropagation();
 
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      toast('Peramban Anda tidak mendukung deteksi lokasi GPS.');
+      toast('Your browser does not support GPS location detection.');
       return;
     }
 
     btn.disabled = true;
-    if (lbl) lbl.textContent = 'Mendeteksi...';
+    if (lbl) lbl.textContent = 'Detecting...';
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -189,18 +189,18 @@ function pasangDeteksiGpsAsal() {
           inp.value = place.headline || place.nama;
           setState({ idAsal: place.id });
           tutupSemuaSaran();
-          toast(`Titik awal diatur ke: ${place.headline || place.nama}`);
+          toast(`Origin set to: ${place.headline || place.nama}`);
         } catch {
-          toast('Gagal menerjemahkan koordinat GPS.');
+          toast('Failed to resolve GPS coordinates.');
         } finally {
           btn.disabled = false;
-          if (lbl) lbl.textContent = 'Lokasi Saya';
+          if (lbl) lbl.textContent = 'My Location';
         }
       },
       () => {
         btn.disabled = false;
-        if (lbl) lbl.textContent = 'Lokasi Saya';
-        toast('Izin lokasi ditolak atau sinyal GPS tidak tersedia.');
+        if (lbl) lbl.textContent = 'My Location';
+        toast('Location permission denied or GPS signal unavailable.');
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
@@ -211,30 +211,30 @@ function pasangDeteksiGpsAsal() {
 function pesanGalat(galat) {
   if (galat?.sebab === SEBAB.TIDAK_TERHUBUNG) {
     return {
-      judul: 'Backend JakSafe tidak dapat dihubungi',
-      teks: 'Frontend berjalan, tetapi tidak ada yang menjawab di sisi backend. '
-        + 'Pencarian rute, data udara, dan kamera semuanya melewati backend, jadi tidak ada yang bisa ditampilkan.',
-      petunjuk: 'Buka terminal baru, masuk ke folder backend, lalu jalankan\n  npm install\n  npm run dev\n\nPastikan porta 3001 sesuai dengan VITE_BACKEND_ORIGIN pada .env frontend.',
+      judul: 'Unable to reach JakSafe backend',
+      teks: 'The frontend is running, but the backend is not responding. '
+        + 'Route search, air quality data, and camera feeds all require the backend.',
+      petunjuk: 'Open a terminal, go to the backend folder, and run\n  npm install\n  npm run dev\n\nEnsure port 3001 matches VITE_BACKEND_ORIGIN in the frontend .env.',
     };
   }
   if (galat?.sebab === SEBAB.WAKTU_HABIS) {
     return {
-      judul: 'Permintaan melewati batas waktu',
-      teks: 'Backend menjawab terlalu lama. Biasanya karena layanan luar seperti OSRM sedang lambat. Coba lagi beberapa saat lagi.',
+      judul: 'Request timed out',
+      teks: 'The backend took too long to respond, usually because an external routing service like OSRM is busy. Please try again shortly.',
       petunjuk: null,
     };
   }
   if (galat?.status === 404) {
     return {
-      judul: 'Rute tidak ditemukan',
-      teks: 'Layanan rute tidak menemukan jalan yang menghubungkan kedua titik dengan moda yang dipilih. Coba ganti titik atau pilih moda perjalanan lain.',
+      judul: 'No route found',
+      teks: 'The routing service could not find a road path connecting these points for the selected travel mode. Try different locations or switch travel mode.',
       petunjuk: null,
     };
   }
   return {
-    judul: 'Pencarian rute gagal',
-    teks: galat?.message || 'Terjadi kegagalan yang tidak dikenali saat mencari rute.',
-    petunjuk: galat?.jalur ? `Jalur yang gagal\n  ${galat.jalur}` : null,
+    judul: 'Route search failed',
+    teks: galat?.message || 'An unexpected error occurred while searching for a route.',
+    petunjuk: galat?.jalur ? `Failed endpoint\n  ${galat.jalur}` : null,
   };
 }
 
@@ -258,11 +258,11 @@ async function jalankanPencarian() {
   const tujuan = findPlaceById(keadaan.idTujuan);
 
   if (!asal || !tujuan) {
-    toast('Pilih titik awal dan tujuan dulu.');
+    toast('Select both an origin and a destination first.');
     return;
   }
   if (asal.id === tujuan.id) {
-    toast('Titik awal dan tujuan tidak boleh sama.');
+    toast('Origin and destination cannot be the same.');
     return;
   }
 
@@ -337,6 +337,7 @@ async function jalankanPencarian() {
         });
     }
   } catch (galat) {
+    tutupSemuaTahap();
     if (galat?.sebab === SEBAB.DIBATALKAN || pengendaliAktif?.signal.aborted) {
       setState({ tampilan: 'siap' });
       return;
@@ -388,6 +389,7 @@ export function pasangPengendaliPencarian() {
 
   $('#btnCancel')?.addEventListener('click', () => {
     pengendaliAktif?.abort();
+    tutupSemuaTahap();
     setState({ tampilan: 'siap' });
   });
 

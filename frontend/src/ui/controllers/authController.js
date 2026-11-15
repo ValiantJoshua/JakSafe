@@ -6,6 +6,7 @@
 
 import { $, $$, show, setText, setPressed } from '../../utils/dom.js';
 import { escapeHtml, formatJarak, formatDurasi } from '../../utils/format.js';
+import { labelSkorInggris } from '../../domain/scoreLabels.js';
 import { PROFILES } from '../../config/constants.js';
 import { getState, setState, subscribe } from '../../state/appState.js';
 import {
@@ -37,7 +38,7 @@ function resetTampilanPassword() {
   if (passEl) passEl.type = 'password';
   if (btnToggle) {
     btnToggle.setAttribute('aria-pressed', 'false');
-    btnToggle.setAttribute('aria-label', 'Tampilkan kata sandi');
+    btnToggle.setAttribute('aria-label', 'Show password');
     btnToggle.innerHTML = ikon('i-eye', 17);
   }
 }
@@ -92,12 +93,12 @@ function aturModeAuth(mode, { focusField = false } = {}) {
   show($('#registerNameWrap'), isRegister);
   show($('#registerSensitifWrap'), isRegister);
 
-  setText($('#loginTitle'), isRegister ? 'Buat Akun JakSafe' : 'Masuk ke JakSafe');
+  setText($('#loginTitle'), isRegister ? 'Create JakSafe Account' : 'Sign In to JakSafe');
   setText(
     $('#loginSub'),
     isRegister
-      ? 'Daftar gratis untuk simpan rute dan profil kesehatan.'
-      : 'Masuk dengan email dan kata sandi Anda.'
+      ? 'Sign up free to save routes and your health profile.'
+      : 'Sign in with your email and password.'
   );
 
   const passEl = /** @type {HTMLInputElement|null} */ ($('#loginPass'));
@@ -107,7 +108,7 @@ function aturModeAuth(mode, { focusField = false } = {}) {
 
   const submitBtn = $('#btnAuthSubmit');
   if (submitBtn && !submitBtn.disabled) {
-    submitBtn.innerHTML = `${isRegister ? 'Daftar Sekarang' : 'Masuk Sekarang'} <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>`;
+    submitBtn.innerHTML = `${isRegister ? 'Create Account' : 'Sign In'} <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>`;
   }
 
   bersihkanErrorAuth();
@@ -155,10 +156,10 @@ function gambarKeadaanMasuk(keadaan) {
   show($('#promoBox'), !masuk);
   show($('#savedBox'), masuk);
 
-  const namaUser = pengguna?.name || 'Pengguna JakSafe';
+  const namaUser = pengguna?.name || 'JakSafe User';
   const emailUser = pengguna?.email || '';
   const inisial = inisialNama(namaUser);
-  const namaPendek = namaUser.trim().split(/\s+/)[0] || 'Akun';
+  const namaPendek = namaUser.trim().split(/\s+/)[0] || 'Account';
 
   setText($('#userChipAva') || document.querySelector('.userchip__ava'), inisial);
   setText($('#userChipNama') || document.querySelector('.userchip__name'), namaPendek);
@@ -172,10 +173,10 @@ function gambarKeadaanMasuk(keadaan) {
   const sapaan = $('#greetBox');
   if (sapaan) {
     sapaan.innerHTML = masuk
-      ? `<h1 class="search__title">Halo, ${escapeHtml(namaPendek)}</h1>
-         <p class="search__sub">Profil kesehatan ${sensitifKesehatan ? 'aktif — bobot polusi udara diprioritaskan saat rute dinilai' : 'nonaktif — bobot penilaian memakai standar bawaan'}.</p>`
-      : `<h1 class="search__title">Rencanakan Rute Perjalanan</h1>
-         <p class="search__sub">Navigasi Jakarta dengan pertimbangan kualitas udara, lalu lintas, dan pantauan CCTV.</p>`;
+      ? `<h1 class="search__title">Hello, ${escapeHtml(namaPendek)}</h1>
+         <p class="search__sub">Health profile ${sensitifKesehatan ? 'enabled — air pollution carries higher weight during route scoring' : 'disabled — default scoring weights applied'}.</p>`
+      : `<h1 class="search__title">Plan Your Route</h1>
+         <p class="search__sub">Navigate Jakarta with live air quality, traffic flow, and CCTV road checks.</p>`;
   }
 
   show($('#menuBadgeSensitif'), masuk && sensitifKesehatan);
@@ -186,27 +187,28 @@ function gambarKeadaanMasuk(keadaan) {
   }
   setText(
     $('#menuSensitifSub'),
-    sensitifKesehatan ? 'Bobot polusi dinaikkan' : 'Prioritaskan udara bersih'
+    sensitifKesehatan ? 'Higher weight on air quality' : 'Prioritize cleaner air'
   );
   setText($('#menuHistoryCount'), String((keadaan.riwayatPerjalanan || []).length));
 }
 
-/** Format waktu ISO ke ringkasan waktu lokal Indonesia. */
+/** Format waktu ISO ke ringkasan waktu lokal Inggris. */
 function formatWaktuRiwayat(iso) {
-  if (!iso) return 'Baru saja';
+  if (!iso) return 'Just now';
   const dt = new Date(iso);
-  if (Number.isNaN(dt.getTime())) return 'Baru saja';
-  return new Intl.DateTimeFormat('id-ID', {
+  if (Number.isNaN(dt.getTime())) return 'Just now';
+  return new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   }).format(dt);
 }
 
-/** Label moda perjalanan Bahasa Indonesia untuk riwayat/rute tersimpan. */
+/** Label moda perjalanan untuk riwayat/rute tersimpan. */
 function namaProfil(profileKey) {
-  return PROFILES.find((p) => p.key === profileKey)?.nama || 'Mobil';
+  return PROFILES.find((p) => p.key === profileKey)?.nama || 'Car';
 }
 
 /** Muat satu record rute tersimpan/riwayat ke form pencarian & pilih chip moda. */
@@ -237,7 +239,7 @@ function muatRuteDariRecord(r) {
     idTujuan: destId,
     ...(savedProfile ? { profil: savedProfile } : {}),
   });
-  toast(`Rute dimuat: ${origin.name} → ${dest.name}`);
+  toast(`Route loaded: ${origin.name} → ${dest.name}`);
 }
 
 /**
@@ -276,24 +278,24 @@ function gambarDialogRiwayat(daftar = []) {
 
   if (sumEl) {
     sumEl.textContent = daftar.length > 0
-      ? `${daftar.length} perjalanan terakhir tercatat`
-      : 'Belum ada riwayat perjalanan tercatat';
+      ? `${daftar.length} recent ${daftar.length === 1 ? 'trip' : 'trips'} recorded`
+      : 'No trip history recorded yet';
   }
   if (btnClear) btnClear.hidden = daftar.length === 0;
   if (!listEl) return;
 
   if (daftar.length === 0) {
-    listEl.innerHTML = '<li class="jempty">Belum ada pencarian rute yang tersimpan ke riwayat Anda.</li>';
+    listEl.innerHTML = '<li class="jempty">No route searches saved to your history yet.</li>';
     return;
   }
 
   listEl.innerHTML = daftar.map((item, idx) => {
     const entryId = escapeHtml(item.id || item._id || '');
-    const asal = escapeHtml(item.origin?.name || 'Titik Awal');
-    const tujuan = escapeHtml(item.destination?.name || 'Tujuan');
+    const asal = escapeHtml(item.origin?.name || 'Origin');
+    const tujuan = escapeHtml(item.destination?.name || 'Destination');
     const koridor = item.summary ? escapeHtml(item.summary) : '';
     const skor = escapeHtml(item.score?.totalScore ?? '-');
-    const labelSkor = escapeHtml(item.score?.label || 'AMAN');
+    const labelSkor = escapeHtml(labelSkorInggris(item.score?.label || 'AMAN'));
     const sevClass = String(item.score?.label || '').toLowerCase().includes('hindari')
       ? 'siaga'
       : String(item.score?.label || '').toLowerCase().includes('hati')
@@ -313,14 +315,14 @@ function gambarDialogRiwayat(daftar = []) {
         <div class="jitem__meta">
           <span>${waktu}</span>
           <span>·</span>
-          <span>Skor ${skor} (${labelSkor})</span>
+          <span>Score ${skor} (${labelSkor})</span>
           ${item.distanceM ? `<span>·</span><span>${jarak} · ${durasi}</span>` : ''}
         </div>
         ${koridor ? `<p class="jitem__desc">Via ${koridor}</p>` : ''}
         <div class="jitem__foot">
           <div class="jitem__btns">
-            <button type="button" class="jitem__btn jitem__btn--primary press" data-load-history="${idx}">Muat Rute</button>
-            <button type="button" class="jitem__btn jitem__btn--del press" data-delete-history="${entryId}" aria-label="Hapus riwayat ini">Hapus</button>
+            <button type="button" class="jitem__btn jitem__btn--primary press" data-load-history="${idx}">Load Route</button>
+            <button type="button" class="jitem__btn jitem__btn--del press" data-delete-history="${entryId}" aria-label="Delete this history entry">Delete</button>
           </div>
         </div>
       </li>`;
@@ -358,28 +360,35 @@ function gambarDialogPeringatan(alerts = [], meta = {}) {
   const metaEl = $('#alertsMetaText');
   const siagaCount = alerts.filter((a) => a.severity === 'siaga').length;
 
-  setText($('#menuAlertCount'), siagaCount > 0 ? `${siagaCount} Siaga` : 'Pantau');
+  setText($('#menuAlertCount'), siagaCount > 0 ? `${siagaCount} Alert` : 'Monitor');
 
   if (metaEl) {
-    const sumberCuaca = meta.weatherAvailable ? 'Cuaca langsung' : 'Data koridor';
-    metaEl.textContent = `${alerts.length} koridor · ${siagaCount} Siaga · ${sumberCuaca}`;
+    const sumberCuaca = meta.weatherAvailable ? 'Live weather' : 'Corridor data';
+    metaEl.textContent = `${alerts.length} corridors · ${siagaCount} Alert · ${sumberCuaca}`;
   }
   if (!listEl) return;
 
   if (alerts.length === 0) {
-    listEl.innerHTML = '<li class="jempty">Tidak ada peringatan koridor untuk filter wilayah saat ini.</li>';
+    listEl.innerHTML = '<li class="jempty">No corridor alerts for the selected region filter.</li>';
     return;
   }
 
+  const labelLevel = (sev, rawLabel) => {
+    if (sev === 'siaga') return 'Alert';
+    if (sev === 'waspada') return 'Caution';
+    if (sev === 'pantau') return 'Monitor';
+    return rawLabel || 'Monitor';
+  };
+
   listEl.innerHTML = alerts.map((a, idx) => {
     const hasRain = Number.isFinite(a.precipitationMm) && a.precipitationMm > 0;
-    const rainText = hasRain ? `${escapeHtml(a.precipitationMm)} mm/jam` : (a.weatherLabel ? escapeHtml(a.weatherLabel) : '');
+    const rainText = hasRain ? `${escapeHtml(a.precipitationMm)} mm/h` : (a.weatherLabel ? escapeHtml(a.weatherLabel) : '');
     const camShort = formatNamaKamera(a.cameraName);
-    const metaParts = [a.region, camShort ? `Kamera ${camShort}` : ''].filter(Boolean).map(escapeHtml);
+    const metaParts = [a.region, camShort ? `Camera ${camShort}` : ''].filter(Boolean).map(escapeHtml);
     const sourceText = (a.signals || [])
       .filter((s) => s !== 'Riwayat Koridor Rawan')
       .map(escapeHtml)
-      .join(' · ') || 'Pantauan koridor historis';
+      .join(' · ') || 'Historical corridor watch';
 
     return `
       <li class="arow" data-sev="${escapeHtml(a.severity || 'pantau')}">
@@ -387,7 +396,7 @@ function gambarDialogPeringatan(alerts = [], meta = {}) {
           <div class="arow__titlegroup">
             <span class="astat" data-sev="${escapeHtml(a.severity || 'pantau')}">
               <span class="astat__dot" aria-hidden="true"></span>
-              <span>${escapeHtml(a.severityLabel || 'Pantau')}</span>
+              <span>${escapeHtml(labelLevel(a.severity, a.severityLabel))}</span>
             </span>
             <h3 class="arow__title">${escapeHtml(a.corridor)}</h3>
           </div>
@@ -396,11 +405,11 @@ function gambarDialogPeringatan(alerts = [], meta = {}) {
 
         <p class="arow__meta">${metaParts.join(' · ')}</p>
         <p class="arow__desc">${escapeHtml(a.summary)}</p>
-        ${a.mitigation && a.severity !== 'pantau' ? `<p class="arow__mit">Saran: ${escapeHtml(a.mitigation)}</p>` : ''}
+        ${a.mitigation && a.severity !== 'pantau' ? `<p class="arow__mit">Advice: ${escapeHtml(a.mitigation)}</p>` : ''}
 
         <div class="arow__foot">
           <span class="arow__source">${sourceText}</span>
-          <button type="button" class="arow__mapbtn press" data-focus-alert="${idx}">Lihat di peta</button>
+          <button type="button" class="arow__mapbtn press" data-focus-alert="${idx}">View on Map</button>
         </div>
       </li>`;
   }).join('');
@@ -414,7 +423,7 @@ async function muatPeringatanArea({ region = wilayahFilterAktif, render = true }
     gambarDialogPeringatan(daftarPeringatanAktif, data);
   } else {
     const siagaCount = daftarPeringatanAktif.filter((a) => a.severity === 'siaga').length;
-    setText($('#menuAlertCount'), siagaCount > 0 ? `${siagaCount} Siaga` : 'Pantau');
+    setText($('#menuAlertCount'), siagaCount > 0 ? `${siagaCount} Alert` : 'Monitor');
   }
   return data;
 }
@@ -425,13 +434,13 @@ function gambarRuteTersimpan(daftar) {
   if (!wadah) return;
 
   if (!daftar || daftar.length === 0) {
-    wadah.innerHTML = '<p class="note" style="color:var(--text-3); font-size:var(--fs-sm); margin:4px 0;">Belum ada rute yang disimpan di database.</p>';
+    wadah.innerHTML = '<p class="note" style="color:var(--text-3); font-size:var(--fs-sm); margin:4px 0;">No saved routes in your account yet.</p>';
     return;
   }
 
   wadah.innerHTML = daftar.map((r, idx) => {
-    const asalNama = escapeHtml(r.origin?.name || r.asal || 'Awal');
-    const tujuanNama = escapeHtml(r.destination?.name || r.tujuan || 'Tujuan');
+    const asalNama = escapeHtml(r.origin?.name || r.asal || 'Origin');
+    const tujuanNama = escapeHtml(r.destination?.name || r.tujuan || 'Destination');
     const ruteId = escapeHtml(r.id || r._id || '');
     const moda = escapeHtml(namaProfil(r.profile));
     const jarak = Number(r.distanceM) > 0 ? formatJarak(r.distanceM) : '';
@@ -440,11 +449,11 @@ function gambarRuteTersimpan(daftar) {
     return `
       <div class="saveditem" data-idx="${idx}" data-route-id="${ruteId}">
         <span class="saveditem__ico" aria-hidden="true">${ikon('i-route', 14)}</span>
-        <span class="saveditem__body press" data-load-route="${idx}" title="Klik untuk memuat rute ini">
+        <span class="saveditem__body press" data-load-route="${idx}" title="Click to load this route">
           <span class="saveditem__name">${asalNama} ${ikon('i-arrow-r', 12)} ${tujuanNama}</span>
           <span class="saveditem__meta">${metaTeks}</span>
         </span>
-        <button type="button" class="saveditem__del press" data-delete-route="${ruteId}" title="Hapus rute dari database" aria-label="Hapus rute">
+        <button type="button" class="saveditem__del press" data-delete-route="${ruteId}" title="Remove saved route" aria-label="Delete route">
           ${ikon('i-x', 14)}
         </button>
       </div>`;
@@ -472,7 +481,7 @@ export async function pasangPengendaliAuth() {
     const tampilkan = passEl.type === 'password';
     passEl.type = tampilkan ? 'text' : 'password';
     btnToggle.setAttribute('aria-pressed', String(tampilkan));
-    btnToggle.setAttribute('aria-label', tampilkan ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
+    btnToggle.setAttribute('aria-label', tampilkan ? 'Hide password' : 'Show password');
     btnToggle.innerHTML = ikon(tampilkan ? 'i-eye-off' : 'i-eye', 17);
   });
 
@@ -504,25 +513,25 @@ export async function pasangPengendaliAuth() {
     const isRegister = modeAutentikasi === 'register';
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      tampilkanErrorAuth('Masukkan alamat email yang valid (contoh: nama@email.com).', { fieldEl: emailEl });
+      tampilkanErrorAuth('Enter a valid email address (e.g. name@email.com).', { fieldEl: emailEl });
       return;
     }
     if (!password || password.length < 6) {
-      tampilkanErrorAuth('Kata sandi minimal 6 karakter.', { fieldEl: passEl });
+      tampilkanErrorAuth('Password must be at least 6 characters.', { fieldEl: passEl });
       return;
     }
 
     const submitBtn = $('#btnAuthSubmit');
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = isRegister ? 'Mendaftarkan...' : 'Menghubungkan...';
+      submitBtn.textContent = isRegister ? 'Creating account...' : 'Signing in...';
     }
 
     try {
       let res;
       if (isRegister) {
         const namaInput = nameEl?.value?.trim() || '';
-        const awalan = email.split('@')[0] || 'Pengguna';
+        const awalan = email.split('@')[0] || 'User';
         const nama = namaInput || (awalan.charAt(0).toUpperCase() + awalan.slice(1));
         res = await daftarPengguna({
           email,
@@ -530,7 +539,7 @@ export async function pasangPengendaliAuth() {
           name: nama,
           isHealthSensitive: sensitif,
         });
-        toast('Akun baru berhasil didaftarkan.');
+        toast('Account created successfully.');
       } else {
         res = await masukPengguna({ email, password });
       }
@@ -547,7 +556,7 @@ export async function pasangPengendaliAuth() {
       });
 
       bukaModal(false);
-      toast(`Selamat datang, ${user.name}!`);
+      toast(`Welcome, ${user.name}!`);
 
       // Muat rute tersimpan & riwayat perjalanan dari backend
       try {
@@ -557,37 +566,37 @@ export async function pasangPengendaliAuth() {
         ]);
         setState({ ruteTersimpan: routes, riwayatPerjalanan: history });
       } catch (loadErr) {
-        console.warn('[auth] Gagal mengambil data akun:', loadErr);
+        console.warn('[auth] Failed to load account data:', loadErr);
       }
     } catch (err) {
       console.error('[auth] Auth error:', err);
       if (!isRegister && err.status === 404) {
         tampilkanErrorAuth(
-          'Email ini belum terdaftar. Periksa kembali ejaan email Anda atau buat akun baru.',
+          'This email is not registered yet. Check your spelling or create a new account.',
           {
             fieldEl: emailEl,
-            actionLabel: 'Daftar dengan email ini',
+            actionLabel: 'Sign up with this email',
             onAction: () => aturModeAuth('register', { focusField: true }),
           }
         );
       } else if (!isRegister && err.status === 401) {
-        tampilkanErrorAuth('Email atau kata sandi salah.', { fieldEl: passEl });
+        tampilkanErrorAuth('Incorrect email or password.', { fieldEl: passEl });
       } else if (isRegister && err.status === 409) {
         tampilkanErrorAuth(
-          'Email ini sudah terdaftar. Silakan masuk dengan akun tersebut.',
+          'This email is already registered. Please sign in with that account.',
           {
             fieldEl: emailEl,
-            actionLabel: 'Pindah ke tab Masuk',
+            actionLabel: 'Switch to Sign In',
             onAction: () => aturModeAuth('login', { focusField: false }),
           }
         );
       } else {
-        tampilkanErrorAuth(err.message || 'Gagal memproses akun. Periksa koneksi dan coba lagi.');
+        tampilkanErrorAuth(err.message || 'Unable to sign in. Check your connection and try again.');
       }
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        const label = modeAutentikasi === 'register' ? 'Daftar Sekarang' : 'Masuk Sekarang';
+        const label = modeAutentikasi === 'register' ? 'Create Account' : 'Sign In';
         submitBtn.innerHTML = `${label} <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>`;
       }
     }
@@ -595,7 +604,7 @@ export async function pasangPengendaliAuth() {
 
   $('#btnGuest')?.addEventListener('click', () => {
     bukaModal(false);
-    toast('Lanjut sebagai tamu. Fitur dasar tetap bisa dipakai.');
+    toast('Continuing as guest. Core routing features remain available.');
   });
 
   $('#userChip')?.addEventListener('click', (e) => {
@@ -625,8 +634,8 @@ export async function pasangPengendaliAuth() {
     }
 
     toast(baru
-      ? 'Profil kesehatan aktif (tersimpan). Bobot polusi dinaikkan saat rute dinilai.'
-      : 'Profil kesehatan nonaktif (tersimpan). Bobot kembali normal.');
+      ? 'Health profile enabled. Air pollution carries higher weight during route scoring.'
+      : 'Health profile disabled. Default scoring weights restored.');
   });
 
   // Inisialisasi native <dialog> untuk Riwayat & Peringatan Area Rawan
@@ -654,7 +663,7 @@ export async function pasangPengendaliAuth() {
     try {
       await muatPeringatanArea({ region: wilayahFilterAktif, render: true });
     } catch {
-      toast('Gagal memuat daftar area rawan.');
+      toast('Failed to load flood alerts.');
     }
   };
 
@@ -670,7 +679,7 @@ export async function pasangPengendaliAuth() {
         const history = await ambilRiwayatPerjalanan(token);
         setState({ riwayatPerjalanan: history });
       } catch (err) {
-        console.warn('[history] Gagal menyegarkan riwayat:', err?.message);
+        console.warn('[history] Failed to refresh history:', err?.message);
       }
     }
   });
@@ -698,9 +707,9 @@ export async function pasangPengendaliAuth() {
         setState({
           riwayatPerjalanan: (riwayatPerjalanan || []).filter((h) => String(h.id || h._id) !== String(id)),
         });
-        toast('Entri riwayat dihapus.');
+        toast('History entry deleted.');
       } catch {
-        toast('Gagal menghapus entri riwayat.');
+        toast('Failed to delete history entry.');
       }
     }
   });
@@ -711,9 +720,9 @@ export async function pasangPengendaliAuth() {
     try {
       await kosongkanRiwayat(token);
       setState({ riwayatPerjalanan: [] });
-      toast('Seluruh riwayat perjalanan dibersihkan.');
+      toast('Trip history cleared.');
     } catch {
-      toast('Gagal membersihkan riwayat.');
+      toast('Failed to clear trip history.');
     }
   });
 
@@ -729,16 +738,16 @@ export async function pasangPengendaliAuth() {
     try {
       await muatPeringatanArea({ region: wilayahFilterAktif, render: true });
     } catch {
-      toast('Gagal menyaring wilayah.');
+      toast('Failed to filter region.');
     }
   });
 
   $('#btnRefreshAlerts')?.addEventListener('click', async () => {
     try {
       await muatPeringatanArea({ region: wilayahFilterAktif, render: true });
-      toast('Status koridor rawan diperbarui.');
+      toast('Corridor alert status refreshed.');
     } catch {
-      toast('Gagal memperbarui data koridor.');
+      toast('Failed to refresh corridor data.');
     }
   });
 
@@ -757,9 +766,9 @@ export async function pasangPengendaliAuth() {
       const user = updated.user || updated;
       localStorage.setItem('jaksafe_user', JSON.stringify(user));
       setState({ pengguna: user });
-      toast('Preferensi peringatan area rawan disimpan.');
+      toast('Flood alert preferences saved.');
     } catch {
-      toast('Gagal menyimpan preferensi peringatan.');
+      toast('Failed to save alert preferences.');
     }
   };
   $('#chkAlertRouteAuto')?.addEventListener('change', simpanPrefPeringatan);
@@ -772,7 +781,7 @@ export async function pasangPengendaliAuth() {
     if (!item || !Number.isFinite(Number(item.lat)) || !Number.isFinite(Number(item.lon))) return;
     alertsDialog?.close();
     flyToCoordinates({ lon: Number(item.lon), lat: Number(item.lat), height: 950 });
-    toast(`Kamera peta diarahkan ke ${item.corridor}`);
+    toast(`Map focused on ${item.corridor}`);
   });
 
   // Tombol Keluar (Logout)
@@ -792,7 +801,7 @@ export async function pasangPengendaliAuth() {
       riwayatPerjalanan: [],
     });
     bukaMenu(false);
-    toast('Anda telah keluar.');
+    toast('You have signed out.');
   });
 
   // Pasang aksi klik dan hapus pada daftar rute tersimpan
@@ -808,9 +817,9 @@ export async function pasangPengendaliAuth() {
         await hapusRute(token, routeId);
         const filtered = ruteTersimpan.filter((r) => String(r.id || r._id) !== String(routeId));
         setState({ ruteTersimpan: filtered });
-        toast('Rute berhasil dihapus dari database.');
+        toast('Saved route removed.');
       } catch (err) {
-        toast('Gagal menghapus rute.');
+        toast('Failed to delete route.');
       }
       return;
     }

@@ -12,6 +12,7 @@ import {
   initCesiumViewer,
   setMapViewMode,
   getMapViewMode,
+  setBuildingsLayerEnabled,
   toggleBuildingsLayer,
   isBuildingsLayerEnabled,
   flyToPreset,
@@ -322,21 +323,21 @@ export function toggleSidebar(forceOpen) {
  */
 function arahkanKeLokasiPengguna() {
   if (!('geolocation' in navigator)) {
-    toast('Browser Anda tidak mendukung deteksi lokasi (Geolocation).');
+    toast('Your browser does not support GPS geolocation.');
     return;
   }
 
   const btnLocate = document.getElementById('btnMapLocate');
   if (btnLocate) btnLocate.classList.add('is-loading');
 
-  toast('Mendeteksi lokasi Anda saat ini...');
+  toast('Detecting your current location...');
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       if (btnLocate) btnLocate.classList.remove('is-loading');
       const { latitude, longitude } = pos.coords;
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-        toast('Koordinat lokasi tidak valid.');
+        toast('Invalid location coordinates.');
         return;
       }
 
@@ -352,23 +353,23 @@ function arahkanKeLokasiPengguna() {
 
       registerCustomPlace({
         id: 'user-gps-location',
-        nama: 'Lokasi Saya Saat Ini',
+        nama: 'My Current Location',
         area: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
         lat: latitude,
         lon: longitude,
       });
 
-      toast('Lokasi Anda berhasil ditemukan.');
+      toast('Your location was found.');
     },
     (err) => {
       if (btnLocate) btnLocate.classList.remove('is-loading');
-      let msg = 'Gagal mendeteksi lokasi saat ini.';
+      let msg = 'Failed to detect your current location.';
       if (err.code === 1) { // PERMISSION_DENIED
-        msg = 'Izin lokasi ditolak. Harap izinkan akses lokasi pada peramban web Anda.';
+        msg = 'Location permission denied. Please allow location access in your browser.';
       } else if (err.code === 2) { // POSITION_UNAVAILABLE
-        msg = 'Sinyal lokasi GPS tidak tersedia.';
+        msg = 'GPS location signal is unavailable.';
       } else if (err.code === 3) { // TIMEOUT
-        msg = 'Waktu permintaan lokasi habis. Coba klik kembali.';
+        msg = 'Location request timed out. Please try again.';
       }
       toast(msg);
     },
@@ -406,6 +407,7 @@ function pasangEventHudPeta() {
 
   document.getElementById('btnLayerBuildings')?.addEventListener('click', async () => {
     if (getMapViewMode() !== '3d') {
+      await setBuildingsLayerEnabled(true);
       await setMapViewMode('3d', { fly: true });
     } else {
       toggleBuildingsLayer();

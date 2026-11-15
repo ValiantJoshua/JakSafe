@@ -33,7 +33,7 @@ export function templateErrorView() {
            ditindaklanjuti dari sisi pengembang, misalnya backend mati. -->
       <pre class="errorbox__hint" id="errHint" hidden></pre>
 
-      <button class="btn btn--primary btn--block press" id="btnRetry">Coba Lagi</button>
+      <button class="btn btn--primary btn--block press" id="btnRetry">Try Again</button>
     </div>
   </div>
 </section>`;

@@ -27,6 +27,10 @@ const TITIK_PANTAU_JAKARTA = [
 let aqiDataSource = null;
 /** @type {boolean} */
 let layerEnabled = false;
+/** @type {boolean} */
+let baseLoaded = false;
+/** @type {Promise<void>|null} */
+let baseLoadPromise = null;
 /** @type {Array<{nama:string, lat:number, lon:number, pm2_5:number|null, us_aqi:number|null, isWorst?:boolean}>} */
 let baseAqiPoints = [];
 /** @type {object|null} */
@@ -120,7 +124,7 @@ export function updateRouteAqiOnMap(hasil) {
   const tb = hasil?.air?.titikTerburuk;
   if (tb && Number.isFinite(tb.lat) && Number.isFinite(tb.lon)) {
     routeWorstPoint = {
-      nama: 'Titik Rute Terpolusi',
+      nama: 'Worst AQI Route Point',
       lat: Number(tb.lat),
       lon: Number(tb.lon),
       pm2_5: Number(tb.values?.pm2_5 ?? hasil?.air?.pm2_5),
@@ -134,13 +138,47 @@ export function updateRouteAqiOnMap(hasil) {
   notifyListeners();
 }
 
-export function setAqiLayerEnabled(enabled) {
+async function ensureAqiLoaded() {
+  if (baseLoaded) return;
+  if (baseLoadPromise) return baseLoadPromise;
+
+  baseLoadPromise = (async () => {
+    try {
+      const res = await ambilKualitasUdara({ titik: TITIK_PANTAU_JAKARTA });
+      baseLoaded = true;
+      baseAqiPoints = TITIK_PANTAU_JAKARTA.map((t, i) => {
+        const r = res.results[i];
+        return {
+          nama: t.nama,
+          lat: t.lat,
+          lon: t.lon,
+          pm2_5: Number(r?.values?.pm2_5),
+          us_aqi: Number(r?.values?.us_aqi),
+        };
+      });
+      renderAqiEntities();
+      notifyListeners();
+    } catch (err) {
+      console.warn('[JakSafe AQI Layer] Gagal memuat titik pantau udara awal:', err?.message || err);
+    } finally {
+      baseLoadPromise = null;
+    }
+  })();
+
+  return baseLoadPromise;
+}
+
+export async function setAqiLayerEnabled(enabled) {
   layerEnabled = Boolean(enabled);
   if (aqiDataSource) {
     aqiDataSource.show = layerEnabled;
   }
   getViewer()?.scene.requestRender();
   notifyListeners();
+
+  if (layerEnabled && !baseLoaded) {
+    await ensureAqiLoaded();
+  }
 }
 
 export function toggleAqiLayer() {
@@ -158,21 +196,9 @@ export async function initAqiLayer() {
     await viewer.dataSources.add(aqiDataSource);
   }
 
-  try {
-    const res = await ambilKualitasUdara({ titik: TITIK_PANTAU_JAKARTA });
-    baseAqiPoints = TITIK_PANTAU_JAKARTA.map((t, i) => {
-      const r = res.results[i];
-      return {
-        nama: t.nama,
-        lat: t.lat,
-        lon: t.lon,
-        pm2_5: Number(r?.values?.pm2_5),
-        us_aqi: Number(r?.values?.us_aqi),
-      };
-    });
-    renderAqiEntities();
+  if (layerEnabled) {
+    await ensureAqiLoaded();
+  } else {
     notifyListeners();
-  } catch (err) {
-    console.warn('[JakSafe AQI Layer] Gagal memuat titik pantau udara awal:', err?.message || err);
   }
 }

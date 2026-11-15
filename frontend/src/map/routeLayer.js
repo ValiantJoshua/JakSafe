@@ -182,7 +182,7 @@ export function previewEndpointsOnMap(asal, tujuan, { fly = false } = {}) {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `Awal · ${asal.nama}`,
+        text: `Origin · ${asal.nama}`,
         font: '700 11.5px Manrope, -apple-system, sans-serif',
         showBackground: true,
         backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
@@ -210,7 +210,7 @@ export function previewEndpointsOnMap(asal, tujuan, { fly = false } = {}) {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `Tujuan · ${tujuan.nama}`,
+        text: `Dest · ${tujuan.nama}`,
         font: '700 11.5px Manrope, -apple-system, sans-serif',
         showBackground: true,
         backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
@@ -340,7 +340,7 @@ export function renderRouteOnMap(hasil) {
         position: Cesium.Cartesian3.fromDegrees(midPair[0], midPair[1], 28),
         properties: { routeOptionIndex: idx },
         label: {
-          text: `Rute ${idx + 1} · ${effMin} mnt`,
+          text: `Route ${idx + 1} · ${effMin} min`,
           font: '700 11.5px Manrope, -apple-system, sans-serif',
           showBackground: true,
           backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
@@ -388,8 +388,8 @@ export function renderRouteOnMap(hasil) {
   // 3. Tambahkan pin Titik Awal dan Tujuan (identik dengan simbol search bar)
   const firstPair = hasil.route.geometry[0];
   const lastPair = hasil.route.geometry[hasil.route.geometry.length - 1];
-  const asal = hasil.asal || (firstPair ? { lon: firstPair[0], lat: firstPair[1], nama: 'Titik Awal' } : null);
-  const tujuan = hasil.tujuan || (lastPair ? { lon: lastPair[0], lat: lastPair[1], nama: 'Tujuan' } : null);
+  const asal = hasil.asal || (firstPair ? { lon: firstPair[0], lat: firstPair[1], nama: 'Origin' } : null);
+  const tujuan = hasil.tujuan || (lastPair ? { lon: lastPair[0], lat: lastPair[1], nama: 'Destination' } : null);
 
   if (asal) {
     routeDataSource.entities.add({
@@ -404,7 +404,7 @@ export function renderRouteOnMap(hasil) {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `Awal · ${asal.nama}`,
+        text: `Origin · ${asal.nama}`,
         font: '700 11.5px Manrope, -apple-system, sans-serif',
         showBackground: true,
         backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
@@ -432,7 +432,7 @@ export function renderRouteOnMap(hasil) {
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: `Tujuan · ${tujuan.nama}`,
+        text: `Dest · ${tujuan.nama}`,
         font: '700 11.5px Manrope, -apple-system, sans-serif',
         showBackground: true,
         backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),
@@ -518,8 +518,8 @@ export function focusStepOnMap(step) {
   }
 
   const labelText = step.index
-    ? `Langkah ${step.index}: ${step.instruction || step.roadName || 'Titik Manuver'}`
-    : step.instruction || 'Titik Manuver';
+    ? `Step ${step.index}: ${step.instruction || step.roadName || 'Waypoint'}`
+    : step.instruction || 'Waypoint';
 
   routeDataSource.entities.add({
     id: 'route-step-focus',
@@ -623,7 +623,7 @@ export function showUserLocationOnMap(lon, lat) {
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
     },
     label: {
-      text: 'Lokasi Anda',
+      text: 'Your Location',
       font: '600 11.5px Manrope, -apple-system, sans-serif',
       showBackground: true,
       backgroundColor: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.96),

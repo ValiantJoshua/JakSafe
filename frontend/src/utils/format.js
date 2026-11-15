@@ -51,10 +51,10 @@ export function formatJarak(meter) {
 export function formatDurasi(detik) {
   if (!Number.isFinite(detik)) return KOSONG;
   const menit = Math.round(detik / 60);
-  if (menit < 60) return `${menit} menit`;
+  if (menit < 60) return `${menit} min`;
   const jam = Math.floor(menit / 60);
   const sisa = menit % 60;
-  return sisa === 0 ? `${jam} jam` : `${jam} jam ${sisa} menit`;
+  return sisa === 0 ? `${jam} hr` : `${jam} hr ${sisa} min`;
 }
 
 /**
@@ -81,7 +81,7 @@ export function formatAngka(nilai, desimal = 1) {
 export function formatLama(ms) {
   if (!Number.isFinite(ms)) return KOSONG;
   if (ms < 1000) return `${Math.round(ms)} ms`;
-  return `${(ms / 1000).toFixed(1)} detik`;
+  return `${(ms / 1000).toFixed(1)} s`;
 }
 
 /**
@@ -97,9 +97,10 @@ export function formatJam(iso) {
   if (!iso) return KOSONG;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return KOSONG;
-  return new Intl.DateTimeFormat('id-ID', {
+  return new Intl.DateTimeFormat('en-US', {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
     timeZone: 'Asia/Jakarta',
   }).format(d);
 }
@@ -114,15 +115,15 @@ export function formatJam(iso) {
  */
 export function labelKondisiJalan(kode) {
   const peta = {
-    lancar: 'Lancar',
+    lancar: 'Smooth',
     normal: 'Normal',
-    padat: 'Padat',
-    merayap: 'Merayap',
-    macet: 'Macet',
-    macet_total: 'Macet total',
-    macet_berat: 'Macet berat',
+    padat: 'Busy',
+    merayap: 'Slow',
+    macet: 'Congested',
+    macet_total: 'Gridlock',
+    macet_berat: 'Heavy traffic',
   };
-  return peta[String(kode || '').toLowerCase()] || 'Tidak diketahui';
+  return peta[String(kode || '').toLowerCase()] || 'Unknown';
 }
 
 /**
@@ -134,13 +135,13 @@ export function labelKondisiJalan(kode) {
  */
 export function labelGenangan(tingkat) {
   const peta = {
-    ringan: 'Genangan ringan',
-    rendah: 'Genangan ringan',
-    sedang: 'Genangan sedang',
-    berat: 'Genangan berat',
-    tinggi: 'Genangan berat',
+    ringan: 'Light flooding',
+    rendah: 'Light flooding',
+    sedang: 'Moderate flooding',
+    berat: 'Heavy flooding',
+    tinggi: 'Heavy flooding',
   };
-  return peta[String(tingkat || '').toLowerCase()] || 'Ada genangan';
+  return peta[String(tingkat || '').toLowerCase()] || 'Flooding present';
 }
 
 /**

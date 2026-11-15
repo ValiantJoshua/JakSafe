@@ -8,15 +8,15 @@ export function templateResultView() {
   return `
 <section id="viewResult" hidden>
 
-  <!-- Header Petunjuk Arah & Titik Awal/Tujuan ala Waze / Google Maps -->
+  <!-- Header Directions & Origin/Destination -->
   <div class="dirhead rise rise-1">
     <div class="dirhead__topbar">
-      <button type="button" class="dirhead__back press" id="btnBackSearch" title="Ubah titik pencarian">
+      <button type="button" class="dirhead__back press" id="btnBackSearch" title="Edit search locations">
         ${ikon('i-arrow-r', 15, 'dirhead__backicon')}
-        <span>Ubah Rute</span>
+        <span>Edit Route</span>
       </button>
-      <span class="dirhead__title">Petunjuk Arah</span>
-      <span class="dirhead__mode" id="sProfileBadge">Mobil</span>
+      <span class="dirhead__title">Directions</span>
+      <span class="dirhead__mode" id="sProfileBadge">Car</span>
     </div>
 
     <div class="dirhead__endpoints">
@@ -26,36 +26,35 @@ export function templateResultView() {
         <span class="dirhead__dot dirhead__dot--dest"></span>
       </div>
       <div class="dirhead__pills">
-        <button type="button" class="dirhead__pill" id="btnEditOrigin" title="Klik untuk ganti titik awal">
+        <button type="button" class="dirhead__pill" id="btnEditOrigin" title="Click to change origin">
           <span class="dirhead__pillname" id="sDirOriginName">-</span>
           <span class="dirhead__pillsub" id="sDirOriginArea"></span>
         </button>
-        <button type="button" class="dirhead__pill" id="btnEditDest" title="Klik untuk ganti tujuan">
+        <button type="button" class="dirhead__pill" id="btnEditDest" title="Click to change destination">
           <span class="dirhead__pillname" id="sDirDestName">-</span>
           <span class="dirhead__pillsub" id="sDirDestArea"></span>
         </button>
       </div>
-      <button type="button" class="dirhead__swap press" id="btnResultSwap" title="Putar balik awal & tujuan" aria-label="Tukar titik awal dan tujuan">
+      <button type="button" class="dirhead__swap press" id="btnResultSwap" title="Swap origin and destination" aria-label="Swap origin and destination">
         ${ikon('i-swap', 16)}
       </button>
     </div>
   </div>
 
-  <!-- Interactive Alternative Route Selector (Pilihan Rute 1, 2, 3...) -->
+  <!-- Interactive Alternative Route Selector -->
   <div class="routeselect rise rise-1" id="routeSelectorBox">
     <div class="routeselect__head">
-      <span class="routeselect__title">Pilihan Rute</span>
-      <span class="routeselect__sub" id="routeSelectorSub">Klik rute untuk membandingkan</span>
+      <span class="routeselect__title">Route Options</span>
     </div>
-    <div class="routeselect__list" id="routeOptionsList" role="listbox" aria-label="Pilihan rute perjalanan"></div>
+    <div class="routeselect__list" id="routeOptionsList" role="listbox" aria-label="Route options"></div>
   </div>
 
-  <!-- Peringatan Area Rawan Banjir / Genangan & Catatan Tol Motor di Sepanjang Rute -->
+  <!-- Hazard & Motor Toll Corridor Alert -->
   <div class="hazardbanner rise rise-1" id="routeHazardAlert" hidden>
     <div class="hazardbanner__head">
       <span class="hazardbanner__icon">${ikon('i-alert', 16)}</span>
-      <span class="hazardbanner__title" id="routeHazardTitle">Peringatan Area Rawan di Rute</span>
-      <button type="button" class="hazardbanner__all press" id="btnViewAllAlerts">Lihat semua</button>
+      <span class="hazardbanner__title" id="routeHazardTitle">Hazard Alerts Along Route</span>
+      <button type="button" class="hazardbanner__all press" id="btnViewAllAlerts">View all</button>
     </div>
     <ul class="hazardbanner__list" id="routeHazardList"></ul>
   </div>
@@ -73,7 +72,7 @@ export function templateResultView() {
         <div class="gauge__ring"></div>
         <div class="gauge__core">
           <span class="gauge__num counting" id="sScore">0</span>
-          <span class="gauge__max">dari 100</span>
+          <span class="gauge__max">of 100</span>
         </div>
       </div>
     </div>
@@ -85,18 +84,18 @@ export function templateResultView() {
 
     <p class="scorecard__arti" id="sArti"></p>
 
-    <button type="button" class="savebtn press" id="btnSaveRoute" title="Simpan rute ini">
-      ${ikon('i-heart', 15)} <span id="saveLabel">Simpan rute</span>
+    <button type="button" class="savebtn press" id="btnSaveRoute" title="Save this route">
+      ${ikon('i-heart', 15)} <span id="saveLabel">Save route</span>
     </button>
   </div>
 
   <div class="statrow rise rise-2">
     <div class="stat stat--a">
-      <p class="stat__label">Jarak</p>
+      <p class="stat__label">Distance</p>
       <p class="stat__value" id="sDistance"></p>
     </div>
     <div class="stat stat--b">
-      <p class="stat__label">Perkiraan Waktu</p>
+      <p class="stat__label">Est. Time</p>
       <p class="stat__value" id="sDuration"></p>
     </div>
   </div>
@@ -104,38 +103,38 @@ export function templateResultView() {
   <div class="reason rise rise-3">
     <div class="reason__head">
       <span class="reason__badge">${ikon('i-shield', 17)}</span>
-      <span class="reason__title">Ringkasan Rekomendasi Rute</span>
+      <span class="reason__title">AI Route Reasoning</span>
     </div>
     <div class="reason__text" id="sReason"></div>
   </div>
 
-  <!-- Daftar Manuver Langkah Rute (Turn-by-Turn Steps) -->
+  <!-- Turn-by-Turn Steps -->
   <div class="card card--steps rise rise-3" id="turnByTurnCard">
     <div class="card__head steps__head">
       <span class="card__icon">${ikon('i-route', 18)}</span>
       <div class="steps__headtext">
-        <span class="card__title">Panduan Langkah Rute</span>
-        <span class="steps__sub" id="stepsSub">Klik langkah untuk melihat titik belokan di peta</span>
+        <span class="card__title">Turn-by-Turn Steps</span>
+        <span class="steps__sub" id="stepsSub">Click a step to inspect on map</span>
       </div>
-      <span class="badge steps__badge" id="stepsCountBadge">0 langkah</span>
-      <button type="button" class="steps__toggle press" id="btnToggleSteps" aria-expanded="true" aria-controls="stepsListWrap" title="Ciutkan atau bentangkan daftar belokan">
+      <span class="badge steps__badge" id="stepsCountBadge">0 steps</span>
+      <button type="button" class="steps__toggle press" id="btnToggleSteps" aria-expanded="true" aria-controls="stepsListWrap" title="Collapse or expand turn list">
         ${ikon('i-chev', 15, 'steps__chev')}
       </button>
     </div>
     <div class="steps__wrap" id="stepsListWrap">
-      <ol class="steps__list" id="stepsList" aria-label="Daftar langkah manuver rute"></ol>
+      <ol class="steps__list" id="stepsList" aria-label="Turn-by-turn route maneuvers"></ol>
     </div>
   </div>
 
   <div class="card card--detail rise rise-4">
     <div class="card__head">
       <span class="card__icon">${ikon('i-route', 18)}</span>
-      <span class="card__title">Rincian Penilaian Risiko</span>
+      <span class="card__title">Risk Score Breakdown</span>
     </div>
 
     <div class="bar">
       <div class="bar__top">
-        <span class="bar__name">Waktu tempuh</span>
+        <span class="bar__name">Travel Time</span>
         <span class="bar__weight" id="bTimeW"></span>
         <span class="bar__raw" id="bTimeRaw"></span>
       </div>
@@ -144,7 +143,7 @@ export function templateResultView() {
 
     <div class="bar">
       <div class="bar__top">
-        <span class="bar__name">Tingkat polusi</span>
+        <span class="bar__name">Air Quality</span>
         <span class="bar__weight" id="bPollW"></span>
         <span class="bar__raw" id="bPollRaw"></span>
       </div>
@@ -153,7 +152,7 @@ export function templateResultView() {
 
     <div class="bar">
       <div class="bar__top">
-        <span class="bar__name">Kondisi jalan</span>
+        <span class="bar__name">Road Condition</span>
         <span class="bar__weight" id="bRoadW"></span>
         <span class="bar__raw" id="bRoadRaw"></span>
       </div>
@@ -166,7 +165,7 @@ export function templateResultView() {
   <div class="card card--aqi rise rise-5" id="aqiCard">
     <div class="card__head">
       <span class="card__icon">${ikon('i-wind', 18)}</span>
-      <span class="card__title">Kualitas Udara Rute</span>
+      <span class="card__title">Route Air Quality (AQI)</span>
       <span class="badge" style="margin-left:auto" id="aqiBadge"></span>
     </div>
     <div class="aqi__main">
@@ -174,31 +173,21 @@ export function templateResultView() {
       <span class="aqi__unit">µg/m³ · PM2.5</span>
     </div>
     <div class="aqi__scale"><span class="aqi__marker" id="aqiMarker" style="left:0%"></span></div>
-    <div class="aqi__ticks"><span>Baik</span><span>Sedang</span><span>Sensitif</span><span>Buruk</span></div>
+    <div class="aqi__ticks"><span>Good</span><span>Moderate</span><span>Sensitive</span><span>Unhealthy</span></div>
     <p class="note" style="margin-top:var(--s3)" id="aqiNote"></p>
   </div>
 
   <div class="card card--cctv rise rise-6" id="cctvCard">
     <div class="card__head">
       <span class="card__icon">${ikon('i-camera', 18)}</span>
-      <span class="card__title">Pantauan Kamera CCTV</span>
-      <span class="badge badge--lime" style="margin-left:auto">Langsung</span>
+      <span class="card__title">CCTV Camera Inspection</span>
+      <span class="badge badge--lime" style="margin-left:auto">Live</span>
     </div>
     <div id="cctvBody"></div>
   </div>
 
-  <div class="disclosure card--log rise rise-6">
-    <button type="button" class="disclosure__btn" id="btnLog" aria-expanded="false" aria-controls="logPanel">
-      <span class="card__icon" style="width:32px;height:32px;flex:0 0 32px">${ikon('i-layers', 16)}</span>
-      <span class="disclosure__title">Jejak Penalaran Agen</span>
-      <span class="disclosure__meta" id="logTotal"></span>
-      ${ikon('i-chev', 16, 'disclosure__chev')}
-    </button>
-    <div class="disclosure__panel" id="logPanel" hidden></div>
-  </div>
-
   <button type="button" class="btn btn--accent btn--block btn--lg press" id="btnAgain" style="margin-top:var(--s2)">
-    Cari Rute Lain
+    Search Another Route
     <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>
   </button>
 </section>`;
