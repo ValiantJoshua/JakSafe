@@ -23,6 +23,56 @@ let lastSweepStats = null;
 let hydratedCount = 0;
 
 /**
+ * Resolve the background CCTV health sweep interval from environment variables.
+ * Supports `CCTV_SWEEP_INTERVAL_MINUTES` (recommended) or `CCTV_SWEEP_INTERVAL_MS`.
+ * Set to `0` (or `off`/`false`/`disabled`) to disable periodic background sweeps.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {number} Interval in milliseconds (`0` disables scheduled sweeps)
+ */
+export function resolveSweepIntervalMs(env = process.env) {
+  const rawMinutes = env?.CCTV_SWEEP_INTERVAL_MINUTES;
+  if (rawMinutes !== undefined && String(rawMinutes).trim() !== '') {
+    const normalized = String(rawMinutes).trim().toLowerCase();
+    if (normalized === 'off' || normalized === 'false' || normalized === 'disabled') {
+      return 0;
+    }
+    const mins = Number(normalized);
+    if (Number.isFinite(mins)) {
+      return mins <= 0 ? 0 : Math.round(mins * 60 * 1000);
+    }
+  }
+
+  const rawMs = env?.CCTV_SWEEP_INTERVAL_MS;
+  if (rawMs !== undefined && String(rawMs).trim() !== '') {
+    const normalized = String(rawMs).trim().toLowerCase();
+    if (normalized === 'off' || normalized === 'false' || normalized === 'disabled') {
+      return 0;
+    }
+    const ms = Number(normalized);
+    if (Number.isFinite(ms)) {
+      return ms <= 0 ? 0 : Math.round(ms);
+    }
+  }
+
+  return DEFAULT_SWEEP_INTERVAL_MS;
+}
+
+function getEffectiveTtls(status) {
+  const intervalMs = resolveSweepIntervalMs();
+  if (status === 'offline') {
+    return {
+      ramTtlMs: intervalMs > 0 ? Math.max(OFFLINE_RAM_TTL_MS, Math.min(intervalMs, 60 * 60 * 1000)) : OFFLINE_RAM_TTL_MS,
+      dbTtlMs: intervalMs > 0 ? Math.max(OFFLINE_DB_TTL_MS, Math.min(intervalMs, 2 * 60 * 60 * 1000)) : OFFLINE_DB_TTL_MS,
+    };
+  }
+  const sweepBufferMs = intervalMs > 0 ? intervalMs + 5 * 60 * 1000 : 0;
+  return {
+    ramTtlMs: Math.max(HEALTH_RAM_TTL_MS, sweepBufferMs),
+    dbTtlMs: Math.max(HEALTH_DB_TTL_MS, sweepBufferMs),
+  };
+}
+
+/**
  * Retrieve cached health status for a single camera.
  * @param {string} cameraId
  * @returns {{ status: 'online'|'offline'|'unknown', reason: string|null, latencyMs: number|null, checkedAt: string|null }}
@@ -116,8 +166,7 @@ export function recordCameraHealth(
     checkedAt: checkedIso,
   };
 
-  const ramTtlMs = entry.status === 'offline' ? OFFLINE_RAM_TTL_MS : HEALTH_RAM_TTL_MS;
-  const dbTtlMs = entry.status === 'offline' ? OFFLINE_DB_TTL_MS : HEALTH_DB_TTL_MS;
+  const { ramTtlMs, dbTtlMs } = getEffectiveTtls(entry.status);
   cctvHealthCache.set(cameraId, entry, ramTtlMs);
 
   if (syncDb && isMongoActive()) {
@@ -469,7 +518,7 @@ export function sortCandidatesByHealth(candidates) {
  * @param {object} [opts]
  */
 export async function startCctvHealthScheduler({
-  intervalMs = DEFAULT_SWEEP_INTERVAL_MS,
+  intervalMs = resolveSweepIntervalMs(),
   concurrency = SWEEP_CONCURRENCY,
 } = {}) {
   const { hydrated } = await hydrateHealthFromMongo();
@@ -477,6 +526,12 @@ export async function startCctvHealthScheduler({
 
   if (hydrated > 0) {
     console.log(`[cctvHealth] Hydrated ${hydrated}/${catalog.length} camera statuses from MongoDB.`);
+  }
+
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+    stopCctvHealthScheduler();
+    console.log('[cctvHealth] Periodic background sweep disabled via config (manual & passive checks active).');
+    return;
   }
 
   // Trigger an immediate background sweep if RAM/DB coverage is sparse (<50%)
@@ -501,6 +556,9 @@ export async function startCctvHealthScheduler({
     });
   }, intervalMs);
   sweepTimer.unref?.();
+
+  const label = intervalMs >= 60_000 ? `${Math.round(intervalMs / 60_000)}m` : `${intervalMs}ms`;
+  console.log(`[cctvHealth] Periodic background sweep scheduled every ${label}.`);
 }
 
 export function stopCctvHealthScheduler() {
