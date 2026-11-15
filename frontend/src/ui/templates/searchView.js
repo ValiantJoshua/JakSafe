@@ -17,62 +17,62 @@ export function templateSearchView() {
 <section id="viewSearch" class="slide-in">
 
   <div class="greet" id="greetBox">
-    <h1 class="search__title">Rencanakan Rute Perjalanan</h1>
-    <p class="search__sub">Navigasi Jakarta dengan pertimbangan kualitas udara, lalu lintas, dan pantauan CCTV.</p>
+    <h1 class="search__title">Plan Your Route</h1>
+    <p class="search__sub">Navigate Jakarta with live air quality, traffic flow, and CCTV road checks.</p>
   </div>
 
   <div class="fieldgroup" style="margin-bottom:var(--s4)">
     <div class="field">
-      <span class="field__label">Titik Awal</span>
+      <span class="field__label">Origin</span>
       <button type="button" class="field__gps press" id="btnDetectOrigin"
-              title="Deteksi lokasi saya saat ini melalui GPS" aria-label="Deteksi lokasi saat ini">
-        ${ikon('i-locate', 12)} <span id="lblDetectOrigin">Lokasi Saya</span>
+              title="Detect my current location via GPS" aria-label="Detect current location">
+        ${ikon('i-locate', 12)} <span id="lblDetectOrigin">My Location</span>
       </button>
       <span class="field__pin field__pin--origin"></span>
       <input class="field__input" id="inpOrigin" type="text" role="combobox"
              aria-expanded="false" aria-controls="saranOrigin"
-             placeholder="Jalan, perumahan, blok/no, atau gedung..." autocomplete="off">
+             placeholder="Street, neighborhood, or landmark..." autocomplete="off">
       <div class="saran" id="saranOrigin" role="listbox" hidden></div>
     </div>
 
     <button type="button" class="fieldgroup__swap press" id="btnSwap"
-            title="Tukar awal dan tujuan" aria-label="Tukar titik awal dan tujuan">
+            title="Swap origin and destination" aria-label="Swap origin and destination">
       ${ikon('i-swap', 16)}
     </button>
 
     <div class="field">
-      <span class="field__label">Tujuan</span>
+      <span class="field__label">Destination</span>
       <span class="field__pin field__pin--dest"></span>
       <input class="field__input" id="inpDest" type="text" role="combobox"
              aria-expanded="false" aria-controls="saranDest"
-             placeholder="Ketik tujuan (jalan, perumahan, blok/no)..." autocomplete="off">
+             placeholder="Enter destination (street, area, or landmark)..." autocomplete="off">
       <div class="saran" id="saranDest" role="listbox" hidden></div>
     </div>
   </div>
 
-  <p class="sectlabel">Moda Perjalanan</p>
-  <div class="chiprow" role="group" aria-label="Pilih cara perjalanan" style="margin-bottom:var(--s4)">
+  <p class="sectlabel">Travel Mode</p>
+  <div class="chiprow" role="group" aria-label="Select travel mode" style="margin-bottom:var(--s4)">
     ${barisProfil()}
   </div>
 
   <button type="button" class="btn btn--primary btn--block btn--lg press" id="btnSearch" style="margin-bottom:var(--s5)">
-    Cari Rute Aman
+    Find Safe Route
     <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>
   </button>
 
   <div id="savedBox" hidden style="margin-bottom:var(--s5)">
-    <p class="sectlabel">Rute Tersimpan</p>
+    <p class="sectlabel">Saved Routes</p>
     <div class="savedlist" id="savedList"></div>
   </div>
 
   <div class="promo" id="promoBox">
     <span class="promo__icon">${ikon('i-shield', 18)}</span>
     <span class="promo__text">
-      <strong>Profil Kesehatan & Simpan Rute</strong>
-      Masuk untuk menyimpan rute favorit dan memprioritaskan bobot udara bersih.
+      <strong>Health Profile &amp; Saved Routes</strong>
+      Sign in to save favorite routes and prioritize clean-air scoring.
     </span>
     <button type="button" class="promo__btn press" id="btnPromoLogin">
-      Masuk ${ikon('i-arrow-r', 14)}
+      Sign In ${ikon('i-arrow-r', 14)}
     </button>
   </div>
 </section>`;

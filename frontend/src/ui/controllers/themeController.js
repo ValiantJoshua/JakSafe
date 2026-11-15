@@ -50,9 +50,9 @@ export function pasangTema(tema) {
     sw.setAttribute('data-theme', valid);
     sw.setAttribute(
       'aria-label',
-      isDark ? 'Mode gelap aktif. Klik untuk beralih ke mode terang.' : 'Mode terang aktif. Klik untuk beralih ke mode gelap.'
+      isDark ? 'Dark mode active. Click to switch to light mode.' : 'Light mode active. Click to switch to dark mode.'
     );
-    sw.setAttribute('title', isDark ? 'Beralih ke mode terang' : 'Beralih ke mode gelap');
+    sw.setAttribute('title', isDark ? 'Switch to light mode' : 'Switch to dark mode');
   }
 
   // Kompatibilitas mundur tombol terpisah

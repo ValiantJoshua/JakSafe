@@ -266,17 +266,17 @@ async function handleMapClick(screenPos) {
   posisikanMenuPick(screenPos);
 
   // Indikator memuat alamat
-  if (titleEl) titleEl.textContent = 'Mendeteksi alamat...';
-  if (areaEl) areaEl.textContent = 'Mengidentifikasi area wilayah...';
+  if (titleEl) titleEl.textContent = 'Resolving address...';
+  if (areaEl) areaEl.textContent = 'Identifying district area...';
   if (coordsEl) coordsEl.textContent = `[${lat.toFixed(4)}, ${lon.toFixed(4)}]`;
 
   // Buat objek tempat sementara berbasis koordinat
   currentPlace = {
     id: `map-${lat.toFixed(4)}-${lon.toFixed(4)}`,
-    nama: `Titik Peta [${lat.toFixed(4)}, ${lon.toFixed(4)}]`,
-    headline: `Titik Peta [${lat.toFixed(4)}, ${lon.toFixed(4)}]`,
-    area: 'Koordinat Peta',
-    subtitle: 'Koordinat Peta',
+    nama: `Map Pin [${lat.toFixed(4)}, ${lon.toFixed(4)}]`,
+    headline: `Map Pin [${lat.toFixed(4)}, ${lon.toFixed(4)}]`,
+    area: 'Map Coordinates',
+    subtitle: 'Map Coordinates',
     lat,
     lon,
   };
@@ -288,8 +288,8 @@ async function handleMapClick(screenPos) {
       currentPlace = resolved;
       registerCustomPlace(resolved);
 
-      const headline = resolved.headline || resolved.nama || `Titik [${lat.toFixed(4)}, ${lon.toFixed(4)}]`;
-      const subtitle = resolved.subtitle || resolved.area || 'Jakarta & Sekitarnya';
+      const headline = resolved.headline || resolved.nama || `Pin [${lat.toFixed(4)}, ${lon.toFixed(4)}]`;
+      const subtitle = resolved.subtitle || resolved.area || 'Greater Jakarta';
 
       if (titleEl) titleEl.textContent = headline;
       if (areaEl) areaEl.textContent = subtitle;
@@ -330,7 +330,7 @@ function tetapkanSebagaiTitikAwal() {
   const destPlace = findPlaceById(state.idTujuan);
   previewEndpointsOnMap(currentPlace, destPlace, { fly: false });
 
-  toast(`📍 Titik awal diatur ke: ${currentPlace.headline || currentPlace.nama}`);
+  toast(`Origin set to: ${currentPlace.headline || currentPlace.nama}`);
   tutupMapPickMenu();
 }
 
@@ -361,7 +361,7 @@ function tetapkanSebagaiTujuan() {
   const originPlace = findPlaceById(state.idAsal);
   previewEndpointsOnMap(originPlace, currentPlace, { fly: false });
 
-  toast(`🏁 Tujuan diatur ke: ${currentPlace.headline || currentPlace.nama}`);
+  toast(`Destination set to: ${currentPlace.headline || currentPlace.nama}`);
   tutupMapPickMenu();
 }
 
@@ -373,9 +373,9 @@ function salinKoordinat() {
   const text = `${currentCoords.lat.toFixed(5)}, ${currentCoords.lon.toFixed(5)}`;
   if (navigator?.clipboard?.writeText) {
     navigator.clipboard.writeText(text);
-    toast(`📋 Koordinat disalin: ${text}`);
+    toast(`Coordinates copied: ${text}`);
   } else {
-    toast(`Koordinat: ${text}`);
+    toast(`Coordinates: ${text}`);
   }
   tutupMapPickMenu();
 }

@@ -182,10 +182,10 @@ export async function minta(jalur, {
       : pengendaliWaktu.signal.aborted ? SEBAB.WAKTU_HABIS
         : SEBAB.TIDAK_TERHUBUNG;
     const pesan = sebab === SEBAB.WAKTU_HABIS
-      ? 'Permintaan melewati batas waktu.'
+      ? 'Request timed out.'
       : sebab === SEBAB.DIBATALKAN
-        ? 'Permintaan dibatalkan.'
-        : 'Backend JakSafe tidak dapat dihubungi.';
+        ? 'Request cancelled.'
+        : 'Unable to reach the JakSafe backend.';
     catat(false, 0, pesan);
     throw new ApiError(pesan, { status: 0, jalur: url, sebab });
   }
@@ -205,7 +205,7 @@ export async function minta(jalur, {
     // menyesatkan, padahal masalahnya backend belum dijalankan. Karena
     // itu keadaan ini digolongkan sebagai tidak terhubung.
     if (tanggapan.status >= 500 && !dariBackend) {
-      const pesanProxy = 'Backend JakSafe tidak dapat dihubungi.';
+      const pesanProxy = 'Unable to reach the JakSafe backend.';
       catat(false, tanggapan.status, pesanProxy);
       throw new ApiError(pesanProxy, {
         status: tanggapan.status,
@@ -214,7 +214,7 @@ export async function minta(jalur, {
       });
     }
 
-    let pesan = `Permintaan gagal dengan status ${tanggapan.status}.`;
+    let pesan = `Request failed with status ${tanggapan.status}.`;
     if (dariBackend) {
       try {
         const isi = await tanggapan.json();

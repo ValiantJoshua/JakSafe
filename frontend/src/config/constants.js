@@ -73,10 +73,10 @@ export const DEFAULT_WEIGHTS = {
  * menghitung skor.
  */
 export const PM25_BANDS = [
-  { sampai: 12, nama: 'Baik', kelas: 'aman' },
-  { sampai: 55, nama: 'Sedang', kelas: 'hati' },
-  { sampai: 150, nama: 'Sensitif', kelas: 'hati' },
-  { sampai: Infinity, nama: 'Buruk', kelas: 'hindari' },
+  { sampai: 12, nama: 'Good', kelas: 'aman' },
+  { sampai: 55, nama: 'Moderate', kelas: 'hati' },
+  { sampai: 150, nama: 'Sensitive', kelas: 'hati' },
+  { sampai: Infinity, nama: 'Unhealthy', kelas: 'hindari' },
 ];
 
 /**
@@ -96,10 +96,10 @@ export const SAMPLING = {
 
 /** Moda perjalanan yang dikenal backend, lihat PROFILE_ALIASES pada osrm.js. */
 export const PROFILES = [
-  { key: 'car', nama: 'Mobil', ikon: 'i-car' },
-  { key: 'motor', nama: 'Motor', ikon: 'i-motor' },
-  { key: 'bike', nama: 'Sepeda', ikon: 'i-bike' },
-  { key: 'foot', nama: 'Jalan Kaki', ikon: 'i-walk' },
+  { key: 'car', nama: 'Car', ikon: 'i-car' },
+  { key: 'motor', nama: 'Motorbike', ikon: 'i-motor' },
+  { key: 'bike', nama: 'Bicycle', ikon: 'i-bike' },
+  { key: 'foot', nama: 'Walking', ikon: 'i-walk' },
 ];
 
 /**

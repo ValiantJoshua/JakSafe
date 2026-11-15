@@ -15,186 +15,186 @@ import { ikon } from '../icons.js';
 
 export function templateStage() {
   return `
-<main class="mapstage" aria-label="Area peta interaktif Indonesia">
+<main class="mapstage" aria-label="Interactive Jakarta 3D map">
 
   <div class="mapholder" id="mapHolder">
     <div class="mapcanvas" id="mapCanvas"></div>
   </div>
 
-  <!-- Kiri Atas: Switch Mode 3D / 2D Peta Normal / Satelit -->
+  <!-- Top-Left: Switch Mode 3D / 2D Map / Satellite -->
   <div class="mapstage__float mapstage__float--tl" id="mapModeWrap">
     <div class="maphud-bar">
-      <div class="mapmode-group" role="group" aria-label="Mode tampilan peta">
-        <button type="button" class="mapmode-btn" data-map-mode="3d" aria-pressed="true" title="Tampilan 3D dengan Gedung 3D">
+      <div class="mapmode-group" role="group" aria-label="Map view mode">
+        <button type="button" class="mapmode-btn" data-map-mode="3d" aria-pressed="false" title="3D view">
           ${ikon('i-layers', 14)}
           <span>3D</span>
         </button>
-        <button type="button" class="mapmode-btn" data-map-mode="2d-road" aria-pressed="false" title="Peta 2D Normal (Google Maps)">
+        <button type="button" class="mapmode-btn" data-map-mode="2d-road" aria-pressed="true" title="2D Road Map">
           ${ikon('i-route', 14)}
-          <span>2D Peta</span>
+          <span>2D Map</span>
         </button>
-        <button type="button" class="mapmode-btn" data-map-mode="2d-sat" aria-pressed="false" title="Peta 2D Satelit">
+        <button type="button" class="mapmode-btn" data-map-mode="2d-sat" aria-pressed="false" title="2D Satellite Map">
           ${ikon('i-eye', 14)}
-          <span>Satelit</span>
+          <span>Satellite</span>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Kanan Atas: Kendali Zoom & Lokasi Saya -->
+  <!-- Top-Right: Zoom & Locate Controls -->
   <div class="mapstage__float mapstage__float--tr" id="mapCtrlWrap">
     <div class="mapctrl">
-      <button type="button" class="iconbtn" id="btnMapZoomIn" aria-label="Perbesar peta" title="Perbesar">${ikon('i-plus', 17)}</button>
-      <button type="button" class="iconbtn" id="btnMapZoomOut" aria-label="Perkecil peta" title="Perkecil">${ikon('i-minus', 17)}</button>
-      <button type="button" class="iconbtn" id="btnMapLocate" aria-label="Menuju lokasi saya saat ini" title="Lokasi Saya Saat Ini">${ikon('i-locate', 17)}</button>
+      <button type="button" class="iconbtn" id="btnMapZoomIn" aria-label="Zoom in" title="Zoom in">${ikon('i-plus', 17)}</button>
+      <button type="button" class="iconbtn" id="btnMapZoomOut" aria-label="Zoom out" title="Zoom out">${ikon('i-minus', 17)}</button>
+      <button type="button" class="iconbtn" id="btnMapLocate" aria-label="Go to my current location" title="My Current Location">${ikon('i-locate', 17)}</button>
     </div>
   </div>
 
-  <!-- Kiri Bawah: Sakelar Layer ON / OFF (Traffic, CCTV, Gedung 3D, AQI) -->
+  <!-- Bottom-Left: Layer Toggles ON / OFF (Traffic, CCTV, 3D Buildings, AQI) -->
   <div class="mapstage__float mapstage__float--bl" id="mapLayersWrap">
-    <div class="maplayer-dock" role="group" aria-label="Lapisan data peta (ON/OFF)">
-      <button type="button" class="maplayer-chip" id="btnLayerTraffic" aria-pressed="true" title="Nyalakan/matikan layer arus lalu lintas">
+    <div class="maplayer-dock" role="group" aria-label="Map data layers (ON/OFF)">
+      <button type="button" class="maplayer-chip" id="btnLayerTraffic" aria-pressed="true" title="Toggle live traffic flow layer">
         <span class="maplayer-chip__dot maplayer-chip__dot--traffic"></span>
         ${ikon('i-car', 15)}
         <span class="maplayer-chip__name">Traffic</span>
         <span class="maplayer-chip__badge" id="badgeLayerTraffic">ON</span>
       </button>
 
-      <button type="button" class="maplayer-chip" id="btnLayerCctv" aria-pressed="true" title="Nyalakan/matikan titik kamera CCTV">
+      <button type="button" class="maplayer-chip" id="btnLayerCctv" aria-pressed="false" title="Toggle CCTV camera pins">
         <span class="maplayer-chip__dot maplayer-chip__dot--cctv"></span>
         ${ikon('i-camera', 15)}
         <span class="maplayer-chip__name">CCTV</span>
-        <span class="maplayer-chip__badge" id="badgeLayerCctv">ON</span>
+        <span class="maplayer-chip__badge" id="badgeLayerCctv">OFF</span>
       </button>
 
-      <button type="button" class="maplayer-chip" id="btnLayerBuildings" aria-pressed="true" title="Nyalakan/matikan Gedung 3D">
+      <button type="button" class="maplayer-chip" id="btnLayerBuildings" aria-pressed="false" title="Toggle 3D buildings">
         <span class="maplayer-chip__dot maplayer-chip__dot--buildings"></span>
         ${ikon('i-layers', 15)}
-        <span class="maplayer-chip__name">Gedung 3D</span>
-        <span class="maplayer-chip__badge" id="badgeLayerBuildings">ON</span>
+        <span class="maplayer-chip__name">3D Buildings</span>
+        <span class="maplayer-chip__badge" id="badgeLayerBuildings">OFF</span>
       </button>
 
-      <button type="button" class="maplayer-chip" id="btnLayerAqi" aria-pressed="false" title="Nyalakan/matikan zona kualitas udara PM2.5">
+      <button type="button" class="maplayer-chip" id="btnLayerAqi" aria-pressed="false" title="Toggle PM2.5 air quality zones">
         <span class="maplayer-chip__dot maplayer-chip__dot--aqi"></span>
         ${ikon('i-wind', 15)}
-        <span class="maplayer-chip__name">Udara</span>
+        <span class="maplayer-chip__name">AQI</span>
         <span class="maplayer-chip__badge" id="badgeLayerAqi">OFF</span>
       </button>
     </div>
   </div>
 
-  <!-- Kartu Mengambang Pratinjau Kamera CCTV saat titik kamera di peta diklik -->
-  <aside class="mapcctv-popup" id="mapCctvPopup" aria-label="Pratinjau kamera CCTV" hidden>
+  <!-- Floating CCTV Camera Preview Card (#mapCctvPopup) -->
+  <aside class="mapcctv-popup" id="mapCctvPopup" aria-label="CCTV camera preview" hidden>
     <div class="mapcctv__head">
       <div class="mapcctv__titlewrap">
         <div class="mapcctv__tagline">
           <span class="mapcctv__live" id="mapCctvLiveBadge"><span class="mapcctv__livedot"></span><span id="mapCctvLiveLabel">LIVE STREAM</span></span>
           <span class="mapcctv__quality" id="mapCctvQuality">HLS 640p</span>
-          <span class="mapcctv__status" id="mapCctvStatusBadge" data-status="unknown" hidden>Belum dicek</span>
+          <span class="mapcctv__status" id="mapCctvStatusBadge" data-status="unknown" hidden>Unchecked</span>
         </div>
-        <h3 class="mapcctv__title" id="mapCctvTitle">Kamera Jakarta</h3>
-        <p class="mapcctv__meta" id="mapCctvMeta">Memuat info kamera...</p>
+        <h3 class="mapcctv__title" id="mapCctvTitle">Jakarta Camera</h3>
+        <p class="mapcctv__meta" id="mapCctvMeta">Loading camera info...</p>
       </div>
-      <button type="button" class="mapcctv__close" id="btnMapCctvClose" aria-label="Tutup pratinjau kamera">
+      <button type="button" class="mapcctv__close" id="btnMapCctvClose" aria-label="Close camera preview">
         ${ikon('i-x', 15)}
       </button>
     </div>
 
-    <!-- Tab mode pilihan: Live Video vs Snapshot -->
+    <!-- Stream Mode Tabs: Live Video vs Snapshot -->
     <div class="mapcctv__tabs">
       <button type="button" class="mapcctv__tab press" id="tabMapCctvVideo" data-active="1">
         <span class="mapcctv__tabdot"></span>
         <span>Live Video</span>
       </button>
       <button type="button" class="mapcctv__tab press" id="tabMapCctvSnapshot" data-active="0">
-        <span>Snapshot (Foto)</span>
+        <span>Snapshot</span>
       </button>
-      <button type="button" class="mapcctv__tabbtn" id="btnMapCctvAutoRefresh" title="Aktifkan/nonaktifkan pembaruan otomatis tiap 3 detik">
+      <button type="button" class="mapcctv__tabbtn" id="btnMapCctvAutoRefresh" title="Toggle 3-second auto refresh">
         Auto: <strong id="lblMapCctvAutoRefresh">ON</strong>
       </button>
     </div>
 
     <div class="mapcctv__frame" id="mapCctvFrame">
-      <!-- Player Video HLS HTML5 -->
+      <!-- HTML5 HLS Video Player -->
       <video class="mapcctv__video" id="mapCctvVideo" autoplay muted playsinline controls preload="auto"></video>
 
-      <!-- Tampilan Snapshot Gambar -->
-      <img class="mapcctv__img" id="mapCctvImg" alt="Cuplikan langsung kamera CCTV" hidden
+      <!-- Snapshot Image View -->
+      <img class="mapcctv__img" id="mapCctvImg" alt="Live CCTV camera snapshot" hidden
            onerror="this.closest('.mapcctv__frame').setAttribute('data-gagal','1')">
 
-      <!-- Status Buffer / Spinner -->
+      <!-- Buffer / Spinner -->
       <div class="mapcctv__spinner-wrap" id="mapCctvSpinner" hidden>
         <span class="mapcctv__spinner"></span>
-        <span class="mapcctv__spinnerText" id="mapCctvSpinnerText">Menghubungkan ke live stream...</span>
+        <span class="mapcctv__spinnerText" id="mapCctvSpinnerText">Connecting to live stream...</span>
       </div>
 
       <div class="mapcctv__fallback">
         ${ikon('i-camera-off', 20)}
-        <span id="mapCctvFallbackMsg">Kamera sedang tidak merespons</span>
+        <span id="mapCctvFallbackMsg">Camera is currently unresponsive</span>
       </div>
     </div>
 
     <div class="mapcctv__actions">
-      <button type="button" class="mapcctv__btn" id="btnMapCctvFly" title="Arahkan kamera 3D ke sudut pandang CCTV ini">
-        ${ikon('i-locate', 13)} Sudut Pandang 3D
+      <button type="button" class="mapcctv__btn" id="btnMapCctvFly" title="Fly 3D camera to this CCTV viewpoint">
+        ${ikon('i-locate', 13)} 3D View
       </button>
-      <button type="button" class="mapcctv__btn" id="btnMapCctvFullscreen" title="Tonton dalam layar penuh">
-        Layar Penuh
+      <button type="button" class="mapcctv__btn" id="btnMapCctvFullscreen" title="Watch in fullscreen">
+        Fullscreen
       </button>
-      <button type="button" class="mapcctv__btn" id="btnMapCctvRefresh" title="Muat ulang siaran langsung">
-        Muat Ulang
+      <button type="button" class="mapcctv__btn" id="btnMapCctvRefresh" title="Reload live feed">
+        Refresh
       </button>
-      <button type="button" class="mapcctv__btn mapcctv__btn--primary" id="btnMapCctvAnalyze" title="Analisis kondisi jalan & banjir dengan Gemini Vision">
-        ${ikon('i-spark', 13)} Analisis AI
+      <button type="button" class="mapcctv__btn mapcctv__btn--primary" id="btnMapCctvAnalyze" title="Analyze road & flood conditions with Gemini Vision">
+        ${ikon('i-spark', 13)} AI Analysis
       </button>
     </div>
 
     <div class="mapcctv__aibox" id="mapCctvAiResult" hidden></div>
   </aside>
 
-  <!-- Menu Titik Peta Terpilih (Click-to-Pick Coordinate) -->
-  <aside class="mappick-menu" id="mapPickMenu" aria-label="Detail Titik Lokasi Peta" hidden>
+  <!-- Click-to-Pick Map Location Menu -->
+  <aside class="mappick-menu" id="mapPickMenu" aria-label="Selected map location details" hidden>
     <div class="mappick__head">
       <div class="mappick__locname">
         <span class="mappick__pin" aria-hidden="true">${ikon('i-pin', 15)}</span>
-        <h4 class="mappick__title" id="mapPickTitle">Mendeteksi alamat...</h4>
+        <h4 class="mappick__title" id="mapPickTitle">Resolving address...</h4>
       </div>
-      <button type="button" class="mappick__close" id="btnMapPickClose" aria-label="Tutup info titik lokasi" title="Tutup">
+      <button type="button" class="mappick__close" id="btnMapPickClose" aria-label="Close location details" title="Close">
         ${ikon('i-x', 14)}
       </button>
     </div>
 
     <div class="mappick__body">
-      <p class="mappick__area" id="mapPickArea">Jakarta &amp; Sekitarnya</p>
+      <p class="mappick__area" id="mapPickArea">Greater Jakarta</p>
       <p class="mappick__coords" id="mapPickCoords">[-6.2088, 106.8456]</p>
     </div>
 
     <div class="mappick__actions">
-      <button type="button" class="mappick__btn mappick__btn--origin press" id="btnPickAsOrigin" title="Jadikan titik awal">
+      <button type="button" class="mappick__btn mappick__btn--origin press" id="btnPickAsOrigin" title="Set as route origin">
         <span class="mappick__indicator mappick__indicator--origin" aria-hidden="true">A</span>
-        <span>Titik Awal</span>
+        <span>Origin</span>
       </button>
-      <button type="button" class="mappick__btn mappick__btn--dest press" id="btnPickAsDest" title="Jadikan tujuan">
+      <button type="button" class="mappick__btn mappick__btn--dest press" id="btnPickAsDest" title="Set as route destination">
         <span class="mappick__indicator mappick__indicator--dest" aria-hidden="true">B</span>
-        <span>Tujuan</span>
+        <span>Destination</span>
       </button>
-      <button type="button" class="mappick__btn mappick__btn--copy press" id="btnPickCopy" title="Salin koordinat">
+      <button type="button" class="mappick__btn mappick__btn--copy press" id="btnPickCopy" title="Copy coordinates">
         ${ikon('i-copy', 13)}
-        <span>Salin</span>
+        <span>Copy</span>
       </button>
     </div>
   </aside>
 
-  <!-- Kanan Bawah: Legenda Ringkas -->
+  <!-- Bottom-Right: Compact Legend -->
   <div class="mapstage__float mapstage__float--br" id="legendWrap">
     <div class="legend">
-      <p class="legend__title">Indeks Rute & Lalu Lintas</p>
+      <p class="legend__title">Route &amp; Traffic Index</p>
       <div class="legend__item"><span class="legend__swatch" style="background:#22C55E"></span>
-        Aman / Lancar <span class="legend__range">0–29</span></div>
+        Safe / Smooth <span class="legend__range">0–29</span></div>
       <div class="legend__item"><span class="legend__swatch" style="background:#F59E0B"></span>
-        Hati-hati / Padat <span class="legend__range">30–59</span></div>
+        Caution / Moderate <span class="legend__range">30–59</span></div>
       <div class="legend__item"><span class="legend__swatch" style="background:#EF4444"></span>
-        Hindari / Macet <span class="legend__range">60–100</span></div>
+        Avoid / Congested <span class="legend__range">60–100</span></div>
     </div>
   </div>
 
