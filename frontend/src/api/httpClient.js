@@ -92,13 +92,19 @@ export function ambilJejak() {
 
 /** Menyusun URL lengkap beserta parameter kueri, melewati nilai kosong. */
 function susunUrl(jalur, kueri) {
-  const url = new URL(`${API_BASE}${jalur}`, window.location.origin);
+  const base = String(API_BASE || '/api').trim().replace(/\/+$/, '');
+  const cleanPath = String(jalur || '').startsWith('/') ? jalur : `/${jalur}`;
+  const isAbsoluteBase = /^https?:\/\//i.test(base);
+  const url = new URL(`${base}${cleanPath}`, window.location.origin);
+
   for (const [kunci, nilai] of Object.entries(kueri || {})) {
     if (nilai === undefined || nilai === null || nilai === '') continue;
     url.searchParams.set(kunci, String(nilai));
   }
-  // Dikembalikan sebagai jalur relatif supaya tetap lewat proxy dev server.
-  return url.pathname + url.search;
+
+  // Untuk URL absolut (mis. Railway backend dari Vercel), pertahankan origin penuh;
+  // untuk jalur relatif ('/api'), kembalikan pathname + search agar lewat proxy Vite.
+  return isAbsoluteBase ? url.href : (url.pathname + url.search);
 }
 
 /** Menentukan sebab kegagalan dari kode status HTTP. */
