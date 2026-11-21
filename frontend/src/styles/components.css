@@ -154,6 +154,7 @@
   flex: 1; min-width: 0; border: none; background: transparent; outline: none;
   font-size: var(--fs-base); font-weight: 500; color: var(--text-1);
 }
+.fieldgroup .field__input { padding-right: 30px; }
 .field__input::placeholder { color: var(--text-3); font-weight: 400; }
 .field__label {
   position: absolute; top: -8px; left: 10px;
@@ -285,15 +286,17 @@
 }
 .chip:hover { background: var(--surface); color: var(--text-1); border-color: var(--border-strong); }
 .chip[aria-pressed="true"] {
-  background: var(--jk-navy);
-  border-color: var(--jk-navy);
-  color: #FFFFFF;
+  background: var(--jk-blue-pale);
+  border-color: rgba(2, 132, 255, 0.42);
+  color: var(--jk-navy);
   font-weight: 600;
+  box-shadow: 0 1px 2px rgba(2, 132, 255, 0.08);
 }
 [data-theme="gelap"] .chip[aria-pressed="true"] {
-  background: var(--jk-blue-1);
-  border-color: var(--jk-blue-1);
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(96, 165, 250, 0.48);
   color: #FFFFFF;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 /* BADGE (Radius 6px, Sentence Case) */
@@ -420,13 +423,28 @@
   justify-self: start;
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 12px; border-radius: var(--r-xs);
-  background: var(--jk-navy);
-  color: #FFFFFF;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--jk-navy);
+  box-shadow: var(--sh-1);
   font-size: var(--fs-xs); font-weight: 600;
-  transition: background var(--dur-1) var(--ease);
+  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.promo__btn:hover { background: var(--jk-blue-1); }
-[data-theme="gelap"] .promo__btn { background: var(--jk-blue-1); }
+.promo__btn:hover {
+  background: var(--jk-blue-pale);
+  border-color: rgba(2, 132, 255, 0.36);
+  color: var(--jk-blue-2);
+}
+[data-theme="gelap"] .promo__btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+[data-theme="gelap"] .promo__btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+}
 
 /* MODAL MASUK */
 .modal { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; padding: var(--s5); }
