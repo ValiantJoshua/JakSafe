@@ -120,9 +120,9 @@
   --tr-micro:    0.012em;
 
   /* MATERIAL TRANSLUSEN & KEDALAMAN (§12) */
-  --glass-bg:     rgba(255, 255, 255, 0.84);
-  --glass-blur:   blur(20px) saturate(180%);
-  --glass-edge:   inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --glass-bg:     rgba(255, 255, 255, 0.78);
+  --glass-blur:   blur(22px) saturate(180%);
+  --glass-edge:   inset 0 1px 0 rgba(255, 255, 255, 0.85);
 
   /* UKURAN KONTROL (Proporsi Aplikasi Desktop/Web Modern) */
   --control-h:    42px;
@@ -149,21 +149,22 @@
   --jk-bg:       #060D1A;
   --jk-green:    #A3E635;
 
-  --text-1:   #F1F5F9;
-  --text-2:   #94A3B8;
-  --text-3:   #64748B;
+  /* Vibrancy ramp (Apple Design §12 & §15): putih transparan bertingkat agar tajam & tidak kusam */
+  --text-1:   rgba(255, 255, 255, 0.94);
+  --text-2:   rgba(255, 255, 255, 0.72);
+  --text-3:   rgba(255, 255, 255, 0.52);
   --text-inv: #060D1A;
 
   --surface:       #0B1528;
-  --surface-2:     #111F38;
-  --surface-3:     #1A2C4E;
-  --border:        rgba(241, 245, 249, 0.09);
-  --border-strong: rgba(241, 245, 249, 0.16);
+  --surface-2:     #122038;
+  --surface-3:     #1B2E4E;
+  --border:        rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.20);
 
-  --jk-blue-pale:   rgba(2, 132, 255, 0.14);
-  --jk-lime-pale:  rgba(163, 230, 53, 0.12);
-  --jk-green-pale: rgba(163, 230, 53, 0.12);
-  --jk-navy-pale:  #111F38;
+  --jk-blue-pale:   rgba(59, 130, 246, 0.20);
+  --jk-lime-pale:  rgba(163, 230, 53, 0.14);
+  --jk-green-pale: rgba(163, 230, 53, 0.14);
+  --jk-navy-pale:  #122038;
 
   --card-score:  var(--surface);
   --card-reason: #0F1E3A;
@@ -182,12 +183,15 @@
   --grad-hero: #060D1A;
 
   --sh-1: none;
-  --sh-2: 0 4px 12px rgba(0, 0, 0, 0.35);
-  --sh-3: 0 8px 24px rgba(0, 0, 0, 0.45);
-  --sh-4: 0 16px 40px rgba(0, 0, 0, 0.55);
-  --sh-inset: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --glass-bg: rgba(11, 21, 40, 0.84);
-  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --sh-2: 0 4px 14px rgba(0, 0, 0, 0.30);
+  --sh-3: 0 8px 28px rgba(0, 0, 0, 0.38);
+  --sh-4: 0 16px 40px rgba(0, 0, 0, 0.50);
+  --sh-inset: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+  /* Translucent frosted glass untuk floating map chrome (§12 Materials & Depth) */
+  --glass-bg:   rgba(14, 22, 38, 0.72);
+  --glass-blur: blur(22px) saturate(180%);
+  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 /*

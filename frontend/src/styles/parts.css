@@ -60,6 +60,16 @@
   opacity: 0.65;
   cursor: wait;
 }
+[data-theme="gelap"] .field__gps {
+  background: rgba(59, 130, 246, 0.20);
+  border-color: rgba(96, 165, 250, 0.38);
+  color: #7DD3FC;
+}
+[data-theme="gelap"] .field__gps:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.30);
+  border-color: rgba(125, 211, 252, 0.58);
+  color: #BAE6FD;
+}
 
 .saran {
   position: absolute;
@@ -401,11 +411,20 @@
   gap: 2px;
   padding: 3px;
   border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  box-shadow: var(--sh-2);
+  background: var(--glass-bg, var(--surface));
+  backdrop-filter: var(--glass-blur, none);
+  -webkit-backdrop-filter: var(--glass-blur, none);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: var(--glass-edge, none), 0 6px 20px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="gelap"] .mapmode-group,
+[data-theme="gelap"] .mappreset-group {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: var(--glass-edge), 0 8px 24px rgba(0, 0, 0, 0.32), 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
 .mapmode-btn,
@@ -428,9 +447,22 @@
   background: var(--surface-2);
 }
 
-.mapmode-btn[aria-pressed="true"] {
-  background: var(--jk-blue-1);
+[data-theme="gelap"] .mapmode-btn:hover,
+[data-theme="gelap"] .mappreset-btn:hover {
   color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.mapmode-btn[aria-pressed="true"] {
+  background: #FFFFFF;
+  color: var(--jk-navy);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="gelap"] .mapmode-btn[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20), 0 1px 3px rgba(0, 0, 0, 0.28);
 }
 
 .mappreset-btn:active {
@@ -449,14 +481,16 @@
   background: var(--glass-bg, var(--surface));
   backdrop-filter: var(--glass-blur, none);
   -webkit-backdrop-filter: var(--glass-blur, none);
-  border: 1px solid var(--border-strong);
-  box-shadow: var(--glass-edge, none), 0 4px 16px rgba(10, 46, 107, 0.08), 0 1px 3px rgba(10, 46, 107, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: var(--glass-edge, none), 0 6px 22px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
 [data-theme="gelap"] .maplayer-dock {
   background: var(--glass-bg, #0B192E);
+  backdrop-filter: var(--glass-blur, none);
+  -webkit-backdrop-filter: var(--glass-blur, none);
   border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: var(--glass-edge, none), 0 8px 24px rgba(0, 0, 0, 0.40);
+  box-shadow: var(--glass-edge, none), 0 8px 28px rgba(0, 0, 0, 0.34), 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
 .maplayer-chip {
@@ -480,7 +514,7 @@
 }
 
 [data-theme="gelap"] .maplayer-chip:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.10);
   color: #FFFFFF;
 }
 
@@ -492,9 +526,15 @@
 }
 
 [data-theme="gelap"] .maplayer-chip[aria-pressed="true"] {
-  background: var(--jk-blue-1);
+  background: rgba(59, 130, 246, 0.26);
+  border-color: rgba(96, 165, 250, 0.44);
   color: #FFFFFF;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 3px rgba(0, 0, 0, 0.24);
+}
+
+[data-theme="gelap"] .maplayer-chip[aria-pressed="true"] .maplayer-chip__badge {
+  background: rgba(96, 165, 250, 0.30);
+  color: #E0F2FE;
 }
 
 /* Hilangkan dot berwarna-warni yang menimbulkan noise visual */
