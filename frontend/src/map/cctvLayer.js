@@ -38,6 +38,8 @@ let highlightedCameraId = null;
 let activeRouteGeometry = null;
 /** @type {string|null} */
 let selectedCameraId = null;
+/** @type {string|null} */
+let activeAngleId = null;
 
 /** @type {Hls|null} */
 let activeHls = null;
@@ -569,6 +571,57 @@ function tampilkanModeKamera(cam, mode) {
   }
 }
 
+function getActiveAngleCamera(cam) {
+  if (!cam) return null;
+  const angles = Array.isArray(cam.angles) ? cam.angles : [];
+  const chosen = angles.find((a) => a.id === activeAngleId) || angles[0] || null;
+  if (!chosen) return cam;
+  return {
+    ...cam,
+    id: chosen.id,
+    hasLiveStream: chosen.hasLiveStream,
+  };
+}
+
+function renderAnglePills(cam) {
+  const wrap = document.getElementById('mapCctvAngles');
+  if (!wrap) return;
+  const angles = Array.isArray(cam?.angles) ? cam.angles : [];
+  if (angles.length <= 1) {
+    wrap.hidden = true;
+    wrap.innerHTML = '';
+    return;
+  }
+
+  wrap.hidden = false;
+  wrap.innerHTML = angles
+    .map((a) => {
+      const isActive = (activeAngleId || angles[0].id) === a.id;
+      return `<button type="button" class="mapcctv__angle press" data-angle-id="${escapeHtml(a.id)}" data-active="${isActive ? '1' : '0'}">${escapeHtml(a.label)}</button>`;
+    })
+    .join('');
+
+  wrap.querySelectorAll('[data-angle-id]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const nextId = btn.getAttribute('data-angle-id');
+      if (!nextId || nextId === activeAngleId) return;
+      activeAngleId = nextId;
+      wrap.querySelectorAll('[data-angle-id]').forEach((el) => {
+        el.setAttribute('data-active', el.getAttribute('data-angle-id') === activeAngleId ? '1' : '0');
+      });
+      const activeCam = getActiveAngleCamera(cam);
+      const tabVid = document.getElementById('tabMapCctvVideo');
+      if (tabVid && activeCam) {
+        tabVid.style.opacity = activeCam.hasLiveStream ? '1' : '0.45';
+      }
+      hentikanStreamKamera();
+      if (activeCam) {
+        tampilkanModeKamera(activeCam, activeCam.hasLiveStream ? 'video' : 'snapshot');
+      }
+    });
+  });
+}
+
 /**
  * Menampilkan modal / kartu mengambang CCTV di atas panggung peta saat kamera diklik.
  * @param {import('../api/cctvApi.js').Kamera|null} cam
@@ -580,6 +633,8 @@ export function bukaPopupKameraPeta(cam) {
   if (!cam) {
     hentikanStreamKamera();
     selectedCameraId = null;
+    activeAngleId = null;
+    renderAnglePills(null);
     popup.hidden = true;
     renderEntitasKamera();
     notifyListeners();
@@ -587,6 +642,7 @@ export function bukaPopupKameraPeta(cam) {
   }
 
   selectedCameraId = cam.id;
+  activeAngleId = cam.angles?.[0]?.id || cam.id;
   renderEntitasKamera();
   notifyListeners();
 
@@ -598,6 +654,7 @@ export function bukaPopupKameraPeta(cam) {
 
   if (titleEl) titleEl.textContent = cam.nama;
   perbaruiBadgeStatusKamera(cam);
+  renderAnglePills(cam);
   const fallbackMsgEl = document.getElementById('mapCctvFallbackMsg');
   if (fallbackMsgEl) {
     fallbackMsgEl.textContent = cam.status === 'offline' && cam.statusReason
@@ -620,16 +677,17 @@ export function bukaPopupKameraPeta(cam) {
     btnAnalyze.innerHTML = `${ikon('i-spark', 13)} AI Analysis`;
   }
 
+  const activeCam = getActiveAngleCamera(cam);
   if (tabVid) {
-    tabVid.style.opacity = cam.hasLiveStream ? '1' : '0.45';
-    tabVid.title = cam.hasLiveStream ? 'Watch live video stream' : 'This camera only provides periodic snapshots';
+    tabVid.style.opacity = activeCam.hasLiveStream ? '1' : '0.45';
+    tabVid.title = activeCam.hasLiveStream ? 'Watch live video stream' : 'This camera only provides periodic snapshots';
   }
 
   popup.hidden = false;
 
   // Jalankan mode sesuai kapabilitas kamera
-  const targetMode = cam.hasLiveStream ? 'video' : 'snapshot';
-  tampilkanModeKamera(cam, targetMode);
+  const targetMode = activeCam.hasLiveStream ? 'video' : 'snapshot';
+  tampilkanModeKamera(activeCam, targetMode);
 }
 
 /**
@@ -742,14 +800,14 @@ function pasangTombolPopupKamera() {
 
   // Tab Live Video
   document.getElementById('tabMapCctvVideo')?.addEventListener('click', () => {
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (!cam) return;
     tampilkanModeKamera(cam, 'video');
   });
 
   // Tab Snapshot
   document.getElementById('tabMapCctvSnapshot')?.addEventListener('click', () => {
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (!cam) return;
     tampilkanModeKamera(cam, 'snapshot');
   });
@@ -762,7 +820,7 @@ function pasangTombolPopupKamera() {
       lbl.textContent = autoRefreshEnabled ? 'ON' : 'OFF';
       lbl.style.color = autoRefreshEnabled ? '' : 'var(--text-3)';
     }
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (cam && currentViewMode === 'snapshot') {
       tampilkanModeKamera(cam, 'snapshot');
     }
@@ -781,7 +839,7 @@ function pasangTombolPopupKamera() {
 
   // Muat Ulang (Refresh)
   document.getElementById('btnMapCctvRefresh')?.addEventListener('click', () => {
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (!cam) return;
     tampilkanModeKamera(cam, currentViewMode);
   });
@@ -800,7 +858,7 @@ function pasangTombolPopupKamera() {
   });
 
   document.getElementById('btnMapCctvAnalyze')?.addEventListener('click', async () => {
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (!cam) return;
     const btn = document.getElementById('btnMapCctvAnalyze');
     const aiBox = document.getElementById('mapCctvAiResult');

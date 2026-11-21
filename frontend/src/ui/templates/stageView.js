@@ -134,6 +134,8 @@ export function templateStage() {
       </div>
     </div>
 
+    <div class="mapcctv__angles" id="mapCctvAngles" role="group" aria-label="Camera angles at this location" hidden></div>
+
     <div class="mapcctv__actions">
       <button type="button" class="mapcctv__btn" id="btnMapCctvFly" title="Fly 3D camera to this CCTV viewpoint">
         ${ikon('i-locate', 13)} 3D View

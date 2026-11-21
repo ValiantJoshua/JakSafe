@@ -44,6 +44,9 @@ router.get('/nearest', (req, res) => {
 router.get('/frame/:id', async (req, res) => {
   const camera = getCameraById(req.params.id);
   if (!camera) return res.status(404).json({ ok: false, error: 'camera not found' });
+  if (!camera.url) {
+    return res.status(404).json({ ok: false, error: 'no snapshot available for HLS-only camera' });
+  }
   const startedAt = Date.now();
   try {
     const { buffer, contentType, fetchedAt } = await fetchFrame(camera);

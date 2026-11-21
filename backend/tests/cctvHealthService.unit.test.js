@@ -103,6 +103,24 @@ describe('Unit Test: Hybrid CCTV Health Checker Service', () => {
     assert.equal(res.status, 'online');
   });
 
+  it('checkCameraEndpoint falls back from HEAD 404/403 to GET on port 7028', async () => {
+    const methods = [];
+    const fetchImpl = async (_url, opts) => {
+      methods.push(opts.method);
+      if (opts.method === 'HEAD') {
+        return makeMockResponse({ status: 404 });
+      }
+      return makeMockResponse({ status: 200, headers: { 'content-type': 'image/jpeg' } });
+    };
+
+    const res = await checkCameraEndpoint(
+      { id: 'c2-7028', url: 'https://8.8.8.8:7028/cam.jpg' },
+      { fetchImpl, timeoutMs: 2000 }
+    );
+    assert.deepEqual(methods, ['HEAD', 'GET']);
+    assert.equal(res.status, 'online');
+  });
+
   it('checkCameraEndpoint rejects image/svg+xml offline placeholders', async () => {
     const fetchImpl = async () =>
       makeMockResponse({ status: 200, headers: { 'content-type': 'image/svg+xml' } });
