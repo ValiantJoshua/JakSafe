@@ -647,6 +647,8 @@ async function scrapeBinaMargaTol(existingList) {
     'streaming-cct.co.id',
     'camera.jtd.co.id',
     'cctv.citramarga.com',
+    'cctv.kkdm.co.id',
+    'cctv.ctptollways.com:2254',
   ]);
 
   // 1. Muat koordinat GPS resmi dari BPJT allStreams (cocokkan via streamhls, UUID, atau nama_km)
@@ -665,7 +667,8 @@ async function scrapeBinaMargaTol(existingList) {
     if (m) {
       const obj = JSON.parse(m[1]);
       for (const c of Object.values(obj).flat()) {
-        const lat = Number(c.lat), lon = Number(c.lon);
+        const lat = Number(String(c.lat ?? '').replace(/\.\.+/g, '.'));
+        const lon = Number(String(c.lon ?? '').replace(/\.\.+/g, '.'));
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
         if (lat < -6.68 || lat > -6.0 || lon < 106.50 || lon > 107.18) continue;
         const pt = { lat, lon, ruas: c.nama_ruas, km: c.nama_km };
@@ -746,6 +749,8 @@ async function scrapeBinaMargaTol(existingList) {
         'streaming-cct.co.id': 'PT Cimanggis Cibitung Tollways',
         'camera.jtd.co.id': 'PT Jakarta Tollroad Development',
         'cctv.citramarga.com': 'PT CMNP Tol Wiyoto Wiyono',
+        'cctv.kkdm.co.id': 'PT KKDM Tol Becakayu',
+        'cctv.ctptollways.com:2254': 'PT CTP Tollways (Cibitung–Cilincing)',
       };
 
       return {
