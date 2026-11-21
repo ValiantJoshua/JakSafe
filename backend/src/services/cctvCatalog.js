@@ -35,7 +35,7 @@ export function catalogPath() {
     : DEFAULT_PATH;
 }
 
-const ALLOWED_CATALOG_PORTS = new Set(['', '80', '443', '7028', '8080', '8443', '8989', '20443']);
+const ALLOWED_CATALOG_PORTS = new Set(['', '80', '443', '2254', '7028', '8080', '8443', '8989', '20443']);
 
 function isBlockedHostLiteral(host) {
   const clean = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
