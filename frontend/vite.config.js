@@ -71,6 +71,7 @@ export default defineConfig(({ mode }) => {
   const backendOrigin = rawBackendOrigin.replace('://localhost:', '://127.0.0.1:');
   const googleMapsKey = env.VITE_GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY || '';
   const cesiumIonToken = env.VITE_CESIUM_ION_TOKEN || env.CESIUM_ION_TOKEN || '';
+  const cartoApiKey = env.VITE_CARTO_API_KEY || env.CARTO_API_KEY || '';
 
   return {
     appType: 'mpa',
@@ -84,6 +85,8 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(googleMapsKey),
       'import.meta.env.CESIUM_ION_TOKEN': JSON.stringify(cesiumIonToken),
       'import.meta.env.VITE_CESIUM_ION_TOKEN': JSON.stringify(cesiumIonToken),
+      'import.meta.env.CARTO_API_KEY': JSON.stringify(cartoApiKey),
+      'import.meta.env.VITE_CARTO_API_KEY': JSON.stringify(cartoApiKey),
     },
 
     server: {
