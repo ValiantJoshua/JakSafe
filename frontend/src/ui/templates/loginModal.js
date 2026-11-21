@@ -29,35 +29,35 @@ export function templateLoginModal() {
 <div class="modal" id="loginModal" hidden>
   <div class="modal__scrim" data-close-modal></div>
   <div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-    <button class="modal__x press" data-close-modal aria-label="Tutup">${ikon('i-x', 18)}</button>
+    <button class="modal__x press" data-close-modal aria-label="Close">${ikon('i-x', 18)}</button>
 
     <div class="modal__grid">
       <div class="modal__left">
-        <h3 class="modal__eyebrow">Kenapa perlu masuk?</h3>
+        <h3 class="modal__eyebrow">Why sign in?</h3>
         <div class="comparebox">
 
           <div class="compare compare--guest">
-            <p class="compare__head"><span class="compare__tag compare__tag--guest">Tanpa Masuk</span></p>
+            <p class="compare__head"><span class="compare__tag compare__tag--guest">Guest</span></p>
             <ul class="compare__list">
-              ${baris('Cari rute aman')}
-              ${baris('Lihat skor dan rincian penilaian')}
-              ${baris('Lihat kualitas udara sepanjang rute')}
-              ${baris('Lihat bukti kamera CCTV')}
-              ${baris('Rute tersimpan', { aktif: false })}
-              ${baris('Riwayat perjalanan', { aktif: false })}
-              ${baris('Peringatan dini area rawan banjir', { aktif: false })}
-              ${baris('Profil kesehatan', { aktif: false })}
+              ${baris('Search safe routes')}
+              ${baris('View safety scores & breakdown')}
+              ${baris('Inspect air quality along routes')}
+              ${baris('View live CCTV evidence')}
+              ${baris('Saved routes', { aktif: false })}
+              ${baris('Trip history', { aktif: false })}
+              ${baris('Flood-prone area alerts', { aktif: false })}
+              ${baris('Health sensitivity profile', { aktif: false })}
             </ul>
           </div>
 
           <div class="compare compare--member">
-            <p class="compare__head"><span class="compare__tag compare__tag--member">Sudah Masuk</span></p>
+            <p class="compare__head"><span class="compare__tag compare__tag--member">Signed In</span></p>
             <ul class="compare__list">
-              ${baris('Semua fitur tanpa masuk')}
-              ${baris('Profil kesehatan, tersimpan permanen di database', { sorot: true, ikonNama: 'i-wind' })}
-              ${baris('Simpan rute favorit permanen ke database', { sorot: true, ikonNama: 'i-star' })}
-              ${baris('Riwayat perjalanan otomatis & muat ulang cepat', { sorot: true, ikonNama: 'i-clock' })}
-              ${baris('Peringatan dini area rawan banjir & hujan', { sorot: true, ikonNama: 'i-bell' })}
+              ${baris('All guest features')}
+              ${baris('Health profile synced permanently to your account', { sorot: true, ikonNama: 'i-wind' })}
+              ${baris('Bookmark favorite routes permanently', { sorot: true, ikonNama: 'i-star' })}
+              ${baris('Automatic trip history & quick reload', { sorot: true, ikonNama: 'i-clock' })}
+              ${baris('Early flood & rain corridor alerts', { sorot: true, ikonNama: 'i-bell' })}
             </ul>
           </div>
 
@@ -66,15 +66,15 @@ export function templateLoginModal() {
 
       <div class="modal__right">
         <div class="modal__logo">${logoMark(54, 'modal')}</div>
-        <h2 class="modal__title" id="loginTitle">Masuk ke JakSafe</h2>
-        <p class="modal__sub" id="loginSub">Masuk dengan email dan kata sandi Anda.</p>
+        <h2 class="modal__title" id="loginTitle">Sign In to JakSafe</h2>
+        <p class="modal__sub" id="loginSub">Sign in with your email and password.</p>
 
-        <div class="auth-tabs" role="tablist" aria-label="Mode akun">
+        <div class="auth-tabs" role="tablist" aria-label="Account mode">
           <button type="button" class="auth-tab" role="tab" id="tabLoginMode" data-auth-tab="login" aria-selected="true">
-            Masuk
+            Sign In
           </button>
           <button type="button" class="auth-tab" role="tab" id="tabRegisterMode" data-auth-tab="register" aria-selected="false">
-            Daftar Akun
+            Create Account
           </button>
         </div>
 
@@ -83,10 +83,10 @@ export function templateLoginModal() {
 
           <div id="registerNameWrap" hidden>
             <label class="inputwrap" for="loginName">
-              <span class="inputwrap__label">Nama Lengkap</span>
+              <span class="inputwrap__label">Full Name</span>
               <input class="inputwrap__input" type="text" id="loginName" name="name"
-                     autocomplete="name" placeholder="Nama lengkap Anda">
-              <span class="inputwrap__hint">Opsional — kosongkan untuk memakai awalan email.</span>
+                     autocomplete="name" placeholder="Your full name">
+              <span class="inputwrap__hint">Optional — leave blank to use your email prefix.</span>
             </label>
           </div>
 
@@ -94,46 +94,42 @@ export function templateLoginModal() {
             <span class="inputwrap__label">Email</span>
             <input class="inputwrap__input" type="email" id="loginEmail" name="email"
                    autocomplete="username" inputmode="email" autocapitalize="none"
-                   spellcheck="false" placeholder="nama@email.com" required>
+                   spellcheck="false" placeholder="you@example.com" required>
           </label>
 
           <div class="inputwrap">
-            <label class="inputwrap__label" for="loginPass">Kata Sandi</label>
+            <label class="inputwrap__label" for="loginPass">Password</label>
             <div class="inputwrap__pass">
               <input class="inputwrap__input inputwrap__input--pass" type="password" id="loginPass" name="password"
                      autocomplete="current-password" minlength="6" spellcheck="false"
-                     placeholder="Minimal 6 karakter" required>
+                     placeholder="At least 6 characters" required>
               <button type="button" class="inputwrap__toggle press" id="btnTogglePass"
-                      aria-label="Tampilkan kata sandi" aria-pressed="false" aria-controls="loginPass">
+                      aria-label="Show password" aria-pressed="false" aria-controls="loginPass">
                 ${ikon('i-eye', 17)}
               </button>
             </div>
-            <span class="inputwrap__hint" id="loginPassHint">Minimal 6 karakter.</span>
+            <span class="inputwrap__hint" id="loginPassHint">Minimum 6 characters.</span>
           </div>
 
           <div id="registerSensitifWrap" hidden>
             <label class="switchrow" for="chkSensitif">
               <input type="checkbox" id="chkSensitif" checked>
               <span class="switchrow__teks">
-                <strong>Saya sensitif terhadap polusi udara</strong>
-                Bobot polusi dinaikkan saat rute dinilai.
+                <strong>I am sensitive to air pollution</strong>
+                Increase air quality weight when scoring routes.
               </span>
             </label>
           </div>
 
           <button class="btn btn--primary btn--block btn--lg press" type="submit" id="btnAuthSubmit" style="margin-top:var(--s4)">
-            Masuk Sekarang
+            Sign In
             <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>
           </button>
         </form>
 
         <button class="btn btn--ghost btn--block press" id="btnGuest" style="margin-top:var(--s3)">
-          Lanjut Sebagai Tamu
+          Continue as Guest
         </button>
-
-        <p class="modal__fine">
-          Akun dan rute tersimpan diamankan dengan otentikasi JWT dan enkripsi kata sandi di backend JakSafe.
-        </p>
       </div>
     </div>
   </div>
@@ -150,7 +146,7 @@ export function templateUserMenu() {
   <div class="usermenu__head">
     <span class="usermenu__ava">JS</span>
     <span>
-      <span class="usermenu__name" id="menuNama">Pengguna JakSafe</span>
+      <span class="usermenu__name" id="menuNama">JakSafe User</span>
       <span class="usermenu__mail" id="menuEmail"></span>
     </span>
   </div>
@@ -159,35 +155,35 @@ export function templateUserMenu() {
        karena pengaruhnya pada skor memang nyata. -->
   <div class="usermenu__badge" id="menuBadgeSensitif" hidden>
     ${ikon('i-wind', 15)}
-    Profil kesehatan aktif, bobot polusi dinaikkan
+    Health profile active — pollution weight increased
   </div>
 
   <button type="button" class="usermenu__item usermenu__switchrow" id="btnToggleSensitif"
           role="switch" aria-checked="false" aria-describedby="menuSensitifSub">
     ${ikon('i-wind', 17)}
     <span class="usermenu__labelwrap">
-      <span class="usermenu__label">Profil Kesehatan</span>
-      <span class="usermenu__sub" id="menuSensitifSub">Prioritaskan udara bersih</span>
+      <span class="usermenu__label">Health Profile</span>
+      <span class="usermenu__sub" id="menuSensitifSub">Prioritize cleaner air</span>
     </span>
     <span class="jswitch" aria-hidden="true"><span class="jswitch__thumb"></span></span>
   </button>
   <button type="button" class="usermenu__item" id="btnOpenHistory">
-    ${ikon('i-clock', 17)} <span class="usermenu__text">Riwayat Perjalanan</span>
+    ${ikon('i-clock', 17)} <span class="usermenu__text">Trip History</span>
     <span class="usermenu__n" id="menuHistoryCount">0</span>
   </button>
   <button type="button" class="usermenu__item" id="btnOpenAlerts">
-    ${ikon('i-bell', 17)} <span class="usermenu__text">Peringatan Area Rawan</span>
-    <span class="usermenu__n" id="menuAlertCount">Pantau</span>
+    ${ikon('i-bell', 17)} <span class="usermenu__text">Flood Alerts</span>
+    <span class="usermenu__n" id="menuAlertCount">Watch</span>
   </button>
 
   <a class="usermenu__item" id="btnOpenAdmin" href="/admin.html" hidden>
-    ${ikon('i-shield', 17)} <span class="usermenu__text">Dashboard Admin</span>
+    ${ikon('i-shield', 17)} <span class="usermenu__text">Admin Dashboard</span>
   </a>
 
   <div class="divider" style="margin:var(--s2) 0"></div>
 
   <button class="usermenu__item usermenu__item--out" id="btnLogout">
-    ${ikon('i-logout', 17)} Keluar
+    ${ikon('i-logout', 17)} Sign Out
   </button>
 </div>`;
 }
@@ -203,23 +199,23 @@ export function templateAccountDialogs() {
   <div class="jmodal__head">
     <span class="jmodal__icon">${ikon('i-clock', 17)}</span>
     <div class="jmodal__titles">
-      <h2 class="jmodal__title" id="historyTitle">Riwayat Perjalanan</h2>
-      <p class="jmodal__sub">Pencarian rute terbaru yang tersimpan ke akun Anda</p>
+      <h2 class="jmodal__title" id="historyTitle">Trip History</h2>
+      <p class="jmodal__sub">Recent route searches saved to your account</p>
     </div>
-    <button type="button" class="jmodal__close press" data-close-dialog="historyDialog" aria-label="Tutup dialog riwayat">
+    <button type="button" class="jmodal__close press" data-close-dialog="historyDialog" aria-label="Close history dialog">
       ${ikon('i-x', 17)}
     </button>
   </div>
 
   <div class="jmodal__toolbar">
-    <span class="jmodal__count" id="historySummaryText">Memuat riwayat</span>
+    <span class="jmodal__count" id="historySummaryText">Loading history</span>
     <button type="button" class="jmodal__action press" id="btnClearHistory" hidden>
-      Kosongkan Riwayat
+      Clear History
     </button>
   </div>
 
   <div class="jmodal__body scroll-y">
-    <ul class="jlist" id="historyList" aria-label="Daftar riwayat perjalanan"></ul>
+    <ul class="jlist" id="historyList" aria-label="Trip history list"></ul>
   </div>
 </dialog>
 
@@ -227,40 +223,40 @@ export function templateAccountDialogs() {
   <div class="jmodal__head">
     <span class="jmodal__icon">${ikon('i-bell', 17)}</span>
     <div class="jmodal__titles">
-      <h2 class="jmodal__title" id="alertsTitle">Peringatan Area Rawan</h2>
-      <p class="jmodal__sub">Pantauan koridor genangan Jakarta berdasarkan curah hujan dan CCTV terkini</p>
+      <h2 class="jmodal__title" id="alertsTitle">Flood-Prone Area Alerts</h2>
+      <p class="jmodal__sub">Jakarta inundation corridor watch based on live rainfall &amp; CCTV</p>
     </div>
-    <button type="button" class="jmodal__close press" data-close-dialog="alertsDialog" aria-label="Tutup dialog area rawan">
+    <button type="button" class="jmodal__close press" data-close-dialog="alertsDialog" aria-label="Close alerts dialog">
       ${ikon('i-x', 17)}
     </button>
   </div>
 
   <div class="alertsbar">
     <div class="alertsbar__top">
-      <div class="aseg" id="alertRegionChips" role="group" aria-label="Filter wilayah DKI Jakarta">
-        <button type="button" class="aseg__btn" data-region="semua" aria-pressed="true">Semua</button>
-        <button type="button" class="aseg__btn" data-region="Jakarta Pusat" aria-pressed="false">Jakpus</button>
-        <button type="button" class="aseg__btn" data-region="Jakarta Selatan" aria-pressed="false">Jaksel</button>
-        <button type="button" class="aseg__btn" data-region="Jakarta Barat" aria-pressed="false">Jakbar</button>
-        <button type="button" class="aseg__btn" data-region="Jakarta Timur" aria-pressed="false">Jaktim</button>
-        <button type="button" class="aseg__btn" data-region="Jakarta Utara" aria-pressed="false">Jakut</button>
+      <div class="aseg" id="alertRegionChips" role="group" aria-label="Filter DKI Jakarta region">
+        <button type="button" class="aseg__btn" data-region="semua" aria-pressed="true">All</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Pusat" aria-pressed="false">Central</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Selatan" aria-pressed="false">South</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Barat" aria-pressed="false">West</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Timur" aria-pressed="false">East</button>
+        <button type="button" class="aseg__btn" data-region="Jakarta Utara" aria-pressed="false">North</button>
       </div>
-      <button type="button" class="alertsbar__refresh press" id="btnRefreshAlerts">Muat ulang</button>
+      <button type="button" class="alertsbar__refresh press" id="btnRefreshAlerts">Refresh</button>
     </div>
 
     <div class="alertsbar__sub">
-      <span class="alertsbar__meta" id="alertsMetaText">Memeriksa kondisi koridor Jakarta</span>
+      <span class="alertsbar__meta" id="alertsMetaText">Checking Jakarta corridors</span>
       <div class="alertsbar__pref" id="alertPrefBar">
         <label class="apref__chk">
           <input type="checkbox" id="chkAlertRouteAuto" checked>
-          <span>Peringatan di rute</span>
+          <span>Route alerts</span>
         </label>
         <label class="apref__sev" for="selAlertSeverity">
-          <span class="apref__label">Ambang</span>
+          <span class="apref__label">Threshold</span>
           <select id="selAlertSeverity">
-            <option value="pantau">Pantau+</option>
-            <option value="waspada">Waspada+</option>
-            <option value="siaga">Hanya Siaga</option>
+            <option value="pantau">Watch+</option>
+            <option value="waspada">Caution+</option>
+            <option value="siaga">Alert Only</option>
           </select>
         </label>
       </div>
@@ -268,7 +264,7 @@ export function templateAccountDialogs() {
   </div>
 
   <div class="jmodal__body jmodal__body--list scroll-y">
-    <ul class="alist" id="alertsList" aria-label="Daftar peringatan area rawan Jakarta"></ul>
+    <ul class="alist" id="alertsList" aria-label="Jakarta flood-prone corridor alerts"></ul>
   </div>
 </dialog>`;
 }

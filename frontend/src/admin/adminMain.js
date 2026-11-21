@@ -38,19 +38,19 @@ const AUTH_TOKEN_KEY = 'jaksafe_token';
 const AUTH_USER_KEY = 'jaksafe_user';
 
 const STORE_LABELS = {
-  cctvVision: 'Visi CCTV AI',
-  cctvHealth: 'Kesehatan kamera',
-  routeGeometry: 'Geometri rute OSRM',
-  navigation: 'Rekomendasi navigasi',
-  geocoding: 'Geocoding alamat',
+  cctvVision: 'CCTV AI Vision',
+  cctvHealth: 'Camera health',
+  routeGeometry: 'OSRM route geometry',
+  navigation: 'Navigation recommendations',
+  geocoding: 'Address geocoding',
 };
 
 const LIMITER_LABELS = {
-  api_general: 'API umum (/api)',
-  auth_sensitive: 'Autentikasi (/auth)',
-  compute_ai: 'Navigasi & AI (/navigate)',
-  traffic_tiles: 'Tile lalu lintas (/tomtom/flow)',
-  admin_api: 'Konsol admin (/api/admin)',
+  api_general: 'General API (/api)',
+  auth_sensitive: 'Authentication (/auth)',
+  compute_ai: 'Navigation & AI (/navigate)',
+  traffic_tiles: 'Traffic tiles (/tomtom/flow)',
+  admin_api: 'Admin console (/api/admin)',
 };
 
 const keadaan = {
@@ -110,11 +110,12 @@ function formatWaktuId(iso) {
   if (!iso) return KOSONG;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return KOSONG;
-  return new Intl.DateTimeFormat('id-ID', {
+  return new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
     timeZone: 'Asia/Jakarta',
   }).format(d);
 }
@@ -133,15 +134,15 @@ function statusDotHtml(tone, label) {
 function cameraHealthHtml(status) {
   if (status === 'online') return statusDotHtml('ok', 'Online');
   if (status === 'offline') return statusDotHtml('danger', 'Offline');
-  return statusDotHtml('warn', 'Belum diuji');
+  return statusDotHtml('warn', 'Unchecked');
 }
 
 function scoreStatusHtml(score) {
-  const rawLabel = score?.label || 'Tidak dinilai';
+  const rawLabel = score?.label || 'Unscored';
   const total = Number.isFinite(score?.totalScore) ? ` · ${score.totalScore}` : '';
-  if (rawLabel === 'AMAN') return statusDotHtml('ok', `Aman${total}`);
-  if (rawLabel === 'HATI-HATI') return statusDotHtml('warn', `Hati-hati${total}`);
-  if (rawLabel === 'HINDARI') return statusDotHtml('danger', `Hindari${total}`);
+  if (rawLabel === 'AMAN') return statusDotHtml('ok', `Safe${total}`);
+  if (rawLabel === 'HATI-HATI') return statusDotHtml('warn', `Caution${total}`);
+  if (rawLabel === 'HINDARI') return statusDotHtml('danger', `Avoid${total}`);
   return statusDotHtml('muted', rawLabel);
 }
 
@@ -188,14 +189,14 @@ function rakitKerangka() {
   root.innerHTML = `
 ${spriteIkon()}
 
-<a class="skip-link" href="#mainContent">Lewati ke konten utama</a>
+<a class="skip-link" href="#mainContent">Skip to main content</a>
 
 <header class="admin-topbar">
-  <a class="admin-brand" href="/app.html" aria-label="Kembali ke aplikasi peta JakSafe">
+  <a class="admin-brand" href="/app.html" aria-label="Back to JakSafe map app">
     <span class="admin-brand__mark">${ikon('i-shield', 16)}</span>
     <span class="admin-brand__text">
       <span class="admin-brand__name">JakSafe</span>
-      <span class="admin-brand__sub">Konsol Operasional</span>
+      <span class="admin-brand__sub">Operations Console</span>
     </span>
   </a>
 
@@ -210,22 +211,22 @@ ${spriteIkon()}
     <button type="button" class="themeswitch" id="btnAdminThemeToggle"
             role="switch"
             aria-checked="false"
-            aria-label="Mode gelap"
-            title="Ubah tema tampilan (Terang / Gelap)">
+            aria-label="Dark mode"
+            title="Switch theme (Light / Dark)">
       <span class="themeswitch__track" aria-hidden="true">
         <span class="themeswitch__thumb"></span>
-        <span class="themeswitch__slot themeswitch__slot--sun" data-theme-set="terang" title="Tema terang">
+        <span class="themeswitch__slot themeswitch__slot--sun" data-theme-set="terang" title="Light theme">
           ${ikon('i-sun', 17)}
         </span>
-        <span class="themeswitch__slot themeswitch__slot--moon" data-theme-set="gelap" title="Tema gelap">
+        <span class="themeswitch__slot themeswitch__slot--moon" data-theme-set="gelap" title="Dark theme">
           ${ikon('i-moon', 17)}
         </span>
       </span>
     </button>
 
-    <a class="btn btn--sm" href="/app.html">${ikon('i-arrow', 16)} Peta Utama</a>
+    <a class="btn btn--sm" href="/app.html">${ikon('i-arrow', 16)} Main Map</a>
     <button type="button" class="btn btn--sm btn--quiet" id="btnAdminLogout" hidden>
-      ${ikon('i-logout', 16)} Keluar
+      ${ikon('i-logout', 16)} Sign Out
     </button>
   </div>
 </header>
@@ -236,7 +237,7 @@ ${spriteIkon()}
       <span class="status-dot status-dot--ok" id="adminToastDot" aria-hidden="true"></span>
       <span id="adminToastText"></span>
     </span>
-    <button type="button" class="btn btn--sm" id="btnCloseToast" aria-label="Tutup pemberitahuan">Tutup</button>
+    <button type="button" class="btn btn--sm" id="btnCloseToast" aria-label="Close notification">Close</button>
   </div>
 
   <!-- Gerbang Masuk / Verifikasi Role Admin -->
@@ -244,18 +245,18 @@ ${spriteIkon()}
     <div class="auth-gate__head">
       <div class="auth-gate__icon">${ikon('i-shield', 16)}</div>
       <div>
-        <h1 id="authGateTitle">Akses Konsol Administrator</h1>
+        <h1 id="authGateTitle">Administrator Console Access</h1>
         <p class="auth-gate__sub" id="authGateSub">
-          Masuk dengan akun administrator JakSafe untuk mengelola katalog CCTV dan memantau telemetri backend
+          Sign in with a JakSafe administrator account to manage the CCTV catalog and inspect backend telemetry
         </p>
       </div>
     </div>
 
     <div class="form-error" id="authRoleMismatchBox" role="alert" hidden>
-      Akun <strong id="mismatchEmailText"></strong> terdaftar sebagai pengguna standar (<code>user</code>) dan tidak memiliki akses ke konsol admin
+      Account <strong id="mismatchEmailText"></strong> has standard permissions (<code>user</code>) and does not have access to the admin console
       <div class="auth-gate__actions">
-        <button type="button" class="btn btn--sm" id="btnSwitchAccount">Ganti Akun Admin</button>
-        <a class="btn btn--sm" href="/app.html">Kembali ke Peta</a>
+        <button type="button" class="btn btn--sm" id="btnSwitchAccount">Switch Admin Account</button>
+        <a class="btn btn--sm" href="/app.html">Back to Map</a>
       </div>
     </div>
 
@@ -263,27 +264,27 @@ ${spriteIkon()}
       <div class="form-error" id="adminLoginError" role="alert" hidden></div>
 
       <div class="field">
-        <label for="loginEmail">Email administrator</label>
+        <label for="loginEmail">Administrator email</label>
         <input id="loginEmail" name="email" type="email" autocomplete="username" required placeholder="admin@jaksafe.id">
       </div>
 
       <div class="field">
-        <label for="loginPassword">Kata sandi</label>
+        <label for="loginPassword">Password</label>
         <div class="pwd-wrap">
-          <input id="loginPassword" name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="Minimal 6 karakter">
-          <button type="button" class="pwd-wrap__toggle" id="btnToggleLoginPwd" aria-pressed="false" aria-label="Tampilkan kata sandi">
-            Lihat
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters">
+          <button type="button" class="pwd-wrap__toggle" id="btnToggleLoginPwd" aria-pressed="false" aria-label="Show password">
+            Show
           </button>
         </div>
       </div>
 
       <button type="submit" class="btn btn--primary" id="btnLoginSubmit" style="width:100%">
-        Masuk Konsol Admin
+        Sign In to Admin Console
       </button>
     </form>
 
     <div class="auth-gate__note">
-      Akun administrator dikonfigurasi lewat <code>ADMIN_EMAIL</code> / <code>ADMIN_EMAILS</code> atau skrip <code>npm run admin:seed</code>
+      Administrator accounts are configured via <code>ADMIN_EMAIL</code> / <code>ADMIN_EMAILS</code> or the <code>npm run admin:seed</code> script
     </div>
   </section>
 
@@ -291,12 +292,12 @@ ${spriteIkon()}
   <div id="adminDashboard" hidden>
     <div class="admin-pagehead">
       <div>
-        <h1 id="dashboardHeading">Konsol Operasional &amp; Telemetri</h1>
-        <p>Kesehatan 500+ kamera CCTV Jakarta, kuota tile TomTom, hit-rate cache, dan audit agen rute</p>
+        <h1 id="dashboardHeading">Operations &amp; Telemetry Console</h1>
+        <p>Health monitoring across 500+ Jakarta CCTV cameras, TomTom tile quota, cache hit rates, and route agent audit logs</p>
       </div>
     </div>
 
-    <div class="admin-tabs" role="tablist" aria-label="Bagian Konsol Admin">
+    <div class="admin-tabs" role="tablist" aria-label="Admin Console Sections">
       <button
         type="button"
         class="admin-tab"
@@ -307,7 +308,7 @@ ${spriteIkon()}
         tabindex="0"
         data-tab="cctv"
       >
-        Kesehatan &amp; Katalog CCTV
+        CCTV Health &amp; Catalog
       </button>
       <button
         type="button"
@@ -319,28 +320,28 @@ ${spriteIkon()}
         tabindex="-1"
         data-tab="monitoring"
       >
-        Kuota, Cache &amp; Performa Agen
+        Quota, Cache &amp; Agent Performance
       </button>
     </div>
 
     <!-- TAB 1: KESEHATAN & KATALOG CCTV -->
     <section role="tabpanel" id="panel-cctv" aria-labelledby="tab-cctv">
-      <div class="kpi-grid" id="cctvSummaryGrid" aria-label="Ringkasan kesehatan kamera"></div>
+      <div class="kpi-grid" id="cctvSummaryGrid" aria-label="Camera health summary"></div>
 
       <div class="panel">
         <div class="panel__head">
           <div>
-            <h2 class="panel__title">Katalog &amp; Kesehatan Kamera CCTV</h2>
+            <h2 class="panel__title">CCTV Camera Catalog &amp; Health</h2>
             <p class="panel__sub">
-              Perubahan disimpan ke store override persisten tanpa menyentuh berkas dasar <code>cctvCatalog.json</code>
+              Changes are saved to a persistent override store without altering the base <code>cctvCatalog.json</code> file
             </p>
           </div>
           <div class="toolbar__actions">
             <button type="button" class="btn" id="btnRunSweep">
-              ${ikon('i-clock', 16)} <span id="btnRunSweepLabel">Sweep Kamera</span>
+              ${ikon('i-clock', 16)} <span id="btnRunSweepLabel">Sweep Cameras</span>
             </button>
             <button type="button" class="btn btn--primary" id="btnAddCamera">
-              ${ikon('i-plus', 16)} Tambah Kamera
+              ${ikon('i-plus', 16)} Add Camera
             </button>
           </div>
         </div>
@@ -348,75 +349,75 @@ ${spriteIkon()}
         <search>
           <form class="filter-form" id="cctvFilterForm">
             <div class="filter-item filter-item--grow">
-              <label for="fCctvQ">Cari kamera</label>
-              <input id="fCctvQ" name="q" type="search" placeholder="Cari ID, simpang, atau error">
+              <label for="fCctvQ">Search cameras</label>
+              <input id="fCctvQ" name="q" type="search" placeholder="Search ID, intersection, or error">
             </div>
 
             <div class="filter-item">
-              <label for="fCctvStatus">Kesehatan</label>
+              <label for="fCctvStatus">Health</label>
               <select id="fCctvStatus" name="status">
-                <option value="all">Semua status</option>
+                <option value="all">All statuses</option>
                 <option value="offline">Offline</option>
                 <option value="online">Online</option>
-                <option value="unknown">Belum diuji</option>
+                <option value="unknown">Unchecked</option>
               </select>
             </div>
 
             <div class="filter-item">
-              <label for="fCctvEnabled">Layanan publik</label>
+              <label for="fCctvEnabled">Public visibility</label>
               <select id="fCctvEnabled" name="enabled">
-                <option value="all">Semua layanan</option>
-                <option value="true">Aktif di peta</option>
-                <option value="false">Dinonaktifkan</option>
+                <option value="all">All cameras</option>
+                <option value="true">Active on map</option>
+                <option value="false">Disabled</option>
               </select>
             </div>
 
             <div class="filter-item">
-              <label for="fCctvCity">Wilayah</label>
+              <label for="fCctvCity">Region</label>
               <select id="fCctvCity" name="city">
-                <option value="all">Semua wilayah</option>
+                <option value="all">All regions</option>
               </select>
             </div>
 
             <div class="filter-item">
-              <label for="fCctvSort">Urutkan</label>
+              <label for="fCctvSort">Sort by</label>
               <select id="fCctvSort" name="sort">
-                <option value="status_offline_first">Offline dulu</option>
-                <option value="latency_desc">Latensi tertinggi</option>
-                <option value="name">Nama (A–Z)</option>
-                <option value="status_online_first">Online dulu</option>
+                <option value="status_offline_first">Offline first</option>
+                <option value="latency_desc">Highest latency</option>
+                <option value="name">Name (A–Z)</option>
+                <option value="status_online_first">Online first</option>
               </select>
             </div>
 
-            <button type="submit" class="btn btn--primary">Terapkan</button>
-            <button type="button" class="btn" id="btnFilterOfflineOnly">Hanya Offline</button>
+            <button type="submit" class="btn btn--primary">Apply</button>
+            <button type="button" class="btn" id="btnFilterOfflineOnly">Offline Only</button>
             <button type="button" class="btn btn--quiet" id="btnResetCctvFilter">Reset</button>
           </form>
         </search>
 
-        <div class="table-wrap" id="cctvTableRegion" role="region" aria-label="Tabel katalog kamera CCTV" tabindex="0">
+        <div class="table-wrap" id="cctvTableRegion" role="region" aria-label="CCTV camera catalog table" tabindex="0">
           <table class="admin-table admin-table--cctv">
-            <caption class="sr-only">Daftar kamera CCTV beserta status kesehatan, alasan error, latensi, dan kontrol katalog</caption>
+            <caption class="sr-only">List of CCTV cameras with health status, error reason, latency, and catalog controls</caption>
             <thead>
               <tr>
-                <th scope="col">Kamera</th>
-                <th scope="col">Kesehatan &amp; Alasan Error</th>
-                <th scope="col" class="col-num">Latensi</th>
-                <th scope="col">Layanan</th>
-                <th scope="col">Aksi</th>
+                <th scope="col">Camera</th>
+                <th scope="col">Health &amp; Error Reason</th>
+                <th scope="col" class="col-num">Latency</th>
+                <th scope="col">Service</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody id="cctvTableBody">
-              <tr><td colspan="5" class="empty-box">Memuat daftar kamera</td></tr>
+              <tr><td colspan="5" class="empty-box">Loading camera list</td></tr>
             </tbody>
           </table>
         </div>
 
         <div class="table-footer" id="cctvPagination">
-          <span id="cctvPageInfo">Menampilkan 0 kamera</span>
+          <span id="cctvPageInfo">Showing 0 cameras</span>
           <div class="toolbar__actions">
-            <button type="button" class="btn btn--sm" id="btnCctvPrev" disabled>Sebelumnya</button>
-            <button type="button" class="btn btn--sm" id="btnCctvNext" disabled>Berikutnya</button>
+            <button type="button" class="btn btn--sm" id="btnCctvPrev" disabled>Previous</button>
+            <button type="button" class="btn btn--sm" id="btnCctvNext" disabled>Next</button>
           </div>
         </div>
       </div>
@@ -426,15 +427,15 @@ ${spriteIkon()}
     <section role="tabpanel" id="panel-monitoring" aria-labelledby="tab-monitoring" hidden>
       <div class="panel__head">
         <div>
-          <h2 class="panel__title">Telemetri Layanan &amp; Audit Performa Agen</h2>
-          <p class="panel__sub" id="monitorLastSync">Memuat ringkasan telemetri</p>
+          <h2 class="panel__title">Service Telemetry &amp; Agent Performance Audit</h2>
+          <p class="panel__sub" id="monitorLastSync">Loading telemetry summary</p>
         </div>
         <div class="toolbar__actions">
           <button type="button" class="btn" id="btnRefreshMonitoring">
-            ${ikon('i-clock', 16)} Muat Ulang
+            ${ikon('i-clock', 16)} Refresh
           </button>
           <button type="button" class="btn btn--danger" id="btnClearAllCache">
-            Kosongkan Semua Cache
+            Clear All Cache
           </button>
         </div>
       </div>
@@ -444,8 +445,8 @@ ${spriteIkon()}
         <section class="panel" aria-labelledby="tomtomChartTitle">
           <div class="panel__head">
             <div>
-              <h2 class="panel__title" id="tomtomChartTitle">Riwayat Pemakaian Kuota TomTom (7 Hari UTC)</h2>
-              <p class="panel__sub">Panggilan tile upstream setelah deduplikasi cache RAM &amp; disk; aksen biru menandai hari UTC berjalan</p>
+              <h2 class="panel__title" id="tomtomChartTitle">TomTom Quota Usage History (7 Days UTC)</h2>
+              <p class="panel__sub">Upstream tile calls after RAM &amp; disk cache deduplication; blue accent marks current UTC day</p>
             </div>
           </div>
           <div class="chart-box" id="tomtomHistoryChart"></div>
@@ -454,15 +455,15 @@ ${spriteIkon()}
         <section class="panel" aria-labelledby="tomtomQuotaTitle">
           <div class="panel__head">
             <div>
-              <h2 class="panel__title" id="tomtomQuotaTitle">Kuota Harian &amp; Cache Tile</h2>
-              <p class="panel__sub" id="tomtomDateLabel">Tanggal UTC —</p>
+              <h2 class="panel__title" id="tomtomQuotaTitle">Daily Quota &amp; Tile Cache</h2>
+              <p class="panel__sub" id="tomtomDateLabel">UTC Date —</p>
             </div>
             <span id="tomtomKeyBadge"></span>
           </div>
 
           <div class="quota-meter" id="tomtomQuotaMeter">
             <div class="quota-meter__head">
-              <span id="tomtomUsageLabel">0 / 8.000 tile</span>
+              <span id="tomtomUsageLabel">0 / 8,000 tiles</span>
               <span id="tomtomPercentLabel" class="mono">0%</span>
             </div>
             <div class="quota-meter__track">
@@ -470,7 +471,7 @@ ${spriteIkon()}
             </div>
           </div>
 
-          <ul class="kv-list" id="tomtomTileStats" aria-label="Rincian cache tile TomTom"></ul>
+          <ul class="kv-list" id="tomtomTileStats" aria-label="TomTom tile cache breakdown"></ul>
         </section>
       </div>
 
@@ -478,8 +479,8 @@ ${spriteIkon()}
       <section class="panel" aria-labelledby="execPerfTitle">
         <div class="panel__head">
           <div>
-            <h2 class="panel__title" id="execPerfTitle">Performa Agen ReAct &amp; Distribusi Keselamatan Rute</h2>
-            <p class="panel__sub" id="execStorageSub">Sumber audit trail: —</p>
+            <h2 class="panel__title" id="execPerfTitle">ReAct Agent Performance &amp; Route Safety Distribution</h2>
+            <p class="panel__sub" id="execStorageSub">Audit trail store: —</p>
           </div>
         </div>
 
@@ -487,16 +488,16 @@ ${spriteIkon()}
 
         <div class="agent-split">
           <div>
-            <h3 class="subblock-title">Proporsi Skor Keselamatan Rute</h3>
-            <div class="dist-bar" id="scoreDistBar" role="img" aria-label="Proporsi skor Aman, Hati-hati, dan Hindari"></div>
+            <h3 class="subblock-title">Route Safety Score Breakdown</h3>
+            <div class="dist-bar" id="scoreDistBar" role="img" aria-label="Proportion of Safe, Caution, and Avoid scores"></div>
             <div class="dist-legend" id="scoreDistLegend"></div>
 
-            <h3 class="subblock-title" style="margin-top:24px">Penggunaan Model Gemini</h3>
+            <h3 class="subblock-title" style="margin-top:24px">Gemini Model Usage</h3>
             <ul class="kv-list" id="modelUsageList"></ul>
           </div>
 
           <div>
-            <h3 class="subblock-title">Batas Laju API (Rate Limiter)</h3>
+            <h3 class="subblock-title">API Rate Limits</h3>
             <ul class="kv-list" id="rateLimitList"></ul>
           </div>
         </div>
@@ -506,26 +507,26 @@ ${spriteIkon()}
       <section class="panel" aria-labelledby="cacheStatsTitle">
         <div class="panel__head">
           <div>
-            <h2 class="panel__title" id="cacheStatsTitle">Statistik Cache &amp; Hit-Rate (<code>/api/cache/stats</code>)</h2>
-            <p class="panel__sub" id="cacheAggregateSub">Memuat hit-rate agregat</p>
+            <h2 class="panel__title" id="cacheStatsTitle">Cache Statistics &amp; Hit Rate (<code>/api/cache/stats</code>)</h2>
+            <p class="panel__sub" id="cacheAggregateSub">Loading aggregate hit rate</p>
           </div>
         </div>
 
-        <div class="table-wrap" role="region" aria-label="Tabel statistik store cache" tabindex="0">
+        <div class="table-wrap" role="region" aria-label="Cache store statistics table" tabindex="0">
           <table class="admin-table admin-table--cache">
-            <caption class="sr-only">Hit rate, jumlah entri, TTL, dan kontrol pembersihan tiap cache LRU backend</caption>
+            <caption class="sr-only">Hit rate, entry count, TTL, and clear controls for each backend LRU cache store</caption>
             <thead>
               <tr>
-                <th scope="col">Store Cache</th>
+                <th scope="col">Cache Store</th>
                 <th scope="col" class="col-num">Hit Rate</th>
                 <th scope="col" class="col-num">Hits / Misses</th>
-                <th scope="col" class="col-num">Entri Aktif</th>
-                <th scope="col" class="col-num">TTL Bawaan</th>
-                <th scope="col">Aksi</th>
+                <th scope="col" class="col-num">Active Entries</th>
+                <th scope="col" class="col-num">Default TTL</th>
+                <th scope="col">Action</th>
               </tr>
             </thead>
             <tbody id="cacheStatsBody">
-              <tr><td colspan="6" class="empty-box">Memuat statistik cache</td></tr>
+              <tr><td colspan="6" class="empty-box">Loading cache statistics</td></tr>
             </tbody>
           </table>
         </div>
@@ -535,8 +536,8 @@ ${spriteIkon()}
       <section class="panel" aria-labelledby="execLogsTitle">
         <div class="panel__head">
           <div>
-            <h2 class="panel__title" id="execLogsTitle">Audit Trail Eksekusi Agen (<code>ExecutionLog</code>)</h2>
-            <p class="panel__sub">Jejak permintaan navigasi, latensi eksekusi, model LLM aktif, dan rincian langkah ReAct</p>
+            <h2 class="panel__title" id="execLogsTitle">Agent Execution Audit Trail (<code>ExecutionLog</code>)</h2>
+            <p class="panel__sub">Navigation request history, execution latency, active LLM model, and ReAct step trace</p>
           </div>
         </div>
 
@@ -544,46 +545,46 @@ ${spriteIkon()}
           <div class="filter-item">
             <label for="fLogStatus">Status</label>
             <select id="fLogStatus" name="status">
-              <option value="all">Semua status</option>
-              <option value="success">Sukses</option>
-              <option value="failed">Gagal</option>
+              <option value="all">All statuses</option>
+              <option value="success">Success</option>
+              <option value="failed">Failed</option>
             </select>
           </div>
 
           <div class="filter-item">
-            <label for="fLogScore">Kategori skor</label>
+            <label for="fLogScore">Score category</label>
             <select id="fLogScore" name="scoreLabel">
-              <option value="all">Semua kategori</option>
-              <option value="AMAN">Aman</option>
-              <option value="HATI-HATI">Hati-hati</option>
-              <option value="HINDARI">Hindari</option>
+              <option value="all">All categories</option>
+              <option value="AMAN">Safe</option>
+              <option value="HATI-HATI">Caution</option>
+              <option value="HINDARI">Avoid</option>
             </select>
           </div>
 
           <label class="filter-check">
             <input type="checkbox" id="fLogFallbackOnly" name="fallbackOnly">
-            Hanya fallback Gemini
+            Gemini fallback only
           </label>
 
-          <button type="submit" class="btn btn--primary">Terapkan</button>
+          <button type="submit" class="btn btn--primary">Apply</button>
         </form>
 
-        <div class="table-wrap" role="region" aria-label="Tabel audit trail eksekusi agen" tabindex="0">
+        <div class="table-wrap" role="region" aria-label="Agent execution audit trail table" tabindex="0">
           <table class="admin-table admin-table--logs">
-            <caption class="sr-only">Riwayat eksekusi ReAct agent termasuk skor, model Gemini, fallback, dan durasi</caption>
+            <caption class="sr-only">ReAct agent execution history including score, Gemini model, fallback status, and duration</caption>
             <thead>
               <tr>
-                <th scope="col">Waktu &amp; ID</th>
-                <th scope="col">Asal &rarr; Tujuan</th>
-                <th scope="col">Moda</th>
-                <th scope="col">Skor</th>
-                <th scope="col">Model Gemini</th>
-                <th scope="col" class="col-num">Durasi</th>
-                <th scope="col">Jejak</th>
+                <th scope="col">Time &amp; ID</th>
+                <th scope="col">Origin &rarr; Destination</th>
+                <th scope="col">Mode</th>
+                <th scope="col">Score</th>
+                <th scope="col">Gemini Model</th>
+                <th scope="col" class="col-num">Duration</th>
+                <th scope="col">Trace</th>
               </tr>
             </thead>
             <tbody id="execLogsBody">
-              <tr><td colspan="7" class="empty-box">Memuat log eksekusi</td></tr>
+              <tr><td colspan="7" class="empty-box">Loading execution logs</td></tr>
             </tbody>
           </table>
         </div>
@@ -596,8 +597,8 @@ ${spriteIkon()}
 <dialog class="admin-dialog" id="cameraDialog" closedby="any" aria-labelledby="cameraDialogTitle">
   <form id="cameraForm">
     <div class="admin-dialog__head">
-      <h2 id="cameraDialogTitle">Tambah Kamera CCTV</h2>
-      <button type="button" class="btn btn--sm btn--quiet" data-close-dialog="cameraDialog" aria-label="Tutup modal">&times;</button>
+      <h2 id="cameraDialogTitle">Add CCTV Camera</h2>
+      <button type="button" class="btn btn--sm btn--quiet" data-close-dialog="cameraDialog" aria-label="Close modal">&times;</button>
     </div>
 
     <div class="admin-dialog__body">
@@ -605,32 +606,32 @@ ${spriteIkon()}
 
       <div class="form-grid-2">
         <div class="field">
-          <label for="camId">ID kamera (opsional saat tambah)</label>
+          <label for="camId">Camera ID (optional when adding)</label>
           <input id="camId" name="id" type="text" pattern="[A-Za-z0-9_-]{2,80}" placeholder="jaksel-kemang-01">
         </div>
         <div class="field">
-          <label for="camName">Nama lokasi kamera *</label>
+          <label for="camName">Camera location name *</label>
           <input id="camName" name="name" type="text" required placeholder="Simpang Kemang Raya">
         </div>
       </div>
 
       <div class="field">
-        <label for="camUrl">URL snapshot gambar (HTTP/HTTPS publik) *</label>
+        <label for="camUrl">Snapshot image URL (public HTTP/HTTPS) *</label>
         <input id="camUrl" name="url" type="url" required placeholder="https://example.org/cctv/frame.jpg">
       </div>
 
       <div class="field">
-        <label for="camHlsUrl">URL live stream HLS (.m3u8, opsional)</label>
+        <label for="camHlsUrl">HLS live stream URL (.m3u8, optional)</label>
         <input id="camHlsUrl" name="hlsUrl" type="url" placeholder="https://example.org/live/stream.m3u8">
       </div>
 
       <div class="form-grid-2">
         <div class="field">
-          <label for="camCity">Wilayah kota</label>
+          <label for="camCity">City / region</label>
           <input id="camCity" name="city" type="text" placeholder="Jakarta Selatan">
         </div>
         <div class="field">
-          <label for="camProvider">Penyedia sumber</label>
+          <label for="camProvider">Source provider</label>
           <input id="camProvider" name="provider" type="text" placeholder="Dishub DKI">
         </div>
       </div>
@@ -648,30 +649,30 @@ ${spriteIkon()}
 
       <div class="form-grid-2">
         <div class="field">
-          <label for="camHeading">Arah hadap (0–360&deg;)</label>
+          <label for="camHeading">Heading angle (0–360&deg;)</label>
           <input id="camHeading" name="headingDeg" type="number" step="any" min="0" max="360" placeholder="90">
         </div>
         <div class="field">
-          <label for="camFov">Sudut pandang FOV (10–180&deg;)</label>
+          <label for="camFov">Field of view FOV (10–180&deg;)</label>
           <input id="camFov" name="fovDeg" type="number" step="any" min="10" max="180" placeholder="70">
         </div>
       </div>
 
       <div class="form-grid-2">
         <div class="field">
-          <label for="camRange">Jarak pantau maks (10–5000 m)</label>
+          <label for="camRange">Max coverage range (10–5000 m)</label>
           <input id="camRange" name="rangeM" type="number" step="any" min="10" max="5000" placeholder="120">
         </div>
         <label class="filter-check">
           <input type="checkbox" id="camEnabled" name="enabled" checked>
-          Aktifkan di layanan publik
+          Enable for public map
         </label>
       </div>
     </div>
 
     <div class="admin-dialog__foot">
-      <button type="button" class="btn" data-close-dialog="cameraDialog">Batal</button>
-      <button type="submit" class="btn btn--primary" id="btnSaveCamera">Simpan Kamera</button>
+      <button type="button" class="btn" data-close-dialog="cameraDialog">Cancel</button>
+      <button type="submit" class="btn btn--primary" id="btnSaveCamera">Save Camera</button>
     </div>
   </form>
 </dialog>
@@ -679,27 +680,27 @@ ${spriteIkon()}
 <!-- Modal Detail Jejak ExecutionLog -->
 <dialog class="admin-dialog" id="traceDialog" closedby="any" aria-labelledby="traceDialogTitle">
   <div class="admin-dialog__head">
-    <h2 id="traceDialogTitle">Jejak Penalaran Agen</h2>
-    <button type="button" class="btn btn--sm btn--quiet" data-close-dialog="traceDialog" aria-label="Tutup modal">&times;</button>
+    <h2 id="traceDialogTitle">Agent Reasoning Trace</h2>
+    <button type="button" class="btn btn--sm btn--quiet" data-close-dialog="traceDialog" aria-label="Close modal">&times;</button>
   </div>
   <div class="admin-dialog__body" id="traceDialogBody"></div>
   <div class="admin-dialog__foot">
-    <button type="button" class="btn btn--primary" data-close-dialog="traceDialog">Tutup</button>
+    <button type="button" class="btn btn--primary" data-close-dialog="traceDialog">Close</button>
   </div>
 </dialog>
 
 <!-- Modal Konfirmasi Aksi Destruktif -->
 <dialog class="admin-dialog" id="confirmDialog" closedby="any" aria-labelledby="confirmDialogTitle">
   <div class="admin-dialog__head">
-    <h2 id="confirmDialogTitle">Konfirmasi Aksi</h2>
-    <button type="button" class="btn btn--sm btn--quiet" data-close-dialog="confirmDialog" aria-label="Tutup modal">&times;</button>
+    <h2 id="confirmDialogTitle">Confirm Action</h2>
+    <button type="button" class="btn btn--sm btn--quiet" data-close-dialog="confirmDialog" aria-label="Close modal">&times;</button>
   </div>
   <div class="admin-dialog__body">
     <p id="confirmDialogMessage" style="margin:0;line-height:1.55"></p>
   </div>
   <div class="admin-dialog__foot">
-    <button type="button" class="btn" data-close-dialog="confirmDialog">Batal</button>
-    <button type="button" class="btn btn--danger" id="btnConfirmProceed">Lanjutkan</button>
+    <button type="button" class="btn" data-close-dialog="confirmDialog">Cancel</button>
+    <button type="button" class="btn btn--danger" id="btnConfirmProceed">Continue</button>
   </div>
 </dialog>
 `;
@@ -728,7 +729,7 @@ function perbaruiTampilanAuth() {
   hentikanPollingSweep();
 
   if (isLoggedIn && user.role !== 'admin') {
-    $('#mismatchEmailText').textContent = user.email || 'Anda';
+    $('#mismatchEmailText').textContent = user.email || 'Your account';
     show($('#authRoleMismatchBox'), true);
     show($('#adminLoginForm'), false);
   } else {
@@ -737,7 +738,7 @@ function perbaruiTampilanAuth() {
   }
 }
 
-function bukaKonfirmasi({ title, message, confirmLabel = 'Lanjutkan', onConfirm }) {
+function bukaKonfirmasi({ title, message, confirmLabel = 'Continue', onConfirm }) {
   const dlg = $('#confirmDialog');
   if (!dlg) return;
   $('#confirmDialogTitle').textContent = title;
@@ -773,7 +774,7 @@ function perbaruiDropdownWilayah(cities = []) {
   const select = $('#fCctvCity');
   if (!select) return;
   const current = keadaan.cctvFilter.city || 'all';
-  const options = ['<option value="all">Semua wilayah</option>'];
+  const options = ['<option value="all">All regions</option>'];
   for (const city of cities) {
     options.push(`<option value="${escapeHtml(city)}">${escapeHtml(city)}</option>`);
   }
@@ -786,7 +787,7 @@ function sinkronkanTombolSweep(sweepInProgress) {
   const lbl = $('#btnRunSweepLabel');
   if (!btn || !lbl) return;
   btn.disabled = Boolean(sweepInProgress);
-  lbl.textContent = sweepInProgress ? 'Sweep Berjalan...' : 'Sweep Kamera';
+  lbl.textContent = sweepInProgress ? 'Sweeping…' : 'Sweep Cameras';
 }
 
 function jadwalkanPollingSweep() {
@@ -802,7 +803,7 @@ async function muatDaftarCctv({ senyap = false } = {}) {
   if (!keadaan.token) return;
   keadaan.cctvMuat = true;
   if (!senyap && !keadaan.cctvData) {
-    $('#cctvTableBody').innerHTML = '<tr><td colspan="5" class="empty-box">Memuat daftar kamera CCTV</td></tr>';
+    $('#cctvTableBody').innerHTML = '<tr><td colspan="5" class="empty-box">Loading CCTV camera catalog</td></tr>';
   }
 
   try {
@@ -819,10 +820,10 @@ async function muatDaftarCctv({ senyap = false } = {}) {
   } catch (err) {
     if (err.status === 401) {
       keluarSesiAdmin();
-      tampilkanPesan('Sesi admin berakhir, silakan masuk kembali', 'warn');
+      tampilkanPesan('Admin session expired, please sign in again', 'warn');
       return;
     }
-    tampilkanPesan(err.message || 'Gagal memuat katalog CCTV', 'error');
+    tampilkanPesan(err.message || 'Failed to load CCTV catalog', 'error');
     if (!keadaan.cctvData) {
       $('#cctvTableBody').innerHTML = `<tr><td colspan="5" class="empty-box">${escapeHtml(err.message)}</td></tr>`;
     }
@@ -835,7 +836,7 @@ function renderRingkasanCctv(summary = {}, catalogStats = {}) {
   const grid = $('#cctvSummaryGrid');
   if (!grid) return;
 
-  const fmt = new Intl.NumberFormat('id-ID');
+  const fmt = new Intl.NumberFormat('en-US');
   const activeTotal = Number(catalogStats.activeTotal ?? summary.total ?? 0);
   const catalogTotal = Number(catalogStats.catalogTotal ?? summary.total ?? 0);
   const disabledCount = Number(catalogStats.disabledCount || 0);
@@ -851,41 +852,41 @@ function renderRingkasanCctv(summary = {}, catalogStats = {}) {
   grid.innerHTML = `
     <div class="kpi-card">
       <div class="kpi-card__label">
-        <span>Katalog aktif</span>
+        <span>Active catalog</span>
         <span class="mono">${fmt.format(catalogTotal)} total</span>
       </div>
       <div class="kpi-card__value">${fmt.format(activeTotal)}</div>
       <div class="kpi-card__meta">
-        ${fmt.format(disabledCount)} nonaktif · ${fmt.format(customCount)} kustom
+        ${fmt.format(disabledCount)} disabled · ${fmt.format(customCount)} custom
       </div>
     </div>
 
     <div class="kpi-card">
       <div class="kpi-card__label">
-        <span>Kamera online</span>
+        <span>Online cameras</span>
         <span class="status-dot status-dot--ok" aria-hidden="true"></span>
       </div>
       <div class="kpi-card__value">${fmt.format(online)}</div>
-      <div class="kpi-card__meta">${pctOnline}% dari kamera aktif</div>
+      <div class="kpi-card__meta">${pctOnline}% of active cameras</div>
     </div>
 
     <div class="kpi-card">
       <div class="kpi-card__label">
-        <span>Kamera offline</span>
+        <span>Offline cameras</span>
         <span class="status-dot status-dot--danger" aria-hidden="true"></span>
       </div>
       <div class="kpi-card__value">${fmt.format(offline)}</div>
-      <div class="kpi-card__meta">${fmt.format(unknown)} belum diuji sejak startup</div>
+      <div class="kpi-card__meta">${fmt.format(unknown)} unchecked since startup</div>
     </div>
 
     <div class="kpi-card">
       <div class="kpi-card__label">
-        <span>Latensi rata-rata</span>
+        <span>Average latency</span>
         <span class="mono">HTTP probe</span>
       </div>
       <div class="kpi-card__value">${escapeHtml(avgLat)}</div>
       <div class="kpi-card__meta">
-        Sweep terakhir: ${escapeHtml(formatWaktuId(summary.lastSweepAt))}
+        Last sweep: ${escapeHtml(formatWaktuId(summary.lastSweepAt))}
       </div>
     </div>
   `;
@@ -897,32 +898,32 @@ function renderTabelCctv(res) {
 
   const cameras = Array.isArray(res?.cameras) ? res.cameras : [];
   if (cameras.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-box">Tidak ada kamera yang cocok dengan filter saat ini</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-box">No cameras match the current filters</td></tr>';
   } else {
     tbody.innerHTML = cameras.map((cam) => {
       const originFlags = [
-        cam.isCustom ? '<span class="meta-tag">Kustom</span>' : '',
-        !cam.isCustom && cam.hasOverride ? '<span class="meta-tag">Dimodifikasi</span>' : '',
+        cam.isCustom ? '<span class="meta-tag">Custom</span>' : '',
+        !cam.isCustom && cam.hasOverride ? '<span class="meta-tag">Modified</span>' : '',
         cam.hasLiveStream ? '<span class="meta-tag">HLS</span>' : '',
       ].filter(Boolean).join('');
 
       const reason = cam.statusReason
         ? `<div class="cell-sub">${escapeHtml(cam.statusReason)}</div>`
-        : '<div class="cell-sub">Tanpa kendala tercatat</div>';
+        : '<div class="cell-sub">No issues recorded</div>';
 
       const latStr = cam.latencyMs !== null && cam.latencyMs !== undefined
         ? `<span class="mono">${Math.round(cam.latencyMs)} ms</span>`
         : KOSONG;
       const checkedStr = cam.checkedAt
         ? `<div class="cell-sub">${escapeHtml(formatWaktuId(cam.checkedAt))}</div>`
-        : '<div class="cell-sub">Belum dicek</div>';
+        : '<div class="cell-sub">Not checked</div>';
 
       const isEnabled = cam.enabled !== false;
       const serviceStatus = isEnabled
-        ? statusDotHtml('ok', 'Aktif publik')
-        : statusDotHtml('muted', 'Nonaktif');
+        ? statusDotHtml('ok', 'Public')
+        : statusDotHtml('muted', 'Disabled');
 
-      const toggleLabel = isEnabled ? 'Nonaktifkan' : 'Aktifkan';
+      const toggleLabel = isEnabled ? 'Disable' : 'Enable';
       const showRestore = !cam.isCustom && (cam.hasOverride || !isEnabled);
 
       return `
@@ -950,11 +951,11 @@ function renderTabelCctv(res) {
           <td>${serviceStatus}</td>
           <td>
             <div class="cell-actions">
-              <button type="button" class="btn btn--sm" data-cam-action="probe" data-id="${escapeHtml(cam.id)}">Uji</button>
+              <button type="button" class="btn btn--sm" data-cam-action="probe" data-id="${escapeHtml(cam.id)}">Probe</button>
               <button type="button" class="btn btn--sm" data-cam-action="edit" data-id="${escapeHtml(cam.id)}">Edit</button>
               <button type="button" class="btn btn--sm" data-cam-action="toggle" data-id="${escapeHtml(cam.id)}">${toggleLabel}</button>
-              ${showRestore ? `<button type="button" class="btn btn--sm" data-cam-action="restore" data-id="${escapeHtml(cam.id)}">Pulihkan</button>` : ''}
-              <button type="button" class="btn btn--sm btn--danger" data-cam-action="delete" data-id="${escapeHtml(cam.id)}">Hapus</button>
+              ${showRestore ? `<button type="button" class="btn btn--sm" data-cam-action="restore" data-id="${escapeHtml(cam.id)}">Restore</button>` : ''}
+              <button type="button" class="btn btn--sm btn--danger" data-cam-action="delete" data-id="${escapeHtml(cam.id)}">Delete</button>
             </div>
           </td>
         </tr>
@@ -967,7 +968,7 @@ function renderTabelCctv(res) {
   const shownStart = total > 0 ? offset + 1 : 0;
   const shownEnd = Math.min(offset + cameras.length, total);
 
-  $('#cctvPageInfo').textContent = `Menampilkan ${shownStart}–${shownEnd} dari ${total} kamera cocok (total katalog ${res?.totalCatalog || 0})`;
+  $('#cctvPageInfo').textContent = `Showing ${shownStart}–${shownEnd} of ${total} matching cameras (total catalog ${res?.totalCatalog || 0})`;
   $('#btnCctvPrev').disabled = offset <= 0;
   $('#btnCctvNext').disabled = offset + cameras.length >= total;
 }
@@ -980,8 +981,8 @@ function bukaModalKamera(cam = null) {
   show($('#cameraFormError'), false);
 
   const isEdit = Boolean(cam);
-  $('#cameraDialogTitle').textContent = isEdit ? `Edit Kamera: ${cam.name}` : 'Tambah Kamera CCTV';
-  $('#btnSaveCamera').textContent = isEdit ? 'Simpan Perubahan' : 'Tambahkan ke Katalog';
+  $('#cameraDialogTitle').textContent = isEdit ? `Edit Camera: ${cam.name}` : 'Add CCTV Camera';
+  $('#btnSaveCamera').textContent = isEdit ? 'Save Changes' : 'Add to Catalog';
 
   const idInput = $('#camId');
   idInput.value = cam?.id || '';
@@ -1012,16 +1013,16 @@ async function tanganiAksiBarisCctv(action, id) {
 
   if (action === 'probe') {
     try {
-      tampilkanPesan(`Menguji koneksi ${cam.name}...`, 'warn');
+      tampilkanPesan(`Probing connection for ${cam.name}…`, 'warn');
       const res = await ujiKameraCctvAdmin(keadaan.token, id);
       const lat = Number.isFinite(res.probe?.latencyMs) ? `${Math.round(res.probe.latencyMs)} ms` : KOSONG;
       tampilkanPesan(
-        `Hasil uji ${cam.name}: ${res.probe?.status || 'unknown'} (${lat}) — ${res.probe?.reason || 'OK'}`,
+        `Probe result for ${cam.name}: ${res.probe?.status || 'unknown'} (${lat}) — ${res.probe?.reason || 'OK'}`,
         res.probe?.status === 'online' ? 'ok' : 'warn'
       );
       await muatDaftarCctv({ senyap: true });
     } catch (err) {
-      tampilkanPesan(err.message || 'Gagal menguji kamera', 'error');
+      tampilkanPesan(err.message || 'Failed to probe camera', 'error');
     }
     return;
   }
@@ -1030,10 +1031,10 @@ async function tanganiAksiBarisCctv(action, id) {
     const nextEnabled = cam.enabled === false;
     try {
       const res = await ubahStatusAktifCctvAdmin(keadaan.token, id, nextEnabled);
-      tampilkanPesan(res.message || 'Status layanan kamera diperbarui', 'ok');
+      tampilkanPesan(res.message || 'Camera service status updated', 'ok');
       await muatDaftarCctv({ senyap: true });
     } catch (err) {
-      tampilkanPesan(err.message || 'Gagal mengubah status kamera', 'error');
+      tampilkanPesan(err.message || 'Failed to update camera status', 'error');
     }
     return;
   }
@@ -1041,29 +1042,29 @@ async function tanganiAksiBarisCctv(action, id) {
   if (action === 'restore') {
     try {
       const res = await pulihkanKameraCctvAdmin(keadaan.token, id);
-      tampilkanPesan(res.message || 'Kamera dipulihkan ke konfigurasi standar', 'ok');
+      tampilkanPesan(res.message || 'Camera restored to default catalog configuration', 'ok');
       await muatDaftarCctv({ senyap: true });
     } catch (err) {
-      tampilkanPesan(err.message || 'Gagal memulihkan kamera', 'error');
+      tampilkanPesan(err.message || 'Failed to restore camera', 'error');
     }
     return;
   }
 
   if (action === 'delete') {
     const msg = cam.isCustom
-      ? `Hapus permanen kamera kustom "${cam.name}" (${cam.id}) dari store override?`
-      : `Sembunyikan kamera bawaan "${cam.name}" (${cam.id}) dari layanan aktif? Data dasar di cctvCatalog.json tetap utuh dan dapat dipulihkan.`;
+      ? `Permanently delete custom camera "${cam.name}" (${cam.id}) from the override store?`
+      : `Hide built-in camera "${cam.name}" (${cam.id}) from public map services? The base entry in cctvCatalog.json stays intact and can be restored.`;
     bukaKonfirmasi({
-      title: 'Hapus Kamera dari Katalog Aktif',
+      title: 'Remove Camera from Active Catalog',
       message: msg,
-      confirmLabel: cam.isCustom ? 'Hapus Permanen' : 'Sembunyikan Kamera',
+      confirmLabel: cam.isCustom ? 'Delete Permanently' : 'Hide Camera',
       onConfirm: async () => {
         try {
           const res = await hapusKameraCctvAdmin(keadaan.token, id);
-          tampilkanPesan(res.message || 'Kamera dihapus dari daftar aktif', 'ok');
+          tampilkanPesan(res.message || 'Camera removed from active list', 'ok');
           await muatDaftarCctv({ senyap: true });
         } catch (err) {
-          tampilkanPesan(err.message || 'Gagal menghapus kamera', 'error');
+          tampilkanPesan(err.message || 'Failed to remove camera', 'error');
         }
       },
     });
@@ -1085,7 +1086,7 @@ async function muatDataMonitoring() {
     keadaan.cacheStatsDirect = directCache;
     keadaan.logsData = logsRes;
 
-    $('#monitorLastSync').textContent = `Sinkronisasi terakhir ${formatWaktuId(overview.time)} WIB`;
+    $('#monitorLastSync').textContent = `Last synced ${formatWaktuId(overview.time)} WIB`;
     renderTomTomSection(overview.tomtom);
     renderCacheSection(directCache);
     renderExecutionStatsSection(overview.execution, overview.rateLimits);
@@ -1093,10 +1094,10 @@ async function muatDataMonitoring() {
   } catch (err) {
     if (err.status === 401) {
       keluarSesiAdmin();
-      tampilkanPesan('Sesi admin berakhir, silakan masuk kembali', 'warn');
+      tampilkanPesan('Admin session expired, please sign in again', 'warn');
       return;
     }
-    tampilkanPesan(err.message || 'Gagal memuat data monitoring sistem', 'error');
+    tampilkanPesan(err.message || 'Failed to load system telemetry', 'error');
   } finally {
     keadaan.monitoringMuat = false;
   }
@@ -1106,17 +1107,17 @@ function renderTomTomSection(tt = {}) {
   const keyBadge = $('#tomtomKeyBadge');
   if (keyBadge) {
     keyBadge.innerHTML = tt.hasKey
-      ? statusDotHtml('ok', 'API key aktif')
-      : statusDotHtml('danger', 'API key kosong');
+      ? statusDotHtml('ok', 'API key active')
+      : statusDotHtml('danger', 'API key missing');
   }
 
-  $('#tomtomDateLabel').textContent = `Tanggal UTC ${tt.date || KOSONG} · sisa ${new Intl.NumberFormat('id-ID').format(tt.remaining || 0)} tile`;
+  $('#tomtomDateLabel').textContent = `UTC Date ${tt.date || KOSONG} · ${new Intl.NumberFormat('en-US').format(tt.remaining || 0)} tiles remaining`;
   const count = Number(tt.dailyCount || 0);
   const limit = Number(tt.budgetLimit || 8000);
   const pct = Number(tt.usagePercent || 0);
-  const fmt = new Intl.NumberFormat('id-ID');
+  const fmt = new Intl.NumberFormat('en-US');
 
-  $('#tomtomUsageLabel').textContent = `${fmt.format(count)} dari ${fmt.format(limit)} tile`;
+  $('#tomtomUsageLabel').textContent = `${fmt.format(count)} / ${fmt.format(limit)} tiles`;
   $('#tomtomPercentLabel').textContent = `${pct}%`;
 
   const fill = $('#tomtomQuotaFill');
@@ -1128,19 +1129,19 @@ function renderTomTomSection(tt = {}) {
 
   $('#tomtomTileStats').innerHTML = `
     <li class="kv-row">
-      <span class="kv-row__label">Tile tersimpan di RAM</span>
-      <span class="kv-row__val">${fmt.format(tt.memCacheEntries || 0)} entri</span>
+      <span class="kv-row__label">Tiles cached in RAM</span>
+      <span class="kv-row__val">${fmt.format(tt.memCacheEntries || 0)} entries</span>
     </li>
     <li class="kv-row">
-      <span class="kv-row__label">Cache segmen arus lalu lintas</span>
-      <span class="kv-row__val">${fmt.format(tt.segmentCacheEntries || 0)} koridor</span>
+      <span class="kv-row__label">Traffic segment cache</span>
+      <span class="kv-row__val">${fmt.format(tt.segmentCacheEntries || 0)} corridors</span>
     </li>
     <li class="kv-row">
-      <span class="kv-row__label">Berkas tile di disk (.cache)</span>
-      <span class="kv-row__val">${fmt.format(tt.diskTileFiles || 0)} berkas</span>
+      <span class="kv-row__label">Tile files on disk (.cache)</span>
+      <span class="kv-row__val">${fmt.format(tt.diskTileFiles || 0)} files</span>
     </li>
     <li class="kv-row">
-      <span class="kv-row__label">Ukuran pemakaian disk</span>
+      <span class="kv-row__label">Disk cache footprint</span>
       <span class="kv-row__val">${escapeHtml(formatUkuranByte(tt.diskSizeBytes))}</span>
     </li>
   `;
@@ -1153,11 +1154,11 @@ function renderTomTomHistoryChart(history = [], limit = 8000) {
   if (!container) return;
 
   if (!Array.isArray(history) || history.length === 0) {
-    container.innerHTML = '<div class="empty-box">Belum ada riwayat penggunaan kuota harian</div>';
+    container.innerHTML = '<div class="empty-box">No daily quota history recorded yet</div>';
     return;
   }
 
-  const fmt = new Intl.NumberFormat('id-ID');
+  const fmt = new Intl.NumberFormat('en-US');
   const maxVal = Math.max(100, ...history.map((d) => Number(d.count || 0)));
   const midVal = Math.round(maxVal / 2);
 
@@ -1194,7 +1195,7 @@ function renderTomTomHistoryChart(history = [], limit = 8000) {
 
     return `
       <g>
-        <title>${escapeHtml(d.date)}: ${fmt.format(val)} tile upstream (batas ${fmt.format(limit)})</title>
+        <title>${escapeHtml(d.date)}: ${fmt.format(val)} upstream tiles (limit ${fmt.format(limit)})</title>
         <rect x="${x}" y="${y}" width="${w}" height="${barH}" rx="4" fill="${fill}"></rect>
         <text x="${cx}" y="${Math.max(14, y - 8)}" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="${isToday ? '500' : '400'}" fill="${isToday ? 'var(--text-1)' : 'var(--text-3)'}">${fmt.format(val)}</text>
         <text x="${cx}" y="${chartH - 8}" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="${isToday ? 'var(--text-1)' : 'var(--text-3)'}">${escapeHtml(shortDate)}</text>
@@ -1203,7 +1204,7 @@ function renderTomTomHistoryChart(history = [], limit = 8000) {
   }).join('');
 
   container.innerHTML = `
-    <svg class="chart-svg" viewBox="0 0 ${chartW} ${chartH}" role="img" aria-label="Grafik batang jumlah panggilan tile TomTom 7 hari terakhir">
+    <svg class="chart-svg" viewBox="0 0 ${chartW} ${chartH}" role="img" aria-label="Bar chart of TomTom tile calls over the past 7 days">
       <line x1="${padLeft}" y1="${padTop}" x2="${chartW - padRight}" y2="${padTop}" stroke="var(--border)" stroke-dasharray="3 3" stroke-width="1"></line>
       <line x1="${padLeft}" y1="${midY}" x2="${chartW - padRight}" y2="${midY}" stroke="var(--border)" stroke-dasharray="3 3" stroke-width="1"></line>
       <line x1="${padLeft}" y1="${baseY}" x2="${chartW - padRight}" y2="${baseY}" stroke="var(--border-strong)" stroke-width="1"></line>
@@ -1220,24 +1221,24 @@ function renderTomTomHistoryChart(history = [], limit = 8000) {
 function renderCacheSection(cachePayload = {}) {
   const summary = cachePayload.summary || {};
   const stores = cachePayload.cache || {};
-  const fmt = new Intl.NumberFormat('id-ID');
+  const fmt = new Intl.NumberFormat('en-US');
 
   $('#cacheAggregateSub').textContent =
-    `Hit-rate gabungan ${summary.overallHitRate || '0.0%'} · ${fmt.format(summary.totalHits || 0)} hits · ${fmt.format(summary.totalMisses || 0)} misses · kapasitas ${fmt.format(summary.totalSize || 0)}/${fmt.format(summary.totalMax || 0)}`;
+    `Aggregate hit rate ${summary.overallHitRate || '0.0%'} · ${fmt.format(summary.totalHits || 0)} hits · ${fmt.format(summary.totalMisses || 0)} misses · capacity ${fmt.format(summary.totalSize || 0)}/${fmt.format(summary.totalMax || 0)}`;
 
   const tbody = $('#cacheStatsBody');
   if (!tbody) return;
 
   const entries = Object.entries(stores);
   if (entries.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-box">Data cache tidak tersedia</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-box">Cache data unavailable</td></tr>';
     return;
   }
 
   tbody.innerHTML = entries.map(([key, st]) => {
     const label = STORE_LABELS[key] || st.name || key;
     const ttlMinutes = Math.round(Number(st.defaultTtlMs || 0) / 60_000);
-    const ttlLabel = ttlMinutes >= 60 ? `${(ttlMinutes / 60).toFixed(1).replace('.0', '')} jam` : `${ttlMinutes} mnt`;
+    const ttlLabel = ttlMinutes >= 60 ? `${(ttlMinutes / 60).toFixed(1).replace('.0', '')} hr` : `${ttlMinutes} min`;
 
     return `
       <tr>
@@ -1252,7 +1253,7 @@ function renderCacheSection(cachePayload = {}) {
         <td class="col-num mono">${fmt.format(Number(st.size || 0))} / ${fmt.format(Number(st.max || 0))}</td>
         <td class="col-num mono">${escapeHtml(ttlLabel)}</td>
         <td>
-          <button type="button" class="btn btn--sm" data-cache-clear="${escapeHtml(key)}">Bersihkan</button>
+          <button type="button" class="btn btn--sm" data-cache-clear="${escapeHtml(key)}">Clear</button>
         </td>
       </tr>
     `;
@@ -1260,8 +1261,8 @@ function renderCacheSection(cachePayload = {}) {
 }
 
 function renderExecutionStatsSection(exec = {}, rateLimits = []) {
-  const fmt = new Intl.NumberFormat('id-ID');
-  $('#execStorageSub').textContent = `Penyimpanan aktif: ${exec.storage || 'local-fallback'} · ringkasan deterministik cadangan: ${fmt.format(exec.summaryFallbackCount || 0)} kali`;
+  const fmt = new Intl.NumberFormat('en-US');
+  $('#execStorageSub').textContent = `Active storage: ${exec.storage || 'local-fallback'} · deterministic summary fallbacks: ${fmt.format(exec.summaryFallbackCount || 0)} times`;
 
   const avgLat = exec.avgDurationMs !== null && exec.avgDurationMs !== undefined ? formatLama(exec.avgDurationMs) : KOSONG;
   const p95Lat = exec.p95DurationMs !== null && exec.p95DurationMs !== undefined ? formatLama(exec.p95DurationMs) : KOSONG;
@@ -1271,29 +1272,29 @@ function renderExecutionStatsSection(exec = {}, rateLimits = []) {
   $('#execKpiGrid').innerHTML = `
     <div class="kpi-card">
       <div class="kpi-card__label">
-        <span>Total eksekusi agen</span>
+        <span>Total agent runs</span>
         <span class="mono">${escapeHtml(exec.storage || 'local')}</span>
       </div>
       <div class="kpi-card__value">${fmt.format(Number(exec.totalExecutions || 0))}</div>
-      <div class="kpi-card__meta">${fmt.format(Number(exec.successCount || 0))} sukses · ${fmt.format(Number(exec.failedCount || 0))} gagal</div>
+      <div class="kpi-card__meta">${fmt.format(Number(exec.successCount || 0))} succeeded · ${fmt.format(Number(exec.failedCount || 0))} failed</div>
     </div>
 
     <div class="kpi-card">
       <div class="kpi-card__label">
-        <span>Latensi rata-rata</span>
+        <span>Average latency</span>
         <span class="mono">ReAct loop</span>
       </div>
       <div class="kpi-card__value">${escapeHtml(avgLat)}</div>
-      <div class="kpi-card__meta">P95 ${escapeHtml(p95Lat)} · maks ${escapeHtml(maxLat)}</div>
+      <div class="kpi-card__meta">P95 ${escapeHtml(p95Lat)} · max ${escapeHtml(maxLat)}</div>
     </div>
 
     <div class="kpi-card">
       <div class="kpi-card__label">
-        <span>Fallback model Gemini</span>
+        <span>Gemini model fallbacks</span>
         <span class="status-dot status-dot--${fallbackCount > 0 ? 'warn' : 'ok'}" aria-hidden="true"></span>
       </div>
       <div class="kpi-card__value">${fmt.format(fallbackCount)}</div>
-      <div class="kpi-card__meta">${Number(exec.fallbackRatePercent || 0)}% dari total eksekusi</div>
+      <div class="kpi-card__meta">${Number(exec.fallbackRatePercent || 0)}% of total executions</div>
     </div>
   `;
 
@@ -1301,10 +1302,10 @@ function renderExecutionStatsSection(exec = {}, rateLimits = []) {
   const dist = exec.scoreDistribution || {};
   const totalScored = (dist.AMAN || 0) + (dist['HATI-HATI'] || 0) + (dist.HINDARI || 0) + (dist.UNKNOWN || 0);
   const segs = [
-    { key: 'Aman', cls: 'aman', dot: 'ok', count: dist.AMAN || 0 },
-    { key: 'Hati-hati', cls: 'hati', dot: 'warn', count: dist['HATI-HATI'] || 0 },
-    { key: 'Hindari', cls: 'hindari', dot: 'danger', count: dist.HINDARI || 0 },
-    { key: 'Lainnya', cls: 'unknown', dot: 'muted', count: dist.UNKNOWN || 0 },
+    { key: 'Safe', cls: 'aman', dot: 'ok', count: dist.AMAN || 0 },
+    { key: 'Caution', cls: 'hati', dot: 'warn', count: dist['HATI-HATI'] || 0 },
+    { key: 'Avoid', cls: 'hindari', dot: 'danger', count: dist.HINDARI || 0 },
+    { key: 'Other', cls: 'unknown', dot: 'muted', count: dist.UNKNOWN || 0 },
   ];
 
   $('#scoreDistBar').innerHTML = totalScored > 0
@@ -1331,10 +1332,10 @@ function renderExecutionStatsSection(exec = {}, rateLimits = []) {
     ? models.map((m) => `
         <li class="kv-row">
           <span class="kv-row__label mono">${escapeHtml(m.model)}</span>
-          <span class="kv-row__val">${fmt.format(Number(m.count || 0))} eksekusi</span>
+          <span class="kv-row__val">${fmt.format(Number(m.count || 0))} runs</span>
         </li>
       `).join('')
-    : '<li class="kv-row"><span class="kv-row__label">Belum ada eksekusi tercatat</span><span class="kv-row__val">0</span></li>';
+    : '<li class="kv-row"><span class="kv-row__label">No executions recorded yet</span><span class="kv-row__val">0</span></li>';
 
   // Rate limits sebagai ledger baris sejajar
   $('#rateLimitList').innerHTML = (Array.isArray(rateLimits) ? rateLimits : []).map((rl) => {
@@ -1344,11 +1345,11 @@ function renderExecutionStatsSection(exec = {}, rateLimits = []) {
       <li class="kv-row">
         <div>
           <div class="kv-row__label">${escapeHtml(LIMITER_LABELS[rl.name] || rl.name)}</div>
-          <div class="cell-sub mono">Batas ${escapeHtml(String(rl.max))} / ${winMin} mnt</div>
+          <div class="cell-sub mono">Limit ${escapeHtml(String(rl.max))} / ${winMin} min</div>
         </div>
         <div class="cell-stack cell-stack--end">
-          <span class="kv-row__val">${fmt.format(Number(rl.allowed || 0))} lolos</span>
-          <span class="cell-sub mono">${blocked > 0 ? `${fmt.format(blocked)} diblokir (429)` : '0 diblokir'}</span>
+          <span class="kv-row__val">${fmt.format(Number(rl.allowed || 0))} allowed</span>
+          <span class="cell-sub mono">${blocked > 0 ? `${fmt.format(blocked)} blocked (429)` : '0 blocked'}</span>
         </div>
       </li>
     `;
@@ -1373,7 +1374,7 @@ function renderLogsTable(logsRes = {}) {
 
   const logs = Array.isArray(logsRes.logs) ? logsRes.logs : [];
   if (logs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-box">Belum ada log eksekusi agen yang cocok dengan filter</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-box">No agent execution logs match the selected filters</td></tr>';
     return;
   }
 
@@ -1389,8 +1390,8 @@ function renderLogsTable(logsRes = {}) {
       ? '<span class="meta-tag">Fallback</span>'
       : '';
     const statusLine = item.status === 'failed'
-      ? statusDotHtml('danger', 'Gagal')
-      : statusDotHtml('ok', 'Sukses');
+      ? statusDotHtml('danger', 'Failed')
+      : statusDotHtml('ok', 'Success');
 
     return `
       <tr>
@@ -1418,11 +1419,11 @@ function renderLogsTable(logsRes = {}) {
         <td class="col-num">
           <div class="cell-stack cell-stack--end">
             <span class="mono">${escapeHtml(formatLama(item.totalDurationMs))}</span>
-            <span class="cell-sub">${Number(item.stepCount ?? item.reasoning?.length ?? 0)} langkah</span>
+            <span class="cell-sub">${Number(item.stepCount ?? item.reasoning?.length ?? 0)} steps</span>
           </div>
         </td>
         <td>
-          <button type="button" class="btn btn--sm" data-log-index="${idx}">Lihat Jejak</button>
+          <button type="button" class="btn btn--sm" data-log-index="${idx}">View Trace</button>
         </td>
       </tr>
     `;
@@ -1443,26 +1444,26 @@ function bukaModalJejakLog(item) {
   body.innerHTML = `
     <div class="trace-meta">
       <div><span class="cell-sub">Request ID:</span> <span class="mono">${escapeHtml(item.requestId)}</span></div>
-      <div><span class="cell-sub">Rute:</span> ${escapeHtml(originName)} &rarr; ${escapeHtml(destName)} (${escapeHtml(item.profile)})</div>
-      <div><span class="cell-sub">Model utama &rarr; dipakai:</span> <span class="mono">${escapeHtml(primaryModelName)}</span> &rarr; <span class="mono">${escapeHtml(tel.modelUsed || KOSONG)}</span></div>
-      ${item.route?.summary ? `<div><span class="cell-sub">Koridor:</span> ${escapeHtml(item.route.summary)}</div>` : ''}
+      <div><span class="cell-sub">Route:</span> ${escapeHtml(originName)} &rarr; ${escapeHtml(destName)} (${escapeHtml(item.profile)})</div>
+      <div><span class="cell-sub">Primary &rarr; active model:</span> <span class="mono">${escapeHtml(primaryModelName)}</span> &rarr; <span class="mono">${escapeHtml(tel.modelUsed || KOSONG)}</span></div>
+      ${item.route?.summary ? `<div><span class="cell-sub">Corridor:</span> ${escapeHtml(item.route.summary)}</div>` : ''}
       ${item.error ? `<div class="form-error">${escapeHtml(item.error)}</div>` : ''}
     </div>
 
-    <h3 class="subblock-title">Langkah Penalaran (${steps.length})</h3>
+    <h3 class="subblock-title">Reasoning Steps (${steps.length})</h3>
     ${steps.length > 0
       ? `<ol class="trace-list">
           ${steps.map((s) => `
             <li class="trace-step">
               <div class="trace-step__top">
-                <span>Langkah ${escapeHtml(s.step)} · <span class="mono">${escapeHtml(s.action)}</span></span>
+                <span>Step ${escapeHtml(s.step)} · <span class="mono">${escapeHtml(s.action)}</span></span>
                 <span class="mono">${escapeHtml(formatLama(s.durationMs))}</span>
               </div>
-              <p class="trace-step__thought">${escapeHtml(s.thought || 'Tanpa catatan penalaran')}</p>
+              <p class="trace-step__thought">${escapeHtml(s.thought || 'No reasoning note')}</p>
             </li>
           `).join('')}
         </ol>`
-      : '<p class="cell-sub">Tidak ada langkah ReAct terekam</p>'}
+      : '<p class="cell-sub">No ReAct steps recorded</p>'}
   `;
 
   dlg.showModal();
@@ -1500,8 +1501,8 @@ function pasangPengendali() {
     const isHidden = input.type === 'password';
     input.type = isHidden ? 'text' : 'password';
     btn.setAttribute('aria-pressed', String(isHidden));
-    btn.setAttribute('aria-label', isHidden ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
-    btn.textContent = isHidden ? 'Tutup' : 'Lihat';
+    btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+    btn.textContent = isHidden ? 'Hide' : 'Show';
   });
 
   $('#adminLoginForm')?.addEventListener('submit', async (e) => {
@@ -1515,7 +1516,7 @@ function pasangPengendali() {
     const submitBtn = $('#btnLoginSubmit');
     show(errBox, false);
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Memverifikasi...';
+    submitBtn.textContent = 'Verifying…';
 
     try {
       const res = await masukPengguna({ email, password });
@@ -1524,21 +1525,21 @@ function pasangPengendali() {
       simpanAuthLocal(res.token, res.user);
       perbaruiTampilanAuth();
       if (res.user?.role === 'admin') {
-        tampilkanPesan('Sesi administrator aktif', 'ok');
+        tampilkanPesan('Administrator session active', 'ok');
       }
     } catch (err) {
-      errBox.textContent = err.message || 'Gagal masuk ke konsol admin';
+      errBox.textContent = err.message || 'Failed to sign in to admin console';
       show(errBox, true);
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Masuk Konsol Admin';
+      submitBtn.textContent = 'Sign In to Admin Console';
     }
   });
 
   $('#btnSwitchAccount')?.addEventListener('click', keluarSesiAdmin);
   $('#btnAdminLogout')?.addEventListener('click', () => {
     keluarSesiAdmin();
-    tampilkanPesan('Sesi administrator ditutup', 'ok');
+    tampilkanPesan('Administrator session signed out', 'ok');
   });
 
   // Tab switching (click + keyboard roving tabindex: ArrowLeft, ArrowRight, Home, End)
@@ -1610,14 +1611,14 @@ function pasangPengendali() {
     try {
       sinkronkanTombolSweep(true);
       const res = await picuSweepCctvAdmin(keadaan.token, { wait: false });
-      tampilkanPesan('Pemeriksaan kesehatan seluruh kamera berjalan di latar belakang', 'ok');
+      tampilkanPesan('Full camera health sweep started in the background', 'ok');
       if (res.summary) {
         renderRingkasanCctv(res.summary, keadaan.cctvData?.catalogStats);
       }
       jadwalkanPollingSweep();
     } catch (err) {
       sinkronkanTombolSweep(false);
-      tampilkanPesan(err.message || 'Gagal memulai pemeriksaan kamera', 'error');
+      tampilkanPesan(err.message || 'Failed to start camera sweep', 'error');
     }
   });
 
@@ -1658,10 +1659,10 @@ function pasangPengendali() {
         ? await perbaruiKameraCctvAdmin(keadaan.token, keadaan.sedangEditKamera.id, payload)
         : await tambahKameraCctvAdmin(keadaan.token, payload);
       $('#cameraDialog')?.close();
-      tampilkanPesan(res.message || 'Data kamera disimpan', 'ok');
+      tampilkanPesan(res.message || 'Camera data saved', 'ok');
       await muatDaftarCctv({ senyap: true });
     } catch (err) {
-      errBox.textContent = err.message || 'Gagal menyimpan data kamera';
+      errBox.textContent = err.message || 'Failed to save camera data';
       show(errBox, true);
     } finally {
       saveBtn.disabled = false;
@@ -1678,16 +1679,16 @@ function pasangPengendali() {
 
   $('#btnClearAllCache')?.addEventListener('click', () => {
     bukaKonfirmasi({
-      title: 'Kosongkan Seluruh Cache Memori',
-      message: 'Seluruh store cache (visi CCTV, kesehatan kamera, rute OSRM, navigasi, dan geocoding) akan dikosongkan.',
-      confirmLabel: 'Kosongkan Semua',
+      title: 'Clear All In-Memory Caches',
+      message: 'All cache stores (CCTV vision, camera health, OSRM routes, navigation, and geocoding) will be flushed.',
+      confirmLabel: 'Clear All',
       onConfirm: async () => {
         try {
           const res = await bersihkanCacheAdmin(keadaan.token, 'all');
-          tampilkanPesan(res.message || 'Seluruh cache dibersihkan', 'ok');
+          tampilkanPesan(res.message || 'All caches cleared', 'ok');
           await muatDataMonitoring();
         } catch (err) {
-          tampilkanPesan(err.message || 'Gagal membersihkan cache', 'error');
+          tampilkanPesan(err.message || 'Failed to clear caches', 'error');
         }
       },
     });
@@ -1699,10 +1700,10 @@ function pasangPengendali() {
     const store = btn.dataset.cacheClear;
     try {
       const res = await bersihkanCacheAdmin(keadaan.token, store);
-      tampilkanPesan(res.message || `Cache ${store} dibersihkan`, 'ok');
+      tampilkanPesan(res.message || `Cache ${store} cleared`, 'ok');
       await muatDataMonitoring();
     } catch (err) {
-      tampilkanPesan(err.message || 'Gagal membersihkan cache', 'error');
+      tampilkanPesan(err.message || 'Failed to clear cache', 'error');
     }
   });
 
@@ -1716,7 +1717,7 @@ function pasangPengendali() {
       keadaan.logsData = logsRes;
       renderLogsTable(logsRes);
     } catch (err) {
-      tampilkanPesan(err.message || 'Gagal memfilter log eksekusi', 'error');
+      tampilkanPesan(err.message || 'Failed to filter execution logs', 'error');
     }
   });
 

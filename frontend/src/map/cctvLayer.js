@@ -27,13 +27,19 @@ let clickHandler = null;
 /** @type {import('../api/cctvApi.js').Kamera[]} */
 let daftarKamera = [];
 /** @type {boolean} */
-let layerEnabled = true;
+let layerEnabled = false;
+/** @type {boolean} */
+let camerasLoaded = false;
+/** @type {Promise<void>|null} */
+let loadCamerasPromise = null;
 /** @type {string|null} */
 let highlightedCameraId = null;
 /** @type {number[][]|null} Geometri rute aktif [[lon, lat], ...] untuk filter koridor */
 let activeRouteGeometry = null;
 /** @type {string|null} */
 let selectedCameraId = null;
+/** @type {string|null} */
+let activeAngleId = null;
 
 /** @type {Hls|null} */
 let activeHls = null;
@@ -377,7 +383,7 @@ function hentikanStreamKamera() {
  * @param {boolean} visible
  * @param {string} [teks]
  */
-function setLoadingSpinner(visible, teks = 'Menghubungkan ke live stream...') {
+function setLoadingSpinner(visible, teks = 'Connecting to live stream...') {
   const spinWrap = document.getElementById('mapCctvSpinner');
   const spinTxt = document.getElementById('mapCctvSpinnerText');
   if (spinWrap) spinWrap.hidden = !visible;
@@ -393,14 +399,14 @@ function perbaruiBadgeStatusKamera(cam) {
   if (status === 'online') {
     statusEl.textContent = 'ONLINE';
     statusEl.title = cam.lastCheckedAt
-      ? `Terakhir aktif: ${new Date(cam.lastCheckedAt).toLocaleTimeString('id-ID')}`
-      : 'Kamera aktif';
+      ? `Last active: ${new Date(cam.lastCheckedAt).toLocaleTimeString('en-US', { hour12: false })}`
+      : 'Camera online';
   } else if (status === 'offline') {
     statusEl.textContent = 'OFFLINE';
-    statusEl.title = cam.statusReason ? `Gangguan: ${cam.statusReason}` : 'Kamera tidak merespons';
+    statusEl.title = cam.statusReason ? `Issue: ${cam.statusReason}` : 'Camera not responding';
   } else {
-    statusEl.textContent = 'CEK...';
-    statusEl.title = 'Status kamera sedang diperiksa berkala';
+    statusEl.textContent = 'CHECK...';
+    statusEl.title = 'Camera status is checked periodically';
   }
 }
 
@@ -434,8 +440,8 @@ function tampilkanModeKamera(cam, mode) {
     if (qualityEl) qualityEl.textContent = cam.hasLiveStream ? 'HLS 640p' : 'HLS N/A';
   } else {
     if (liveBadge) liveBadge.style.display = 'inline-flex';
-    if (liveLabel) liveLabel.textContent = 'FOTO REALTIME';
-    if (qualityEl) qualityEl.textContent = 'FOTO 720p';
+    if (liveLabel) liveLabel.textContent = 'LIVE PHOTO';
+    if (qualityEl) qualityEl.textContent = 'PHOTO 720p';
   }
 
   if (mode === 'video') {
@@ -452,7 +458,7 @@ function tampilkanModeKamera(cam, mode) {
       return;
     }
 
-    setLoadingSpinner(true, 'Menghubungkan ke live stream...');
+    setLoadingSpinner(true, 'Connecting to live stream...');
 
     const streamUrl = urlStreamKamera(cam.id);
 
@@ -479,13 +485,13 @@ function tampilkanModeKamera(cam, mode) {
           console.warn('[JakSafe HLS] Fatal stream error, switching to snapshot:', data.type, data.details);
           hentikanStreamKamera();
           tampilkanModeKamera(cam, 'snapshot');
-          if (fallbackMsg) fallbackMsg.textContent = 'Live video offline, beralih ke Snapshot';
+          if (fallbackMsg) fallbackMsg.textContent = 'Live video offline, switching to Snapshot';
         }
       });
 
       if (videoEl) {
         videoEl.onplaying = () => setLoadingSpinner(false);
-        videoEl.onwaiting = () => setLoadingSpinner(true, 'Memuat segmen video...');
+        videoEl.onwaiting = () => setLoadingSpinner(true, 'Buffering video segments...');
         videoEl.onerror = () => {
           hentikanStreamKamera();
           tampilkanModeKamera(cam, 'snapshot');
@@ -511,7 +517,7 @@ function tampilkanModeKamera(cam, mode) {
     if (imgEl) {
       imgEl.hidden = false;
       frameEl?.removeAttribute('data-gagal');
-      setLoadingSpinner(true, 'Memuat cuplikan CCTV...');
+      setLoadingSpinner(true, 'Loading CCTV snapshot...');
       imgEl.onload = () => {
         setLoadingSpinner(false);
         frameEl?.removeAttribute('data-gagal');
@@ -526,7 +532,7 @@ function tampilkanModeKamera(cam, mode) {
       imgEl.onerror = () => {
         if (retriesLeft > 0 && selectedCameraId === cam.id && currentViewMode === 'snapshot') {
           retriesLeft -= 1;
-          setLoadingSpinner(true, 'Menyambungkan ulang kamera...');
+          setLoadingSpinner(true, 'Reconnecting camera...');
           activeSnapRetryTimer = window.setTimeout(() => {
             activeSnapRetryTimer = null;
             if (selectedCameraId === cam.id && currentViewMode === 'snapshot') {
@@ -538,7 +544,7 @@ function tampilkanModeKamera(cam, mode) {
         setLoadingSpinner(false);
         frameEl?.setAttribute('data-gagal', '1');
         if (fallbackMsg && cam.statusReason) {
-          fallbackMsg.textContent = `Kamera sedang offline (${cam.statusReason})`;
+          fallbackMsg.textContent = `Camera offline (${cam.statusReason})`;
         }
         if (cam.status !== 'offline') {
           cam.status = 'offline';
@@ -565,6 +571,57 @@ function tampilkanModeKamera(cam, mode) {
   }
 }
 
+function getActiveAngleCamera(cam) {
+  if (!cam) return null;
+  const angles = Array.isArray(cam.angles) ? cam.angles : [];
+  const chosen = angles.find((a) => a.id === activeAngleId) || angles[0] || null;
+  if (!chosen) return cam;
+  return {
+    ...cam,
+    id: chosen.id,
+    hasLiveStream: chosen.hasLiveStream,
+  };
+}
+
+function renderAnglePills(cam) {
+  const wrap = document.getElementById('mapCctvAngles');
+  if (!wrap) return;
+  const angles = Array.isArray(cam?.angles) ? cam.angles : [];
+  if (angles.length <= 1) {
+    wrap.hidden = true;
+    wrap.innerHTML = '';
+    return;
+  }
+
+  wrap.hidden = false;
+  wrap.innerHTML = angles
+    .map((a) => {
+      const isActive = (activeAngleId || angles[0].id) === a.id;
+      return `<button type="button" class="mapcctv__angle press" data-angle-id="${escapeHtml(a.id)}" data-active="${isActive ? '1' : '0'}">${escapeHtml(a.label)}</button>`;
+    })
+    .join('');
+
+  wrap.querySelectorAll('[data-angle-id]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const nextId = btn.getAttribute('data-angle-id');
+      if (!nextId || nextId === activeAngleId) return;
+      activeAngleId = nextId;
+      wrap.querySelectorAll('[data-angle-id]').forEach((el) => {
+        el.setAttribute('data-active', el.getAttribute('data-angle-id') === activeAngleId ? '1' : '0');
+      });
+      const activeCam = getActiveAngleCamera(cam);
+      const tabVid = document.getElementById('tabMapCctvVideo');
+      if (tabVid && activeCam) {
+        tabVid.style.opacity = activeCam.hasLiveStream ? '1' : '0.45';
+      }
+      hentikanStreamKamera();
+      if (activeCam) {
+        tampilkanModeKamera(activeCam, activeCam.hasLiveStream ? 'video' : 'snapshot');
+      }
+    });
+  });
+}
+
 /**
  * Menampilkan modal / kartu mengambang CCTV di atas panggung peta saat kamera diklik.
  * @param {import('../api/cctvApi.js').Kamera|null} cam
@@ -576,6 +633,8 @@ export function bukaPopupKameraPeta(cam) {
   if (!cam) {
     hentikanStreamKamera();
     selectedCameraId = null;
+    activeAngleId = null;
+    renderAnglePills(null);
     popup.hidden = true;
     renderEntitasKamera();
     notifyListeners();
@@ -583,6 +642,7 @@ export function bukaPopupKameraPeta(cam) {
   }
 
   selectedCameraId = cam.id;
+  activeAngleId = cam.angles?.[0]?.id || cam.id;
   renderEntitasKamera();
   notifyListeners();
 
@@ -594,16 +654,17 @@ export function bukaPopupKameraPeta(cam) {
 
   if (titleEl) titleEl.textContent = cam.nama;
   perbaruiBadgeStatusKamera(cam);
+  renderAnglePills(cam);
   const fallbackMsgEl = document.getElementById('mapCctvFallbackMsg');
   if (fallbackMsgEl) {
     fallbackMsgEl.textContent = cam.status === 'offline' && cam.statusReason
-      ? `Kamera sedang offline (${cam.statusReason})`
-      : 'Kamera sedang tidak merespons';
+      ? `Camera offline (${cam.statusReason})`
+      : 'Camera is not responding';
   }
   if (metaEl) {
-    const arah = Number.isFinite(cam.headingDeg) ? `Arah ${cam.headingDeg}°` : 'Arah 360°';
+    const arah = Number.isFinite(cam.headingDeg) ? `Heading ${cam.headingDeg}°` : '360° View';
     const waktuCek = cam.lastCheckedAt
-      ? ` · Cek ${new Date(cam.lastCheckedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`
+      ? ` · Checked ${new Date(cam.lastCheckedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}`
       : '';
     metaEl.textContent = `${cam.provider || 'CCTV Jakarta'} · ${arah} · ${cam.lat.toFixed(4)}, ${cam.lon.toFixed(4)}${waktuCek}`;
   }
@@ -613,19 +674,20 @@ export function bukaPopupKameraPeta(cam) {
   }
   if (btnAnalyze) {
     btnAnalyze.disabled = false;
-    btnAnalyze.innerHTML = `${ikon('i-spark', 13)} Analisis AI`;
+    btnAnalyze.innerHTML = `${ikon('i-spark', 13)} AI Analysis`;
   }
 
+  const activeCam = getActiveAngleCamera(cam);
   if (tabVid) {
-    tabVid.style.opacity = cam.hasLiveStream ? '1' : '0.45';
-    tabVid.title = cam.hasLiveStream ? 'Tonton siaran langsung live video' : 'Kamera ini hanya menyediakan foto berkala';
+    tabVid.style.opacity = activeCam.hasLiveStream ? '1' : '0.45';
+    tabVid.title = activeCam.hasLiveStream ? 'Watch live video stream' : 'This camera only provides periodic snapshots';
   }
 
   popup.hidden = false;
 
   // Jalankan mode sesuai kapabilitas kamera
-  const targetMode = cam.hasLiveStream ? 'video' : 'snapshot';
-  tampilkanModeKamera(cam, targetMode);
+  const targetMode = activeCam.hasLiveStream ? 'video' : 'snapshot';
+  tampilkanModeKamera(activeCam, targetMode);
 }
 
 /**
@@ -738,14 +800,14 @@ function pasangTombolPopupKamera() {
 
   // Tab Live Video
   document.getElementById('tabMapCctvVideo')?.addEventListener('click', () => {
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (!cam) return;
     tampilkanModeKamera(cam, 'video');
   });
 
   // Tab Snapshot
   document.getElementById('tabMapCctvSnapshot')?.addEventListener('click', () => {
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (!cam) return;
     tampilkanModeKamera(cam, 'snapshot');
   });
@@ -758,7 +820,7 @@ function pasangTombolPopupKamera() {
       lbl.textContent = autoRefreshEnabled ? 'ON' : 'OFF';
       lbl.style.color = autoRefreshEnabled ? '' : 'var(--text-3)';
     }
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (cam && currentViewMode === 'snapshot') {
       tampilkanModeKamera(cam, 'snapshot');
     }
@@ -777,7 +839,7 @@ function pasangTombolPopupKamera() {
 
   // Muat Ulang (Refresh)
   document.getElementById('btnMapCctvRefresh')?.addEventListener('click', () => {
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (!cam) return;
     tampilkanModeKamera(cam, currentViewMode);
   });
@@ -796,7 +858,7 @@ function pasangTombolPopupKamera() {
   });
 
   document.getElementById('btnMapCctvAnalyze')?.addEventListener('click', async () => {
-    const cam = daftarKamera.find((c) => c.id === selectedCameraId);
+    const cam = getActiveAngleCamera(daftarKamera.find((c) => c.id === selectedCameraId));
     if (!cam) return;
     const btn = document.getElementById('btnMapCctvAnalyze');
     const aiBox = document.getElementById('mapCctvAiResult');
@@ -804,44 +866,44 @@ function pasangTombolPopupKamera() {
 
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Menganalisis citra dengan Gemini...';
+      btn.textContent = 'Analyzing image with Gemini...';
     }
     aiBox.hidden = false;
-    aiBox.innerHTML = '<p class="mapcctv__loading">Mengunduh bingkai CCTV & menjalankan Gemini Vision...</p>';
+    aiBox.innerHTML = '<p class="mapcctv__loading">Fetching CCTV frame & running Gemini Vision...</p>';
 
     try {
       const res = await analisisKamera(cam.id);
       const a = res.analysis;
       if (!a) {
-        aiBox.innerHTML = '<p class="mapcctv__err">Hasil analisis kosong.</p>';
+        aiBox.innerHTML = '<p class="mapcctv__err">Empty analysis result.</p>';
       } else {
         const genanganTeks = a.genangan_air
           ? `⚠️ ${labelGenangan(a.tingkat_genangan)}`
-          : '✅ Tidak tampak banjir/genangan';
+          : '✅ No flooding visible';
         const jalanTeks = labelKondisiJalan(a.kondisi_jalan);
         const conf = Number.isFinite(a.confidence) ? `${Math.round(a.confidence * 100)}%` : '-';
         aiBox.innerHTML = `
           <div class="mapcctv__ai">
-            <div class="mapcctv__airow"><span>Genangan:</span><strong>${escapeHtml(genanganTeks)}</strong></div>
-            <div class="mapcctv__airow"><span>Arus Jalan:</span><strong>${escapeHtml(jalanTeks)}</strong></div>
-            <div class="mapcctv__airow"><span>Keyakinan AI:</span><strong>${escapeHtml(conf)}</strong></div>
+            <div class="mapcctv__airow"><span>Flooding:</span><strong>${escapeHtml(genanganTeks)}</strong></div>
+            <div class="mapcctv__airow"><span>Traffic Flow:</span><strong>${escapeHtml(jalanTeks)}</strong></div>
+            <div class="mapcctv__airow"><span>AI Confidence:</span><strong>${escapeHtml(conf)}</strong></div>
             ${a.alasan ? `<p class="mapcctv__aireason">"${escapeHtml(a.alasan)}"</p>` : ''}
           </div>
         `;
       }
     } catch (err) {
-      aiBox.innerHTML = `<p class="mapcctv__err">Gagal menganalisis kamera: ${escapeHtml(err?.message || 'Terjadi kesalahan')}</p>`;
+      aiBox.innerHTML = `<p class="mapcctv__err">Failed to analyze camera: ${escapeHtml(err?.message || 'Unknown error')}</p>`;
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = `${ikon('i-spark', 13)} Analisis Ulang AI`;
+        btn.innerHTML = `${ikon('i-spark', 13)} Re-analyze AI`;
       }
     }
   });
 }
 
 
-export function setCctvLayerEnabled(enabled) {
+export async function setCctvLayerEnabled(enabled) {
   layerEnabled = Boolean(enabled);
   if (cctvDataSource) {
     cctvDataSource.show = layerEnabled;
@@ -852,6 +914,10 @@ export function setCctvLayerEnabled(enabled) {
   const viewer = getViewer();
   viewer?.scene.requestRender();
   notifyListeners();
+
+  if (layerEnabled && !camerasLoaded) {
+    await ensureCctvLoaded();
+  }
 }
 
 export function toggleCctvLayer() {
@@ -926,7 +992,35 @@ function jadwalkanSinkronKesehatanAwal(attempt = 0) {
 }
 
 /**
- * Menginisialisasi layer CCTV dan memuat katalog kamera dari backend.
+ * Memuat daftar kamera CCTV dari backend secara lazy (sekali saat layer dinyalakan).
+ */
+async function ensureCctvLoaded() {
+  if (camerasLoaded) return;
+  if (loadCamerasPromise) return loadCamerasPromise;
+
+  loadCamerasPromise = (async () => {
+    try {
+      const kameraAwal = await ambilSemuaKamera();
+      camerasLoaded = true;
+      terapkanDaftarKamera(kameraAwal);
+
+      const hasUnknown = daftarKamera.some((c) => c.status === 'unknown');
+      if (hasUnknown) {
+        jadwalkanSinkronKesehatanAwal(0);
+      }
+    } catch (err) {
+      console.warn('[JakSafe CCTV Layer] Gagal memuat daftar kamera:', err?.message || err);
+    } finally {
+      loadCamerasPromise = null;
+    }
+  })();
+
+  return loadCamerasPromise;
+}
+
+/**
+ * Menginisialisasi layer CCTV (data source & handler klik). Katalog kamera baru
+ * dimuat secara lazy saat layer dinyalakan agar startup peta tetap ringan.
  */
 export async function initCctvLayer() {
   const viewer = getViewer();
@@ -940,15 +1034,9 @@ export async function initCctvLayer() {
     pasangTombolPopupKamera();
   }
 
-  try {
-    const kameraAwal = await ambilSemuaKamera();
-    terapkanDaftarKamera(kameraAwal);
-
-    const hasUnknown = daftarKamera.some((c) => c.status === 'unknown');
-    if (hasUnknown) {
-      jadwalkanSinkronKesehatanAwal(0);
-    }
-  } catch (err) {
-    console.warn('[JakSafe CCTV Layer] Gagal memuat daftar kamera:', err?.message || err);
+  if (layerEnabled) {
+    await ensureCctvLoaded();
+  } else {
+    notifyListeners();
   }
 }

@@ -23,6 +23,56 @@ let lastSweepStats = null;
 let hydratedCount = 0;
 
 /**
+ * Resolve the background CCTV health sweep interval from environment variables.
+ * Supports `CCTV_SWEEP_INTERVAL_MINUTES` (recommended) or `CCTV_SWEEP_INTERVAL_MS`.
+ * Set to `0` (or `off`/`false`/`disabled`) to disable periodic background sweeps.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {number} Interval in milliseconds (`0` disables scheduled sweeps)
+ */
+export function resolveSweepIntervalMs(env = process.env) {
+  const rawMinutes = env?.CCTV_SWEEP_INTERVAL_MINUTES;
+  if (rawMinutes !== undefined && String(rawMinutes).trim() !== '') {
+    const normalized = String(rawMinutes).trim().toLowerCase();
+    if (normalized === 'off' || normalized === 'false' || normalized === 'disabled') {
+      return 0;
+    }
+    const mins = Number(normalized);
+    if (Number.isFinite(mins)) {
+      return mins <= 0 ? 0 : Math.round(mins * 60 * 1000);
+    }
+  }
+
+  const rawMs = env?.CCTV_SWEEP_INTERVAL_MS;
+  if (rawMs !== undefined && String(rawMs).trim() !== '') {
+    const normalized = String(rawMs).trim().toLowerCase();
+    if (normalized === 'off' || normalized === 'false' || normalized === 'disabled') {
+      return 0;
+    }
+    const ms = Number(normalized);
+    if (Number.isFinite(ms)) {
+      return ms <= 0 ? 0 : Math.round(ms);
+    }
+  }
+
+  return DEFAULT_SWEEP_INTERVAL_MS;
+}
+
+function getEffectiveTtls(status) {
+  const intervalMs = resolveSweepIntervalMs();
+  if (status === 'offline') {
+    return {
+      ramTtlMs: intervalMs > 0 ? Math.max(OFFLINE_RAM_TTL_MS, Math.min(intervalMs, 60 * 60 * 1000)) : OFFLINE_RAM_TTL_MS,
+      dbTtlMs: intervalMs > 0 ? Math.max(OFFLINE_DB_TTL_MS, Math.min(intervalMs, 2 * 60 * 60 * 1000)) : OFFLINE_DB_TTL_MS,
+    };
+  }
+  const sweepBufferMs = intervalMs > 0 ? intervalMs + 5 * 60 * 1000 : 0;
+  return {
+    ramTtlMs: Math.max(HEALTH_RAM_TTL_MS, sweepBufferMs),
+    dbTtlMs: Math.max(HEALTH_DB_TTL_MS, sweepBufferMs),
+  };
+}
+
+/**
  * Retrieve cached health status for a single camera.
  * @param {string} cameraId
  * @returns {{ status: 'online'|'offline'|'unknown', reason: string|null, latencyMs: number|null, checkedAt: string|null }}
@@ -116,8 +166,7 @@ export function recordCameraHealth(
     checkedAt: checkedIso,
   };
 
-  const ramTtlMs = entry.status === 'offline' ? OFFLINE_RAM_TTL_MS : HEALTH_RAM_TTL_MS;
-  const dbTtlMs = entry.status === 'offline' ? OFFLINE_DB_TTL_MS : HEALTH_DB_TTL_MS;
+  const { ramTtlMs, dbTtlMs } = getEffectiveTtls(entry.status);
   cctvHealthCache.set(cameraId, entry, ramTtlMs);
 
   if (syncDb && isMongoActive()) {
@@ -247,10 +296,50 @@ async function probeGetOnce(urlStr, { timeoutMs, fetchImpl }) {
     : { ok: false, reason: 'empty frame body', retryable: true };
 }
 
+async function probeHlsEndpoint(hlsUrl, { timeoutMs, fetchImpl }) {
+  const startedAt = Date.now();
+  try {
+    const { res } = await fetchPublicUrl(hlsUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        Accept: 'application/vnd.apple.mpegurl,application/x-mpegurl,*/*',
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+      maxRedirects: MAX_REDIRECTS,
+      fetchImpl,
+    });
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (!res.ok) {
+      await res.body?.cancel().catch(() => {});
+      return { status: 'offline', reason: `HLS HTTP ${res.status}`, latencyMs: Date.now() - startedAt };
+    }
+    const isPlaylistType = ct.includes('mpegurl') || ct.includes('m3u8');
+    if (isPlaylistType) {
+      await res.body?.cancel().catch(() => {});
+      return { status: 'online', reason: null, latencyMs: Date.now() - startedAt };
+    }
+    const text = await res.text().catch(() => '');
+    if (text.includes('#EXTM3U')) {
+      return { status: 'online', reason: null, latencyMs: Date.now() - startedAt };
+    }
+    return { status: 'offline', reason: `non-hls (${ct.split(';')[0] || 'unknown'})`, latencyMs: Date.now() - startedAt };
+  } catch (err) {
+    return {
+      status: 'offline',
+      reason:
+        err?.name === 'TimeoutError' || err?.name === 'AbortError'
+          ? `timeout (${timeoutMs}ms)`
+          : err?.message || 'hls probe failed',
+      latencyMs: Date.now() - startedAt,
+    };
+  }
+}
+
 /**
- * Probe a single camera snapshot endpoint without consuming AI/Vision tokens.
- * Uses HTTP HEAD first, falls back to lightweight GET when needed, and performs
- * 1x automatic GET retry on transient timeouts/5xx to match cold-start wake-up behavior.
+ * Probe a single camera snapshot (or HLS-only) endpoint without consuming AI/Vision tokens.
+ * Uses HTTP HEAD first (unless host is known to require GET), falls back to lightweight GET when needed,
+ * and performs 1x automatic GET retry on transient timeouts/5xx to match cold-start wake-up behavior.
  * @param {object} camera
  * @param {object} [opts]
  * @returns {Promise<{ status: 'online'|'offline', reason: string|null, latencyMs: number }>}
@@ -260,56 +349,55 @@ export async function checkCameraEndpoint(
   { timeoutMs = PROBE_TIMEOUT_MS, retryDelayMs = PROBE_RETRY_DELAY_MS, fetchImpl = globalThis.fetch } = {}
 ) {
   if (!camera?.url) {
+    if (camera?.hlsUrl) {
+      return probeHlsEndpoint(camera.hlsUrl, { timeoutMs, fetchImpl });
+    }
     return { status: 'offline', reason: 'missing snapshot url', latencyMs: 0 };
   }
 
   const startedAt = Date.now();
   let lastFailure = { reason: 'probe failed', retryable: true };
+  const skipHead = String(camera.url).includes('cctvnusantara.com');
 
   // Attempt 1: fast HEAD (bounded at max 4.5s); fallback cleanly to GET if needed
-  try {
-    const headTimeoutMs = Math.min(timeoutMs, 4500);
-    const headRes = await fetchProbeResponse(camera.url, {
-      method: 'HEAD',
-      timeoutMs: headTimeoutMs,
-      fetchImpl,
-    });
-    await headRes.body?.cancel().catch(() => {});
+  if (!skipHead) {
+    try {
+      const headTimeoutMs = Math.min(timeoutMs, 4500);
+      const headRes = await fetchProbeResponse(camera.url, {
+        method: 'HEAD',
+        timeoutMs: headTimeoutMs,
+        fetchImpl,
+      });
+      await headRes.body?.cancel().catch(() => {});
 
-    if (headRes.status !== 405 && headRes.status !== 501) {
-      const headerCheck = validateImageHeaders(headRes);
-      if (headerCheck.ok && headerCheck.hasImageType) {
-        return { status: 'online', reason: null, latencyMs: Date.now() - startedAt };
+      if (headRes.status !== 405 && headRes.status !== 501) {
+        const headerCheck = validateImageHeaders(headRes);
+        if (headerCheck.ok && headerCheck.hasImageType) {
+          return { status: 'online', reason: null, latencyMs: Date.now() - startedAt };
+        }
+        lastFailure = {
+          reason: headerCheck.ok ? 'missing content-type on HEAD' : headerCheck.reason,
+          retryable: headerCheck.ok ? true : headerCheck.retryable,
+        };
+      } else {
+        lastFailure = { reason: `HEAD ${headRes.status}`, retryable: true };
       }
-      if (!headerCheck.ok && !headerCheck.retryable) {
+    } catch (err) {
+      if (err instanceof FrameError) {
         return {
           status: 'offline',
-          reason: headerCheck.reason,
+          reason: err.message,
           latencyMs: Date.now() - startedAt,
         };
       }
       lastFailure = {
-        reason: headerCheck.ok ? 'missing content-type on HEAD' : headerCheck.reason,
+        reason:
+          err?.name === 'TimeoutError' || err?.name === 'AbortError'
+            ? `timeout (${Math.min(timeoutMs, 4500)}ms)`
+            : err?.message || 'probe failed',
         retryable: true,
       };
-    } else {
-      lastFailure = { reason: `HEAD ${headRes.status}`, retryable: true };
     }
-  } catch (err) {
-    if (err instanceof FrameError) {
-      return {
-        status: 'offline',
-        reason: err.message,
-        latencyMs: Date.now() - startedAt,
-      };
-    }
-    lastFailure = {
-      reason:
-        err?.name === 'TimeoutError' || err?.name === 'AbortError'
-          ? `timeout (${Math.min(timeoutMs, 4500)}ms)`
-          : err?.message || 'probe failed',
-      retryable: true,
-    };
   }
 
   // Attempt 2 (& optional 1x retry): lightweight GET with header + first-chunk check
@@ -359,6 +447,8 @@ export async function checkCameraEndpoint(
 export function runHealthSweep({
   cameras = loadCatalog(),
   concurrency = SWEEP_CONCURRENCY,
+  maxPerHost = 2,
+  hostDelayMs = 180,
   timeoutMs = PROBE_TIMEOUT_MS,
   persistDb = true,
   fetchImpl = globalThis.fetch,
@@ -370,17 +460,76 @@ export function runHealthSweep({
     const list = Array.isArray(cameras) ? cameras : [];
     const total = list.length;
     const batchOps = [];
-    let cursor = 0;
     let online = 0;
     let offline = 0;
 
+    // Interleave cameras across hosts (round-robin) + cap per-host concurrency
+    // so Cloudflare-protected hosts (e.g. cctvnusantara.com) are never flooded.
+    const hostQueues = new Map();
+    for (const cam of list) {
+      let host = 'unknown';
+      try { host = new URL(cam.url).hostname.toLowerCase(); } catch { /* ignore */ }
+      if (!hostQueues.has(host)) hostQueues.set(host, []);
+      hostQueues.get(host).push(cam);
+    }
+
+    const interleaved = [];
+    const queues = Array.from(hostQueues.values());
+    let remaining = total;
+    while (remaining > 0) {
+      for (const q of queues) {
+        if (q.length > 0) {
+          interleaved.push(q.shift());
+          remaining -= 1;
+        }
+      }
+    }
+
+    const perHostInFlight = new Map();
+    const perHostWaiters = new Map();
+    const effectiveDelayMs = fetchImpl === globalThis.fetch ? Math.max(0, hostDelayMs) : 0;
+
+    async function acquireHostSlot(host) {
+      const cap = Math.max(1, maxPerHost);
+      while ((perHostInFlight.get(host) || 0) >= cap) {
+        await new Promise((resolve) => {
+          if (!perHostWaiters.has(host)) perHostWaiters.set(host, []);
+          perHostWaiters.get(host).push(resolve);
+        });
+      }
+      perHostInFlight.set(host, (perHostInFlight.get(host) || 0) + 1);
+    }
+
+    function releaseHostSlot(host) {
+      const next = Math.max(0, (perHostInFlight.get(host) || 1) - 1);
+      perHostInFlight.set(host, next);
+      const waiters = perHostWaiters.get(host);
+      if (waiters && waiters.length > 0) {
+        const wake = waiters.shift();
+        wake();
+      }
+    }
+
+    let cursor = 0;
     const workerCount = Math.min(Math.max(1, concurrency), Math.max(1, total));
     const workers = Array.from({ length: workerCount }, async () => {
       while (cursor < total) {
         const idx = cursor;
         cursor += 1;
-        const cam = list[idx];
-        const result = await checkCameraEndpoint(cam, { timeoutMs, fetchImpl });
+        const cam = interleaved[idx];
+        let host = 'unknown';
+        try { host = new URL(cam.url).hostname.toLowerCase(); } catch { /* ignore */ }
+
+        await acquireHostSlot(host);
+        let result;
+        try {
+          result = await checkCameraEndpoint(cam, { timeoutMs, fetchImpl });
+          if (effectiveDelayMs > 0) {
+            await new Promise((r) => setTimeout(r, effectiveDelayMs));
+          }
+        } finally {
+          releaseHostSlot(host);
+        }
         const checkedAt = new Date();
 
         if (result.status === 'online') online += 1;
@@ -394,6 +543,7 @@ export function runHealthSweep({
           syncDb: false,
         });
 
+        const { dbTtlMs } = getEffectiveTtls(result.status);
         batchOps.push({
           updateOne: {
             filter: { cameraId: cam.id },
@@ -404,10 +554,7 @@ export function runHealthSweep({
                 reason: result.reason,
                 latencyMs: result.latencyMs,
                 checkedAt,
-                expiresAt: new Date(
-                  checkedAt.getTime() +
-                    (result.status === 'offline' ? OFFLINE_DB_TTL_MS : HEALTH_DB_TTL_MS)
-                ),
+                expiresAt: new Date(checkedAt.getTime() + dbTtlMs),
               },
             },
             upsert: true,
@@ -469,7 +616,7 @@ export function sortCandidatesByHealth(candidates) {
  * @param {object} [opts]
  */
 export async function startCctvHealthScheduler({
-  intervalMs = DEFAULT_SWEEP_INTERVAL_MS,
+  intervalMs = resolveSweepIntervalMs(),
   concurrency = SWEEP_CONCURRENCY,
 } = {}) {
   const { hydrated } = await hydrateHealthFromMongo();
@@ -477,6 +624,12 @@ export async function startCctvHealthScheduler({
 
   if (hydrated > 0) {
     console.log(`[cctvHealth] Hydrated ${hydrated}/${catalog.length} camera statuses from MongoDB.`);
+  }
+
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+    stopCctvHealthScheduler();
+    console.log('[cctvHealth] Periodic background sweep disabled via config (manual & passive checks active).');
+    return;
   }
 
   // Trigger an immediate background sweep if RAM/DB coverage is sparse (<50%)
@@ -501,6 +654,9 @@ export async function startCctvHealthScheduler({
     });
   }, intervalMs);
   sweepTimer.unref?.();
+
+  const label = intervalMs >= 60_000 ? `${Math.round(intervalMs / 60_000)}m` : `${intervalMs}ms`;
+  console.log(`[cctvHealth] Periodic background sweep scheduled every ${label}.`);
 }
 
 export function stopCctvHealthScheduler() {

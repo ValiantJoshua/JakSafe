@@ -8,7 +8,7 @@ import net from 'node:net';
 const TIMEOUT_MS = 10_000;
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_REDIRECTS = 3;
-export const ALLOWED_STREAM_PORTS = new Set(['', '80', '443', '8080', '8443']);
+export const ALLOWED_STREAM_PORTS = new Set(['', '80', '443', '7028', '8080', '8443', '8989', '20443']);
 
 export class FrameError extends Error {
   constructor(message, status = 502) {

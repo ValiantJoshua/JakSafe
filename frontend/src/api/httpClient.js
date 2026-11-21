@@ -92,13 +92,19 @@ export function ambilJejak() {
 
 /** Menyusun URL lengkap beserta parameter kueri, melewati nilai kosong. */
 function susunUrl(jalur, kueri) {
-  const url = new URL(`${API_BASE}${jalur}`, window.location.origin);
+  const base = String(API_BASE || '/api').trim().replace(/\/+$/, '');
+  const cleanPath = String(jalur || '').startsWith('/') ? jalur : `/${jalur}`;
+  const isAbsoluteBase = /^https?:\/\//i.test(base);
+  const url = new URL(`${base}${cleanPath}`, window.location.origin);
+
   for (const [kunci, nilai] of Object.entries(kueri || {})) {
     if (nilai === undefined || nilai === null || nilai === '') continue;
     url.searchParams.set(kunci, String(nilai));
   }
-  // Dikembalikan sebagai jalur relatif supaya tetap lewat proxy dev server.
-  return url.pathname + url.search;
+
+  // Untuk URL absolut (mis. Railway backend dari Vercel), pertahankan origin penuh;
+  // untuk jalur relatif ('/api'), kembalikan pathname + search agar lewat proxy Vite.
+  return isAbsoluteBase ? url.href : (url.pathname + url.search);
 }
 
 /** Menentukan sebab kegagalan dari kode status HTTP. */
@@ -182,10 +188,10 @@ export async function minta(jalur, {
       : pengendaliWaktu.signal.aborted ? SEBAB.WAKTU_HABIS
         : SEBAB.TIDAK_TERHUBUNG;
     const pesan = sebab === SEBAB.WAKTU_HABIS
-      ? 'Permintaan melewati batas waktu.'
+      ? 'Request timed out.'
       : sebab === SEBAB.DIBATALKAN
-        ? 'Permintaan dibatalkan.'
-        : 'Backend JakSafe tidak dapat dihubungi.';
+        ? 'Request cancelled.'
+        : 'Unable to reach the JakSafe backend.';
     catat(false, 0, pesan);
     throw new ApiError(pesan, { status: 0, jalur: url, sebab });
   }
@@ -205,7 +211,7 @@ export async function minta(jalur, {
     // menyesatkan, padahal masalahnya backend belum dijalankan. Karena
     // itu keadaan ini digolongkan sebagai tidak terhubung.
     if (tanggapan.status >= 500 && !dariBackend) {
-      const pesanProxy = 'Backend JakSafe tidak dapat dihubungi.';
+      const pesanProxy = 'Unable to reach the JakSafe backend.';
       catat(false, tanggapan.status, pesanProxy);
       throw new ApiError(pesanProxy, {
         status: tanggapan.status,
@@ -214,7 +220,7 @@ export async function minta(jalur, {
       });
     }
 
-    let pesan = `Permintaan gagal dengan status ${tanggapan.status}.`;
+    let pesan = `Request failed with status ${tanggapan.status}.`;
     if (dariBackend) {
       try {
         const isi = await tanggapan.json();

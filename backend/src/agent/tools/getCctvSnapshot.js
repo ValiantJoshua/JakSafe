@@ -50,9 +50,9 @@ export async function getCctvSnapshot(
     return { ok: false, error: 'no camera within radius', cameraFound: false };
   }
 
-  // Skip cameras already marked offline so the agent never wastes 10-30s on dead endpoints
+  // Skip cameras already marked offline or HLS-only cameras without a snapshot url
   const nonOffline = rawCandidates.filter(
-    ({ camera }) => getCameraHealth(camera.id).status !== 'offline'
+    ({ camera }) => Boolean(camera.url) && getCameraHealth(camera.id).status !== 'offline'
   );
   const skippedOfflineCount = rawCandidates.length - nonOffline.length;
   if (!nonOffline.length) {

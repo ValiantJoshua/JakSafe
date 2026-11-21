@@ -51,11 +51,11 @@ import { calculateRouteScore } from './previewScorer.js';
  * mana yang sedang berjalan. Urutannya mengikuti urutan nyata pemanggilan.
  */
 export const TAHAP = [
-  { id: 'rute', nama: 'Menghitung rute jalan' },
-  { id: 'lalulintas', nama: 'Memeriksa arus lalu lintas' },
-  { id: 'udara', nama: 'Membaca kualitas udara' },
-  { id: 'cctv', nama: 'Mencari kamera di sekitar rute' },
-  { id: 'skor', nama: 'Menyusun penilaian dan rekomendasi' },
+  { id: 'rute', nama: 'Calculating road route' },
+  { id: 'lalulintas', nama: 'Checking live traffic flow' },
+  { id: 'udara', nama: 'Sampling air quality (AQI)' },
+  { id: 'cctv', nama: 'Scanning nearby CCTV cameras' },
+  { id: 'skor', nama: 'Scoring & building recommendation' },
 ];
 
 /**
@@ -170,7 +170,7 @@ async function rangkaiPratinjau({
   saatTahap('rute');
   const { routes } = await ambilRute({ asal, tujuan, profil, alternatif: true, signal });
   if (routes.length === 0) {
-    throw new Error('Tidak ada rute yang ditemukan untuk titik tersebut.');
+    throw new Error('No routes were found between those points.');
   }
   const rute = routes[0];
 
@@ -241,7 +241,7 @@ async function rangkaiPratinjau({
     return {
       distanceM: r.distanceM,
       durationS: r.durationS,
-      summary: r.summary || `Jalur Alternatif ${idx + 2}`,
+      summary: r.summary || `Alternative Route ${idx + 2}`,
       usesToll: Boolean(r.usesToll),
       geometry: r.geometry,
       steps: Array.isArray(r.steps) ? r.steps : [],

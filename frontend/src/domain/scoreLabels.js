@@ -47,9 +47,22 @@ export function pitaDariSkor(skor) {
  */
 export function kunciDariLabel(label) {
   const teks = String(label || '').toUpperCase();
-  if (teks === 'AMAN') return 'aman';
-  if (teks === 'HINDARI') return 'hindari';
+  if (teks === 'AMAN' || teks === 'SAFE') return 'aman';
+  if (teks === 'HINDARI' || teks === 'AVOID') return 'hindari';
   return 'hati';
+}
+
+/**
+ * Mengonversi label backend (AMAN / HATI-HATI / HINDARI) ke label tampilan Inggris.
+ *
+ * @param {string} label
+ * @returns {'SAFE'|'CAUTION'|'AVOID'}
+ */
+export function labelSkorInggris(label) {
+  const kunci = kunciDariLabel(label);
+  if (kunci === 'aman') return 'SAFE';
+  if (kunci === 'hindari') return 'AVOID';
+  return 'CAUTION';
 }
 
 /**
@@ -63,9 +76,9 @@ export function kunciDariLabel(label) {
  * @returns {string}
  */
 export function kalimatArti(kunci) {
-  if (kunci === 'aman') return 'Rute ini layak dilewati sekarang.';
-  if (kunci === 'hindari') return 'Sebaiknya cari waktu atau rute lain.';
-  return 'Masih bisa dilewati, tetapi perlu kewaspadaan.';
+  if (kunci === 'aman') return 'This route is clear and safe to take now.';
+  if (kunci === 'hindari') return 'Consider choosing another route or departure time.';
+  return 'Passable right now, but stay cautious along the way.';
 }
 
 /**

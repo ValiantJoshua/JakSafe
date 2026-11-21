@@ -58,6 +58,7 @@ function keKamera(c) {
     rangeM: Number.isFinite(c.rangeM) ? Number(c.rangeM) : null,
     provider: c.provider ?? null,
     hasLiveStream: Boolean(c.hasLiveStream),
+    angles: Array.isArray(c.angles) ? c.angles : [],
     status: c.status === 'online' || c.status === 'offline' ? c.status : 'unknown',
     statusReason: c.statusReason ?? null,
     lastCheckedAt: c.lastCheckedAt ?? null,

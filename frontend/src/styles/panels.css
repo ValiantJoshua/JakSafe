@@ -117,60 +117,232 @@
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 
-/* PROGRES AGEN */
-.progress__head { text-align: center; margin-bottom: var(--s5); }
-.progress__ring {
-  width: 64px; height: 64px; margin: 0 auto var(--s4);
-  border-radius: 50%;
-  background: conic-gradient(var(--jk-blue-1) 0 28%, var(--surface-3) 0 100%);
-  display: grid; place-items: center;
-  animation: spin 1.2s linear infinite;
+/* PROGRES AGEN — Apple-Style Translucent Status Capsule + Shimmer Skeleton */
+.progresswrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
 }
-@keyframes spin { to { transform: rotate(360deg); } }
-.progress__ringcore {
-  width: 52px; height: 52px; border-radius: 50%;
-  background: var(--surface);
-  display: block;
+
+.progresspill {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s4);
+  box-shadow: var(--glass-edge), var(--sh-2);
+}
+
+.progresspill__top {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.progresspill__badge {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--r-pill);
+  background: var(--jk-blue-pale);
+  display: grid;
+  place-items: center;
+}
+
+.progresspill__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--jk-blue-1);
   position: relative;
 }
-.progress__ringcore::after {
-  content: ''; position: absolute; inset: 18px;
+
+.progresspill__dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
   border-radius: 50%;
-  background: var(--jk-lime);
+  border: 1.5px solid var(--jk-blue-1);
+  opacity: 0;
+  animation: pill-pulse 1.8s var(--ease) infinite;
 }
-.progress__title { font-size: var(--fs-md); font-weight: 600; margin-bottom: var(--s1); }
-.progress__sub { font-size: var(--fs-sm); color: var(--text-3); }
 
-.stages { position: relative; padding-left: 36px; }
-.stages::before {
-  content: ''; position: absolute; left: 11px; top: 12px; bottom: 12px;
-  width: 1px; background: var(--border-strong);
+@keyframes pill-pulse {
+  0%   { transform: scale(0.75); opacity: 0.6; }
+  75%  { transform: scale(1.7);  opacity: 0; }
+  100% { transform: scale(1.7);  opacity: 0; }
 }
-.stage { position: relative; display: flex; align-items: center; gap: var(--s3); padding: var(--s3) 0; }
-.stage__bullet {
-  position: absolute; left: -36px;
-  width: 24px; height: 24px; border-radius: 50%;
-  display: grid; place-items: center;
-  background: var(--surface); border: 1.5px solid var(--border-strong);
-  color: var(--text-3); font-size: 11px; font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  transition: background-color var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+
+.progresspill__copy {
+  min-width: 0;
+  flex: 1;
 }
-.stage__name { font-size: var(--fs-sm); font-weight: 500; color: var(--text-3); transition: color var(--dur-2) var(--ease); }
-.stage__time { margin-left: auto; font-size: var(--fs-xs); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--text-3); opacity: 0; transition: opacity var(--dur-2) var(--ease); }
 
-.stage[data-state="done"] .stage__bullet { background: var(--st-aman); border-color: transparent; color: #fff; }
-.stage[data-state="done"] .stage__name { color: var(--text-2); }
-.stage[data-state="done"] .stage__time { opacity: 1; }
-
-.stage[data-state="active"] .stage__bullet {
-  background: var(--jk-blue-1); border-color: transparent; color: #fff;
-  box-shadow: 0 0 0 3px rgba(2, 132, 255, 0.16);
+.progresspill__title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: var(--tr-heading);
+  line-height: var(--lh-tight);
+  color: var(--text-1);
+  margin: 0;
 }
-.stage[data-state="active"] .stage__name { color: var(--text-1); font-weight: 600; }
 
-.stage[data-state="skipped"] .stage__bullet { background: var(--surface-2); border-color: var(--border-strong); }
-.stage[data-state="skipped"] .stage__name { color: var(--text-3); text-decoration: line-through; text-decoration-color: var(--border-strong); }
+.progresspill__sub {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 130ms var(--ease);
+}
+
+.progresspill__sub.is-swapping {
+  opacity: 0.25;
+}
+
+.progresspill__cancel {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 var(--s3);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--tr-micro);
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+
+.progresspill__cancel:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.progresspill__pips {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: var(--s3);
+}
+
+.progresspip {
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  transition: background-color var(--dur-2) var(--ease), opacity var(--dur-2) var(--ease);
+}
+
+.progresspip.is-done {
+  background: var(--st-aman);
+}
+
+.progresspip.is-active {
+  background: var(--jk-blue-1);
+}
+
+/* Kartu Skeleton yang mencerminkan proporsi Route Options & Score Card */
+.skelcard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s4);
+  box-shadow: var(--sh-1);
+}
+
+.skelcard__head {
+  margin-bottom: var(--s3);
+}
+
+.skel--label { display: block; width: 96px; height: 11px; }
+
+.skelroute {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s3) 0;
+}
+
+.skelroute + .skelroute {
+  border-top: 1px solid var(--border);
+}
+
+.skel--num { width: 24px; height: 24px; border-radius: var(--r-sm); flex-shrink: 0; }
+.skelroute__body { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+.skelroute__top { display: flex; align-items: center; gap: var(--s2); }
+.skel--dur { width: 62px; height: 15px; }
+.skel--dur-sm { width: 54px; height: 15px; }
+.skel--eta { width: 58px; height: 12px; }
+.skel--pill { margin-left: auto; width: 78px; height: 18px; border-radius: var(--r-pill); }
+.skel--pill-sm { margin-left: auto; width: 70px; height: 18px; border-radius: var(--r-pill); }
+.skel--via { width: 82%; height: 12px; }
+.skel--via-sm { width: 70%; height: 12px; }
+.skel--meta { width: 56%; height: 11px; }
+.skel--meta-sm { width: 48%; height: 11px; }
+
+.skelcard--score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s5) var(--s4);
+}
+
+.skelscore__ringwrap {
+  display: grid;
+  place-items: center;
+}
+
+.skel--ring {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+}
+
+.skel--badge { width: 84px; height: 22px; border-radius: var(--r-pill); }
+.skel--line-md { width: 72%; height: 12px; }
+
+.skelmetrics {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--s3);
+  margin-top: var(--s1);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+.skelmetric {
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  padding: var(--s3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skel--m-lbl { width: 48px; height: 10px; }
+.skel--m-val { width: 72px; height: 16px; }
+
+[data-theme="kontras"] .progresspill {
+  background: #FFFFFF;
+  border: 2px solid #000000;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .progresspill {
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
 
 /* KARTU SKOR — Flat Technical Circular Meter */
 .scorecard {

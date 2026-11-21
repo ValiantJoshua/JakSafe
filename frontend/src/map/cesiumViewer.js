@@ -72,13 +72,13 @@ let flatTerrainProvider = null;
 let baseImageryLayer = null;
 
 /** @type {'3d'|'2d-road'|'2d-sat'} */
-let currentMode = '3d';
+let currentMode = '2d-road';
 /** @type {'road'|'sat'|'hybrid'|null} */
 let currentImageryStyle = null;
 /** @type {boolean} */
-let buildingsEnabled = true;
+let buildingsEnabled = false;
 /** @type {string} */
-let statusMessage = '3D Peta Jakarta';
+let statusMessage = '2D Standard Map';
 /** @type {number} */
 let lastFogHeight = -1;
 
@@ -538,9 +538,9 @@ export async function setMapViewMode(mode, { fly = true } = {}) {
     const hasBuildings = await ensureCesiumIonBuildings();
     if (hasBuildings && osmBuildingsTileset) {
       osmBuildingsTileset.show = buildingsEnabled;
-      statusMessage = '3D Peta Jakarta';
+      statusMessage = '3D Jakarta Map';
     } else {
-      statusMessage = '3D Globe Standar';
+      statusMessage = 'Standard 3D Globe';
     }
   } else if (mode === '2d-sat') {
     // Mode 2D Satelit: Kunci kemiringan kamera (kamera murni tegak lurus dari atas / top-down)
@@ -550,7 +550,7 @@ export async function setMapViewMode(mode, { fly = true } = {}) {
     if (osmBuildingsTileset) osmBuildingsTileset.show = false;
     viewerInstance.scene.globe.show = true;
     await applyGlobeImagery('hybrid');
-    statusMessage = '2D Satelit';
+    statusMessage = '2D Satellite';
   } else {
     // Mode 2D Peta Normal: Kunci kemiringan kamera (kamera murni tegak lurus dari atas / top-down)
     controller.enableTilt = false;
@@ -559,7 +559,7 @@ export async function setMapViewMode(mode, { fly = true } = {}) {
     if (osmBuildingsTileset) osmBuildingsTileset.show = false;
     viewerInstance.scene.globe.show = true;
     await applyGlobeImagery('road');
-    statusMessage = '2D Peta Normal';
+    statusMessage = '2D Standard Map';
   }
 
   // Nada basemap diterapkan setelah status gedung 3D pasti (redup hanya di 3D + gedung aktif)
@@ -815,15 +815,15 @@ export async function initCesiumViewer(containerOrId = 'mapCanvas') {
 
   const jkt = CAMERA_PRESETS.jakarta;
   viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(jkt.lon, jkt.lat - 0.010, jkt.height3d),
+    destination: Cesium.Cartesian3.fromDegrees(jkt.lon, jkt.lat, jkt.height2d),
     orientation: {
-      heading: Cesium.Math.toRadians(jkt.headingDeg),
-      pitch: Cesium.Math.toRadians(jkt.pitch3dDeg),
+      heading: 0,
+      pitch: Cesium.Math.toRadians(-89.9),
       roll: 0,
     },
   });
 
-  await setMapViewMode('3d', { fly: false });
+  await setMapViewMode('2d-road', { fly: false });
 
   return viewer;
 }

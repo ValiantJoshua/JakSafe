@@ -764,6 +764,50 @@
   background: #4ADE80;
 }
 
+.mapcctv__angles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.mapcctv__angle {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
+}
+
+.mapcctv__angle:hover {
+  background: var(--surface-3, #e2e8f0);
+}
+
+.mapcctv__angle[data-active="1"] {
+  background: var(--jk-navy, #0f172a);
+  border-color: transparent;
+  color: #FFFFFF;
+}
+
+[data-theme="gelap"] .mapcctv__angle {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #E2E8F0;
+}
+
+[data-theme="gelap"] .mapcctv__angle[data-active="1"] {
+  background: #FFFFFF;
+  color: #0F172A;
+}
+
 .mapcctv__tabbtn {
   margin-left: auto;
   display: inline-flex;

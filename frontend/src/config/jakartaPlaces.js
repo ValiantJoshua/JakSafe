@@ -7,6 +7,8 @@
    yaitu fungsi toCoordParam pada src/utils/geo.js.
 */
 
+import { minta } from '../api/httpClient.js';
+
 /**
  * @typedef {object} Tempat
  * @property {string} id            pengenal pendek, dipakai sebagai kunci daftar
@@ -198,55 +200,44 @@ export async function searchPlacesLive(teks, maks = 7, signal) {
     return localHits;
   }
 
-  const timeoutCtrl = new AbortController();
-  const timer = setTimeout(() => timeoutCtrl.abort(), 5000);
-  const onAbort = () => timeoutCtrl.abort();
-  if (signal) {
-    if (signal.aborted) {
-      clearTimeout(timer);
-      return localHits;
-    }
-    signal.addEventListener('abort', onAbort, { once: true });
+  if (signal?.aborted) {
+    return localHits;
   }
 
   try {
-    const res = await fetch(`/api/geocode?q=${encodeURIComponent(kunci)}`, {
-      signal: timeoutCtrl.signal,
+    const data = await minta('/geocode', {
+      kueri: { q: kunci },
+      timeoutMs: 5000,
+      signal,
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.ok && Array.isArray(data.places) && data.places.length > 0) {
-        const normalizedPlaces = data.places.map((p) => ({
-          ...p,
-          nama: p.headline || p.nama || '',
-          area: p.subtitle || p.area || '',
-          headline: p.headline || p.nama || '',
-          subtitle: p.subtitle || p.area || '',
-        }));
-        normalizedPlaces.forEach((p) => registerCustomPlace(p));
+    if (data?.ok && Array.isArray(data.places) && data.places.length > 0) {
+      const normalizedPlaces = data.places.map((p) => ({
+        ...p,
+        nama: p.headline || p.nama || '',
+        area: p.subtitle || p.area || '',
+        headline: p.headline || p.nama || '',
+        subtitle: p.subtitle || p.area || '',
+      }));
+      normalizedPlaces.forEach((p) => registerCustomPlace(p));
 
-        const hasil = [...normalizedPlaces];
-        for (const loc of localHits) {
-          if (!hasil.some((h) => h.nama.toLowerCase() === loc.nama.toLowerCase())) {
-            hasil.push(loc);
-          }
+      const hasil = [...normalizedPlaces];
+      for (const loc of localHits) {
+        if (!hasil.some((h) => h.nama.toLowerCase() === loc.nama.toLowerCase())) {
+          hasil.push(loc);
         }
-        const finalHits = hasil.slice(0, maks);
-        clientGeocodeCache.set(cacheKey, finalHits);
-        if (clientGeocodeCache.size > MAX_CLIENT_CACHE) {
-          const firstKey = clientGeocodeCache.keys().next().value;
-          clientGeocodeCache.delete(firstKey);
-        }
-        return finalHits;
       }
+      const finalHits = hasil.slice(0, maks);
+      clientGeocodeCache.set(cacheKey, finalHits);
+      if (clientGeocodeCache.size > MAX_CLIENT_CACHE) {
+        const firstKey = clientGeocodeCache.keys().next().value;
+        clientGeocodeCache.delete(firstKey);
+      }
+      return finalHits;
     }
   } catch (err) {
-    if (err?.name !== 'AbortError') {
+    if (err?.name !== 'AbortError' && err?.sebab !== 'dibatalkan') {
       console.warn('[searchPlacesLive] Fallback ke katalog lokal:', err.message);
     }
-  } finally {
-    clearTimeout(timer);
-    if (signal) signal.removeEventListener('abort', onAbort);
   }
 
   return localHits;
@@ -260,21 +251,21 @@ export async function searchPlacesLive(teks, maks = 7, signal) {
  */
 export async function reverseGeocodeLive(lat, lon) {
   try {
-    const res = await fetch(`/api/geocode/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
-    if (res.ok) {
-      const data = await res.json();
-      const rawPlace = data.place || data;
-      if (rawPlace && rawPlace.id) {
-        const place = {
-          ...rawPlace,
-          nama: rawPlace.headline || rawPlace.nama || `Lokasi Saya (${lat.toFixed(4)}, ${lon.toFixed(4)})`,
-          area: rawPlace.subtitle || rawPlace.area || 'Titik GPS Saat Ini',
-          lat: Number(rawPlace.lat ?? lat),
-          lon: Number(rawPlace.lon ?? lon),
-        };
-        registerCustomPlace(place);
-        return place;
-      }
+    const data = await minta('/geocode/reverse', {
+      kueri: { lat, lon },
+      timeoutMs: 6000,
+    });
+    const rawPlace = data?.place || data;
+    if (rawPlace && rawPlace.id) {
+      const place = {
+        ...rawPlace,
+        nama: rawPlace.headline || rawPlace.nama || `Lokasi Saya (${lat.toFixed(4)}, ${lon.toFixed(4)})`,
+        area: rawPlace.subtitle || rawPlace.area || 'Titik GPS Saat Ini',
+        lat: Number(rawPlace.lat ?? lat),
+        lon: Number(rawPlace.lon ?? lon),
+      };
+      registerCustomPlace(place);
+      return place;
     }
   } catch (err) {
     console.warn('[reverseGeocodeLive] Fallback koordinat GPS:', err.message);

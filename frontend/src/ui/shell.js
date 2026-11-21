@@ -26,10 +26,10 @@ ${spriteIkon()}
   ${templateTopbar()}
 
   <div class="workspace" id="workspace" data-sidebar="open" data-sheet="half">
-    <aside class="sidepanel" id="sidePanel" aria-label="Panel navigasi rute">
+    <aside class="sidepanel" id="sidePanel" aria-label="Route navigation panel">
       <!-- Handle Tarik Sheet untuk Layar Sentuh / Mobile (Apple Fluid Sheet) -->
       <div class="sidepanel__grabber" id="sheetGrabber" role="separator"
-           aria-orientation="horizontal" aria-label="Geser panel ke atas atau ke bawah" tabindex="0">
+           aria-orientation="horizontal" aria-label="Drag panel up or down" tabindex="0">
         <span class="sidepanel__pill" aria-hidden="true"></span>
       </div>
 
@@ -42,8 +42,8 @@ ${spriteIkon()}
 
       <!-- Tab Lipat/Buka Panel Samping ala Google Maps -->
       <button type="button" class="sidepanel__tab" id="btnSidebarTab"
-              aria-label="Sembunyikan atau tampilkan panel rute"
-              title="Sembunyikan / Tampilkan Panel">
+              aria-label="Hide or show route panel"
+              title="Toggle Side Panel">
         ${ikon('i-chev', 16, 'sidepanel__tabicon')}
       </button>
     </aside>

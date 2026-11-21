@@ -35,7 +35,7 @@ export function catalogPath() {
     : DEFAULT_PATH;
 }
 
-const ALLOWED_CATALOG_PORTS = new Set(['', '80', '443', '8080', '8443']);
+const ALLOWED_CATALOG_PORTS = new Set(['', '80', '443', '7028', '8080', '8443', '8989', '20443']);
 
 function isBlockedHostLiteral(host) {
   const clean = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
@@ -74,9 +74,11 @@ function isSafeHttpUrl(urlStr) {
 }
 
 function isValid(c) {
+  const hasImageUrl = typeof c?.url === 'string' && isSafeHttpUrl(c.url);
+  const hasHlsUrl = typeof c?.hlsUrl === 'string' && isSafeHttpUrl(c.hlsUrl);
   return c && typeof c.id === 'string' && c.id.trim().length > 0
     && typeof c.name === 'string' && c.name.trim().length > 0
-    && typeof c.url === 'string' && /^https?:\/\//i.test(c.url)
+    && (hasImageUrl || hasHlsUrl)
     && Number.isFinite(Number(c.lat)) && Number.isFinite(Number(c.lon))
     && Math.abs(Number(c.lat)) <= 90 && Math.abs(Number(c.lon)) <= 180;
 }
@@ -198,7 +200,25 @@ export function loadCatalog({ includeDisabled = false } = {}) {
 }
 
 export function getCameraById(id, { includeDisabled = false } = {}) {
-  return loadCatalog({ includeDisabled }).find((c) => c.id === id) || null;
+  const list = loadCatalog({ includeDisabled });
+  const direct = list.find((c) => c.id === id);
+  if (direct) return direct;
+
+  for (const parent of list) {
+    if (!Array.isArray(parent.angles)) continue;
+    const ang = parent.angles.find((a) => a.id === id);
+    if (ang) {
+      return {
+        ...parent,
+        id: ang.id,
+        name: `${parent.name} (${ang.label})`,
+        url: ang.url ?? '',
+        hlsUrl: ang.hlsUrl ?? null,
+        feedType: ang.url ? 'image' : 'hls',
+      };
+    }
+  }
+  return null;
 }
 
 /** Haversine distance in meters. */
@@ -236,6 +256,13 @@ export function publicView(c) {
     rangeM: c.rangeM ?? null,
     feedType: c.feedType,
     hasLiveStream: Boolean(c.hlsUrl),
+    angles: Array.isArray(c.angles) && c.angles.length > 1
+      ? c.angles.map((a) => ({
+          id: a.id,
+          label: a.label,
+          hasLiveStream: Boolean(a.hlsUrl),
+        }))
+      : undefined,
     license: c.license ?? null,
   };
 }

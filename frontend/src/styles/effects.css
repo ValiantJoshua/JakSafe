@@ -73,7 +73,7 @@
     transform: none !important;
   }
   .skeleton,
-  .progress__ring,
+  .progresspill__dot::after,
   .mapcctv__spinner {
     animation: none !important;
   }
