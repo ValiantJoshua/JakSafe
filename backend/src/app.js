@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import routeRouter from './routes/route.js';
 import aqiRouter from './routes/aqi.js';
+import weatherRouter from './routes/weather.js';
 import cctvRouter from './routes/cctv.js';
 import tomtomRouter from './routes/tomtom.js';
 import navigateRouter from './routes/navigate.js';
@@ -117,6 +118,7 @@ export function createApp(options = {}) {
 
   app.use('/api/route', routeRouter);
   app.use('/api/aqi', aqiRouter);
+  app.use('/api/weather', weatherRouter);
   app.use('/api/cctv', cctvRouter);
   app.use('/api/tomtom', tomtomRouter);
   app.use('/api/navigate', navigateRouter);

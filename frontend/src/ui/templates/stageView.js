@@ -38,6 +38,17 @@ export function templateStage() {
           <span>Satellite</span>
         </button>
       </div>
+
+      <!-- Always-On Compact Weather Pill (Hybrid BMKG + Open-Meteo Fallback) -->
+      <div class="weatherpill-wrap" id="weatherPillWrap">
+        <button type="button" class="weatherpill press" id="btnWeatherPill" aria-expanded="false" aria-controls="weatherPopover" title="Live weather & temperature">
+          <span class="weatherpill__icon" id="weatherPillIcon" aria-hidden="true"></span>
+          <span class="weatherpill__temp" id="weatherPillTemp">—°</span>
+          <span class="weatherpill__sep" aria-hidden="true">·</span>
+          <span class="weatherpill__place" id="weatherPillPlace">Jakarta</span>
+        </button>
+        <div class="weatherpop" id="weatherPopover" role="dialog" aria-label="Map area weather details" hidden></div>
+      </div>
     </div>
   </div>
 

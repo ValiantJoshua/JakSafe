@@ -50,6 +50,7 @@ import {
   updateRouteAqiOnMap,
 } from './aqiLayer.js';
 import { initMapPicker } from './mapPicker.js';
+import { initWeatherPill } from './weatherPill.js';
 
 /** Memperbarui tampilan tombol pemilih mode 3D / 2D Peta / Satelit. */
 function sinkronkanTombolMode(mode, buildingsEnabled) {
@@ -483,6 +484,7 @@ export async function pasangPengendaliPeta() {
     initAqiLayer(),
     initMapPicker(viewer),
   ]);
+  initWeatherPill();
 
   const awal = getState();
   if (!awal.hasil && (awal.idAsal || awal.idTujuan)) {

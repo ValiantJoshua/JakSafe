@@ -1,0 +1,389 @@
+[
+  {
+    "adm4": "31.71.01.1001",
+    "desa": "Gambir",
+    "kecamatan": "Gambir",
+    "kotkab": "Jakarta Pusat",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.17638,
+    "lon": 106.82671
+  },
+  {
+    "adm4": "31.73.08.1001",
+    "desa": "Kembangan Utara",
+    "kecamatan": "Kembangan",
+    "kotkab": "Jakarta Barat",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.17232,
+    "lon": 106.74251
+  },
+  {
+    "adm4": "31.74.01.1001",
+    "desa": "Tebet Timur",
+    "kecamatan": "Tebet",
+    "kotkab": "Jakarta Selatan",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.23382,
+    "lon": 106.85552
+  },
+  {
+    "adm4": "31.74.02.1001",
+    "desa": "Setia Budi",
+    "kecamatan": "Setiabudi",
+    "kotkab": "Jakarta Selatan",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.20742,
+    "lon": 106.82584
+  },
+  {
+    "adm4": "31.74.04.1001",
+    "desa": "Pasar Minggu",
+    "kecamatan": "Pasar Minggu",
+    "kotkab": "Jakarta Selatan",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.28992,
+    "lon": 106.83936
+  },
+  {
+    "adm4": "31.74.05.1001",
+    "desa": "Kebayoran Lama Utara",
+    "kecamatan": "Kebayoran Lama",
+    "kotkab": "Jakarta Selatan",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.24614,
+    "lon": 106.77685
+  },
+  {
+    "adm4": "31.74.06.1001",
+    "desa": "Cilandak Barat",
+    "kecamatan": "Cilandak",
+    "kotkab": "Jakarta Selatan",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.29051,
+    "lon": 106.79716
+  },
+  {
+    "adm4": "31.74.07.1001",
+    "desa": "Melawai",
+    "kecamatan": "Kebayoran Baru",
+    "kotkab": "Jakarta Selatan",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.24559,
+    "lon": 106.80225
+  },
+  {
+    "adm4": "31.74.09.1001",
+    "desa": "Jagakarsa",
+    "kecamatan": "Jagakarsa",
+    "kotkab": "Jakarta Selatan",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.32537,
+    "lon": 106.81925
+  },
+  {
+    "adm4": "31.75.02.1001",
+    "desa": "Pulo Gadung",
+    "kecamatan": "Pulogadung",
+    "kotkab": "Jakarta Timur",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.18299,
+    "lon": 106.8989
+  },
+  {
+    "adm4": "31.75.03.1001",
+    "desa": "Kampung Melayu",
+    "kecamatan": "Jatinegara",
+    "kotkab": "Jakarta Timur",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.21738,
+    "lon": 106.86128
+  },
+  {
+    "adm4": "31.75.04.1001",
+    "desa": "Kramatjati",
+    "kecamatan": "Kramatjati",
+    "kotkab": "Jakarta Timur",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.27411,
+    "lon": 106.87071
+  },
+  {
+    "adm4": "31.75.06.1001",
+    "desa": "Jatinegara",
+    "kecamatan": "Cakung",
+    "kotkab": "Jakarta Timur",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.20345,
+    "lon": 106.91605
+  },
+  {
+    "adm4": "31.75.07.1001",
+    "desa": "Duren Sawit",
+    "kecamatan": "Duren Sawit",
+    "kotkab": "Jakarta Timur",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.23328,
+    "lon": 106.91572
+  },
+  {
+    "adm4": "31.75.09.1001",
+    "desa": "Ciracas",
+    "kecamatan": "Ciracas",
+    "kotkab": "Jakarta Timur",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.32606,
+    "lon": 106.87532
+  },
+  {
+    "adm4": "31.75.10.1001",
+    "desa": "Cipayung",
+    "kecamatan": "Cipayung",
+    "kotkab": "Jakarta Timur",
+    "provinsi": "DKI Jakarta",
+    "lat": -6.32906,
+    "lon": 106.8939
+  },
+  {
+    "adm4": "32.75.01.1001",
+    "desa": "Bekasijaya",
+    "kecamatan": "Bekasi Timur",
+    "kotkab": "Kota Bekasi",
+    "provinsi": "Jawa Barat",
+    "lat": -6.23336,
+    "lon": 107.01356
+  },
+  {
+    "adm4": "32.75.02.1001",
+    "desa": "Bintara",
+    "kecamatan": "Bekasi Barat",
+    "kotkab": "Kota Bekasi",
+    "provinsi": "Jawa Barat",
+    "lat": -6.22668,
+    "lon": 106.9585
+  },
+  {
+    "adm4": "32.75.03.1001",
+    "desa": "Kaliabang Tengah",
+    "kecamatan": "Bekasi Utara",
+    "kotkab": "Kota Bekasi",
+    "provinsi": "Jawa Barat",
+    "lat": -6.19004,
+    "lon": 107.00371
+  },
+  {
+    "adm4": "32.75.04.1001",
+    "desa": "Pekayonjaya",
+    "kecamatan": "Bekasi Selatan",
+    "kotkab": "Kota Bekasi",
+    "provinsi": "Jawa Barat",
+    "lat": -6.25847,
+    "lon": 106.98215
+  },
+  {
+    "adm4": "32.75.08.1001",
+    "desa": "Jatiwaringin",
+    "kecamatan": "Pondokgede",
+    "kotkab": "Kota Bekasi",
+    "provinsi": "Jawa Barat",
+    "lat": -6.27529,
+    "lon": 106.91715
+  },
+  {
+    "adm4": "32.75.09.1001",
+    "desa": "Jatimekar",
+    "kecamatan": "Jatiasih",
+    "kotkab": "Kota Bekasi",
+    "provinsi": "Jawa Barat",
+    "lat": -6.29583,
+    "lon": 106.94792
+  },
+  {
+    "adm4": "32.76.03.1001",
+    "desa": "Pasir Putih",
+    "kecamatan": "Sawangan",
+    "kotkab": "Kota Depok",
+    "provinsi": "Jawa Barat",
+    "lat": -6.42435,
+    "lon": 106.78121
+  },
+  {
+    "adm4": "32.76.05.1001",
+    "desa": "Sukmajaya",
+    "kecamatan": "Sukmajaya",
+    "kotkab": "Kota Depok",
+    "provinsi": "Jawa Barat",
+    "lat": -6.41423,
+    "lon": 106.83995
+  },
+  {
+    "adm4": "32.76.06.1001",
+    "desa": "Beji",
+    "kecamatan": "Beji",
+    "kotkab": "Kota Depok",
+    "provinsi": "Jawa Barat",
+    "lat": -6.38277,
+    "lon": 106.81404
+  },
+  {
+    "adm4": "32.76.09.1001",
+    "desa": "Cinere",
+    "kecamatan": "Cinere",
+    "kotkab": "Kota Depok",
+    "provinsi": "Jawa Barat",
+    "lat": -6.33609,
+    "lon": 106.78143
+  },
+  {
+    "adm4": "32.71.01.1001",
+    "desa": "Batu Tulis",
+    "kecamatan": "Bogor Selatan",
+    "kotkab": "Kota Bogor",
+    "provinsi": "Jawa Barat",
+    "lat": -6.62161,
+    "lon": 106.80873
+  },
+  {
+    "adm4": "32.71.03.1001",
+    "desa": "Gudang",
+    "kecamatan": "Bogor Tengah",
+    "kotkab": "Kota Bogor",
+    "provinsi": "Jawa Barat",
+    "lat": -6.60715,
+    "lon": 106.79993
+  },
+  {
+    "adm4": "32.71.04.1001",
+    "desa": "Menteng",
+    "kecamatan": "Bogor Barat",
+    "kotkab": "Kota Bogor",
+    "provinsi": "Jawa Barat",
+    "lat": -6.58117,
+    "lon": 106.78088
+  },
+  {
+    "adm4": "32.71.06.1001",
+    "desa": "Tanah Sareal",
+    "kecamatan": "Tanah Sareal",
+    "kotkab": "Kota Bogor",
+    "provinsi": "Jawa Barat",
+    "lat": -6.57251,
+    "lon": 106.80131
+  },
+  {
+    "adm4": "36.71.01.1001",
+    "desa": "Sukarasa",
+    "kecamatan": "Tangerang",
+    "kotkab": "Kota Tangerang",
+    "provinsi": "Banten",
+    "lat": -6.17288,
+    "lon": 106.63185
+  },
+  {
+    "adm4": "36.71.04.1001",
+    "desa": "Belendung",
+    "kecamatan": "Benda",
+    "kotkab": "Kota Tangerang",
+    "provinsi": "Banten",
+    "lat": -6.1449,
+    "lon": 106.66323
+  },
+  {
+    "adm4": "36.71.05.1001",
+    "desa": "Cipondoh",
+    "kecamatan": "Cipondoh",
+    "kotkab": "Kota Tangerang",
+    "provinsi": "Banten",
+    "lat": -6.192,
+    "lon": 106.67689
+  },
+  {
+    "adm4": "36.71.06.1001",
+    "desa": "Paninggilan",
+    "kecamatan": "Ciledug",
+    "kotkab": "Kota Tangerang",
+    "provinsi": "Banten",
+    "lat": -6.24709,
+    "lon": 106.7132
+  },
+  {
+    "adm4": "36.71.07.1001",
+    "desa": "Karawaci",
+    "kecamatan": "Karawaci",
+    "kotkab": "Kota Tangerang",
+    "provinsi": "Banten",
+    "lat": -6.18994,
+    "lon": 106.62483
+  },
+  {
+    "adm4": "36.74.01.1001",
+    "desa": "Ciater",
+    "kecamatan": "Serpong",
+    "kotkab": "Kota Tangerang Selatan",
+    "provinsi": "Banten",
+    "lat": -6.32231,
+    "lon": 106.69429
+  },
+  {
+    "adm4": "36.74.03.1001",
+    "desa": "Pondok Betung",
+    "kecamatan": "Pondok Aren",
+    "kotkab": "Kota Tangerang Selatan",
+    "provinsi": "Banten",
+    "lat": -6.26324,
+    "lon": 106.74917
+  },
+  {
+    "adm4": "36.74.04.1001",
+    "desa": "Sawah Baru",
+    "kecamatan": "Ciputat",
+    "kotkab": "Kota Tangerang Selatan",
+    "provinsi": "Banten",
+    "lat": -6.29301,
+    "lon": 106.72186
+  },
+  {
+    "adm4": "36.74.06.1001",
+    "desa": "Pamulang Barat",
+    "kecamatan": "Pamulang",
+    "kotkab": "Kota Tangerang Selatan",
+    "provinsi": "Banten",
+    "lat": -6.34354,
+    "lon": 106.73404
+  },
+  {
+    "adm4": "32.16.06.1001",
+    "desa": "Jatimulya",
+    "kecamatan": "Tambun Selatan",
+    "kotkab": "Bekasi",
+    "provinsi": "Jawa Barat",
+    "lat": -6.26712,
+    "lon": 107.0291
+  },
+  {
+    "adm4": "32.16.07.1001",
+    "desa": "Wanasari",
+    "kecamatan": "Cibitung",
+    "kotkab": "Bekasi",
+    "provinsi": "Jawa Barat",
+    "lat": -6.24698,
+    "lon": 107.08826
+  },
+  {
+    "adm4": "32.01.01.1001",
+    "desa": "Pondok Rajeg",
+    "kecamatan": "Cibinong",
+    "kotkab": "Bogor",
+    "provinsi": "Jawa Barat",
+    "lat": -6.4563,
+    "lon": 106.81988
+  },
+  {
+    "adm4": "36.03.28.1001",
+    "desa": "Kelapa Dua",
+    "kecamatan": "Kelapa Dua",
+    "kotkab": "Tangerang",
+    "provinsi": "Banten",
+    "lat": -6.23608,
+    "lon": 106.61427
+  }
+]

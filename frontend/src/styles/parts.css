@@ -470,6 +470,250 @@
   color: var(--jk-blue-1);
 }
 
+/* Always-On Compact Weather Pill & Popover (Apple Maps Frosted Style) */
+.weatherpill-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.weatherpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 11px;
+  border-radius: var(--r-sm);
+  background: var(--glass-bg, var(--surface));
+  backdrop-filter: var(--glass-blur, none);
+  -webkit-backdrop-filter: var(--glass-blur, none);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: var(--glass-edge, none), 0 6px 20px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+  color: var(--text-1);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), transform 100ms ease-out;
+}
+
+.weatherpill:active {
+  transform: scale(0.97);
+}
+
+.weatherpill:hover {
+  border-color: rgba(15, 23, 42, 0.16);
+}
+
+.weatherpill__icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--jk-blue-1);
+}
+
+.weatherpill[data-rain="1"] {
+  border-color: rgba(2, 132, 255, 0.32);
+}
+
+.weatherpill[data-rain="1"] .weatherpill__icon {
+  color: var(--jk-blue-1);
+}
+
+.weatherpill__temp {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.weatherpill__sep {
+  color: var(--text-3);
+}
+
+.weatherpill__place {
+  color: var(--text-2);
+  font-weight: 500;
+  max-width: 128px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme="gelap"] .weatherpill {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: var(--glass-edge), 0 8px 24px rgba(0, 0, 0, 0.32), 0 1px 3px rgba(0, 0, 0, 0.18);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+[data-theme="gelap"] .weatherpill:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+[data-theme="gelap"] .weatherpill__icon {
+  color: #7DD3FC;
+}
+
+[data-theme="gelap"] .weatherpill__place {
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.weatherpop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: calc(var(--z-mapctrl) + 6);
+  width: 268px;
+  padding: 13px 14px;
+  border-radius: var(--r-lg);
+  background: var(--glass-bg, var(--surface));
+  backdrop-filter: var(--glass-blur, none);
+  -webkit-backdrop-filter: var(--glass-blur, none);
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  box-shadow: var(--glass-edge, none), 0 12px 32px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+  transform-origin: top left;
+  animation: weatherPopIn 180ms var(--ease) both;
+}
+
+[data-theme="gelap"] .weatherpop {
+  background: rgba(14, 22, 38, 0.84);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: var(--glass-edge), 0 14px 36px rgba(0, 0, 0, 0.45);
+}
+
+@keyframes weatherPopIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weatherpop { animation: none; }
+}
+
+.weatherpop__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.weatherpop__area {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.25;
+}
+
+.weatherpop__cond {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+.weatherpop__src {
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--jk-blue-pale);
+  color: var(--jk-blue-2);
+  flex-shrink: 0;
+}
+
+[data-theme="gelap"] .weatherpop__src {
+  background: rgba(59, 130, 246, 0.22);
+  color: #7DD3FC;
+}
+
+.weatherpop__hero {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.weatherpop__hero-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.weatherpop__icon {
+  display: inline-flex;
+  color: var(--jk-blue-1);
+}
+
+[data-theme="gelap"] .weatherpop__icon {
+  color: #7DD3FC;
+}
+
+.weatherpop__temp {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.028em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+  line-height: 1;
+}
+
+.weatherpop__feels {
+  font-size: 11px;
+  color: var(--text-2);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.weatherpop__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.weatherpop__metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 3px;
+  padding: 8px 9px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+[data-theme="gelap"] .weatherpop__metric {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.weatherpop__mlabel {
+  font-size: 10px;
+  letter-spacing: 0.012em;
+  color: var(--text-3);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.weatherpop__mval {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.weatherpop__foot {
+  margin-top: 9px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--text-3);
+  line-height: 1.35;
+}
+
 /* Dock Sakelar Layer ON / OFF (Traffic, CCTV, Gedung 3D, Udara) */
 .maplayer-dock {
   display: inline-flex;
