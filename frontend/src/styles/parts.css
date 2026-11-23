@@ -957,113 +957,239 @@
 
 .mapcctv__actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mapcctv__utils {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
 
 .mapcctv__btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 6px 11px;
-  border-radius: var(--r-xs);
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text-1);
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
+  transition: background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform 100ms ease-out, box-shadow var(--dur-1) var(--ease);
+}
+
+.mapcctv__btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .mapcctv__btn:hover:not(:disabled) {
-  background: var(--surface-hover);
+  background: var(--surface-hover, var(--surface-3));
   border-color: var(--border-strong);
 }
 
 [data-theme="gelap"] .mapcctv__btn {
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.14);
-  color: #E2E8F0;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 [data-theme="gelap"] .mapcctv__btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.20);
   color: #FFFFFF;
 }
 
 .mapcctv__btn--primary {
+  width: 100%;
+  height: 34px;
   background: var(--jk-blue-1);
   border-color: transparent;
   color: #FFFFFF;
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20), 0 1px 2px rgba(2, 132, 255, 0.22);
 }
 
 .mapcctv__btn--primary:hover:not(:disabled) {
-  background: #0066CC;
+  background: var(--jk-blue-2);
+  border-color: transparent;
   color: #FFFFFF;
 }
 
 .mapcctv__btn:disabled {
-  opacity: 0.6;
+  opacity: 0.65;
   cursor: wait;
 }
 
+.mapcctv__btnspin,
+.mapcctv__aispin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  display: inline-block;
+  flex-shrink: 0;
+  animation: spin 0.75s linear infinite;
+}
+
+/* Kartu Hasil AI Vision (Apple Health / Weather Card Style) */
 .mapcctv__aibox {
-  margin-top: 12px;
+  margin-top: 10px;
   padding: 12px;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--jk-blue-1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   font-size: 12px;
+  animation: mapcctvAiReveal 220ms var(--ease) both;
 }
 
 [data-theme="gelap"] .mapcctv__aibox {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.12);
-  border-left-color: var(--jk-blue-1);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@keyframes mapcctvAiReveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapcctv__aibox { animation: none; }
+}
+
+.mapcctv__ailoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 0;
 }
 
 .mapcctv__loading { color: var(--text-2); font-size: 11.5px; }
-.mapcctv__err { color: #DC2626; font-weight: 600; font-size: 11.5px; }
+.mapcctv__err { color: var(--st-hindari); font-weight: 600; font-size: 11.5px; }
 
 .mapcctv__ai {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.mapcctv__airow {
+.mapcctv__aihead {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--s2);
-  color: var(--text-2);
-  font-size: 11.5px;
+  gap: 8px;
 }
 
-.mapcctv__airow strong {
-  color: var(--text-1);
+.mapcctv__aititle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-2);
 }
 
-[data-theme="gelap"] .mapcctv__airow strong {
-  color: #FFFFFF;
+.mapcctv__aititle svg {
+  color: var(--jk-blue-1);
 }
+
+.mapcctv__aiconf {
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="gelap"] .mapcctv__aiconf {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.mapcctv__aimetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mapcctv__aimetric {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+[data-theme="gelap"] .mapcctv__aimetric {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.mapcctv__ailabel {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.mapcctv__aival {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mapcctv__aival strong {
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mapcctv__aidot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--st-aman);
+}
+
+.mapcctv__aival[data-tone="safe"] .mapcctv__aidot   { background: var(--st-aman); }
+.mapcctv__aival[data-tone="warn"] .mapcctv__aidot   { background: var(--st-hati); }
+.mapcctv__aival[data-tone="danger"] .mapcctv__aidot { background: var(--st-hindari); }
 
 .mapcctv__aireason {
-  margin-top: 6px;
-  padding-top: 6px;
+  margin: 0;
+  padding-top: 8px;
   border-top: 1px solid var(--border);
   color: var(--text-2);
-  font-size: 11px;
-  line-height: 1.45;
-  font-style: italic;
+  font-size: 11.5px;
+  line-height: 1.5;
+  font-style: normal;
 }
 
 [data-theme="gelap"] .mapcctv__aireason {
-  border-top-color: rgba(255, 255, 255, 0.12);
-  color: #CBD5E1;
+  border-top-color: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.74);
 }
 
 /* Penyesuaian tema kontras. */
