@@ -137,16 +137,18 @@ export function templateStage() {
     <div class="mapcctv__angles" id="mapCctvAngles" role="group" aria-label="Camera angles at this location" hidden></div>
 
     <div class="mapcctv__actions">
-      <button type="button" class="mapcctv__btn" id="btnMapCctvFly" title="Fly 3D camera to this CCTV viewpoint">
-        ${ikon('i-locate', 13)} 3D View
-      </button>
-      <button type="button" class="mapcctv__btn" id="btnMapCctvFullscreen" title="Watch in fullscreen">
-        Fullscreen
-      </button>
-      <button type="button" class="mapcctv__btn" id="btnMapCctvRefresh" title="Reload live feed">
-        Refresh
-      </button>
-      <button type="button" class="mapcctv__btn mapcctv__btn--primary" id="btnMapCctvAnalyze" title="Analyze road & flood conditions with Gemini Vision">
+      <div class="mapcctv__utils">
+        <button type="button" class="mapcctv__btn press" id="btnMapCctvFly" title="Fly 3D camera to this CCTV viewpoint">
+          ${ikon('i-locate', 13)} 3D View
+        </button>
+        <button type="button" class="mapcctv__btn press" id="btnMapCctvFullscreen" title="Watch in fullscreen">
+          Fullscreen
+        </button>
+        <button type="button" class="mapcctv__btn press" id="btnMapCctvRefresh" title="Reload live feed">
+          Refresh
+        </button>
+      </div>
+      <button type="button" class="mapcctv__btn mapcctv__btn--primary press" id="btnMapCctvAnalyze" title="Analyze road & flood conditions with Gemini Vision">
         ${ikon('i-spark', 13)} AI Analysis
       </button>
     </div>

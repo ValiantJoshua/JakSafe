@@ -866,28 +866,64 @@ function pasangTombolPopupKamera() {
 
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Analyzing image with Gemini...';
+      btn.innerHTML = '<span class="mapcctv__btnspin" aria-hidden="true"></span> Analyzing frame...';
     }
     aiBox.hidden = false;
-    aiBox.innerHTML = '<p class="mapcctv__loading">Fetching CCTV frame & running Gemini Vision...</p>';
+    aiBox.innerHTML = `
+      <div class="mapcctv__ailoading" role="status" aria-live="polite">
+        <span class="mapcctv__aispin" aria-hidden="true"></span>
+        <span>Analyzing live frame with Gemini Vision...</span>
+      </div>
+    `;
 
     try {
       const res = await analisisKamera(cam.id);
       const a = res.analysis;
       if (!a) {
-        aiBox.innerHTML = '<p class="mapcctv__err">Empty analysis result.</p>';
+        aiBox.innerHTML = '<p class="mapcctv__err">No analysis result returned.</p>';
       } else {
+        const floodSeverity = String(a.tingkat_genangan || '').toLowerCase();
+        const floodTone = !a.genangan_air
+          ? 'safe'
+          : (floodSeverity.includes('tinggi') || floodSeverity.includes('berat') || floodSeverity.includes('parah'))
+            ? 'danger'
+            : 'warn';
         const genanganTeks = a.genangan_air
-          ? `⚠️ ${labelGenangan(a.tingkat_genangan)}`
-          : '✅ No flooding visible';
+          ? labelGenangan(a.tingkat_genangan)
+          : 'Clear';
+
+        const jalanRaw = String(a.kondisi_jalan || '').toLowerCase();
+        const jalanTone = (jalanRaw.includes('macet') || jalanRaw.includes('padat_berat') || jalanRaw.includes('tutup'))
+          ? 'danger'
+          : (jalanRaw.includes('ramai') || jalanRaw.includes('padat') || jalanRaw.includes('sedang') || jalanRaw.includes('tersendat'))
+            ? 'warn'
+            : 'safe';
         const jalanTeks = labelKondisiJalan(a.kondisi_jalan);
-        const conf = Number.isFinite(a.confidence) ? `${Math.round(a.confidence * 100)}%` : '-';
+        const conf = Number.isFinite(a.confidence) ? `${Math.round(a.confidence * 100)}%` : '—';
+
         aiBox.innerHTML = `
           <div class="mapcctv__ai">
-            <div class="mapcctv__airow"><span>Flooding:</span><strong>${escapeHtml(genanganTeks)}</strong></div>
-            <div class="mapcctv__airow"><span>Traffic Flow:</span><strong>${escapeHtml(jalanTeks)}</strong></div>
-            <div class="mapcctv__airow"><span>AI Confidence:</span><strong>${escapeHtml(conf)}</strong></div>
-            ${a.alasan ? `<p class="mapcctv__aireason">"${escapeHtml(a.alasan)}"</p>` : ''}
+            <div class="mapcctv__aihead">
+              <span class="mapcctv__aititle">${ikon('i-spark', 12)} Gemini Vision</span>
+              <span class="mapcctv__aiconf" title="AI model confidence">${escapeHtml(conf)} confidence</span>
+            </div>
+            <div class="mapcctv__aimetrics">
+              <div class="mapcctv__aimetric">
+                <span class="mapcctv__ailabel">Flooding</span>
+                <span class="mapcctv__aival" data-tone="${floodTone}">
+                  <span class="mapcctv__aidot" aria-hidden="true"></span>
+                  <strong>${escapeHtml(genanganTeks)}</strong>
+                </span>
+              </div>
+              <div class="mapcctv__aimetric">
+                <span class="mapcctv__ailabel">Traffic Flow</span>
+                <span class="mapcctv__aival" data-tone="${jalanTone}">
+                  <span class="mapcctv__aidot" aria-hidden="true"></span>
+                  <strong>${escapeHtml(jalanTeks)}</strong>
+                </span>
+              </div>
+            </div>
+            ${a.alasan ? `<p class="mapcctv__aireason">${escapeHtml(a.alasan)}</p>` : ''}
           </div>
         `;
       }
