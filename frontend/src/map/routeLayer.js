@@ -8,7 +8,7 @@
 */
 
 import * as Cesium from 'cesium';
-import { getViewer, getMapViewMode, flyToCoordinates } from './cesiumViewer.js';
+import { getViewer, getMapViewMode, flyToCoordinates, getMobileCameraViewportOffset } from './cesiumViewer.js';
 import { boundsOf } from '../utils/geo.js';
 import { pitaDariSkor, kunciDariLabel } from '../domain/scoreLabels.js';
 import { pilihRuteByIndex, susunDaftarPilihanRute } from '../ui/controllers/resultController.js';
@@ -259,12 +259,15 @@ export function flyToRouteBounds(geometry) {
   const is3D = getMapViewMode() === '3d';
 
   const heightMultiplier = is3D ? 230000 : 210000;
-  const height = Math.max(2800, Math.min(36000, spanDeg * heightMultiplier));
+  const baseHeight = Math.max(2800, Math.min(36000, spanDeg * heightMultiplier));
   const pitchDeg = is3D ? -38 : -89.9;
-  const latOffset = is3D ? (height / 111320) * 0.70 : 0;
+  const { heightScale } = getMobileCameraViewportOffset(baseHeight, { is3D, pitchDeg });
+  const height = Math.min(48000, baseHeight * heightScale);
+  const { latOffsetDeg: mobileLatOffset } = getMobileCameraViewportOffset(height, { is3D, pitchDeg });
+  const baseLatOffset = is3D ? (height / 111320) * 0.70 : 0;
 
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat - latOffset, height),
+    destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat - baseLatOffset - mobileLatOffset, height),
     orientation: {
       heading: 0,
       pitch: Cesium.Math.toRadians(pitchDeg),

@@ -645,6 +645,7 @@ export function bukaPopupKameraPeta(cam) {
   activeAngleId = cam.angles?.[0]?.id || cam.id;
   renderEntitasKamera();
   notifyListeners();
+  window.dispatchEvent(new CustomEvent('jaksafe:mobile-peek'));
 
   const titleEl = document.getElementById('mapCctvTitle');
   const metaEl = document.getElementById('mapCctvMeta');

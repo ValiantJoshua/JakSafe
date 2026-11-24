@@ -115,9 +115,11 @@ function isMobileSheetViewport() {
 }
 
 function getMobileSheetDetents(panelEl) {
-  const h = Math.max(260, panelEl?.offsetHeight || Math.round(window.innerHeight * 0.78));
-  const peekOffset = Math.max(140, h - 82);
-  const halfOffset = Math.round(h * 0.34);
+  const h = Math.max(260, panelEl?.offsetHeight || Math.round(window.innerHeight * 0.82));
+  const safeBottom = panelEl ? (parseFloat(getComputedStyle(panelEl).paddingBottom) || 0) : 0;
+  const peekVisible = 86 + safeBottom;
+  const peekOffset = Math.max(140, h - peekVisible);
+  const halfOffset = Math.round(h * 0.36);
   return {
     height: h,
     expanded: 0,
@@ -203,7 +205,38 @@ function pasangGestureSheetMobile() {
   };
 
   window.addEventListener('resize', sinkronUkuranLayar, { passive: true });
+  window.visualViewport?.addEventListener('resize', sinkronUkuranLayar, { passive: true });
+  window.addEventListener('jaksafe:mobile-peek', () => {
+    if (isMobileSheetViewport() && (ws.getAttribute('data-sheet') || 'half') !== 'peek') {
+      snapSheetKeDetent('peek', 0);
+    }
+  });
+  window.addEventListener('jaksafe:mobile-half', () => {
+    if (isMobileSheetViewport() && (ws.getAttribute('data-sheet') || 'half') === 'expanded') {
+      snapSheetKeDetent('half', 0);
+    }
+  });
   requestAnimationFrame(sinkronUkuranLayar);
+
+  // Tap area header/body saat sheet dalam posisi peek -> langsung buka ke half (Apple Maps UX)
+  const panelBody = document.getElementById('panelBody');
+  panelBody?.addEventListener('click', (e) => {
+    if (!isMobileSheetViewport()) return;
+    if ((ws.getAttribute('data-sheet') || 'half') !== 'peek') return;
+    e.preventDefault();
+    snapSheetKeDetent('half', 0);
+  });
+
+  // Saat input asal/tujuan difokuskan pada layar ponsel, naikkan sheet ke expanded agar bebas dari keyboard
+  ['inpOrigin', 'inpDest'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('focus', () => {
+      if (!isMobileSheetViewport()) return;
+      const cur = ws.getAttribute('data-sheet') || 'half';
+      if (cur !== 'expanded') {
+        snapSheetKeDetent('expanded', 0);
+      }
+    });
+  });
 
   grabber.addEventListener('pointerdown', (e) => {
     if (!isMobileSheetViewport()) return;

@@ -784,6 +784,7 @@ export function pasangPengendaliHasil() {
     if (!btn) return;
     const item = hasilRuteRawanTersimpan[Number(btn.dataset.focusHazard)];
     if (!item || !Number.isFinite(Number(item.lat)) || !Number.isFinite(Number(item.lon))) return;
+    window.dispatchEvent(new CustomEvent('jaksafe:mobile-half'));
     flyToCoordinates({ lon: Number(item.lon), lat: Number(item.lat), height: 950 });
     toast(`Focused map on ${item.corridor}`);
   });
@@ -803,6 +804,7 @@ export function pasangPengendaliHasil() {
     $('#stepsList')?.querySelectorAll('.stepitem').forEach((el) => {
       el.dataset.active = el === item ? '1' : '0';
     });
+    window.dispatchEvent(new CustomEvent('jaksafe:mobile-half'));
     focusStepOnMap(step);
   });
 

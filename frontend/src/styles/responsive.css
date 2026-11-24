@@ -19,6 +19,22 @@
 
 /* Ponsel — Interactive Fluid Bottom-Sheet (§2, §4–§6, §9, §12) */
 @media (max-width: 720px) {
+  .topbar {
+    height: calc(54px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) max(var(--s3), env(safe-area-inset-right, 0px)) 0 max(var(--s3), env(safe-area-inset-left, 0px));
+    gap: var(--s2);
+  }
+  .logo { gap: 8px; }
+  .logo__word { font-size: 17px; }
+  .logo__tag { display: none; }
+  .topbar__tools { gap: 6px; }
+  .userchip__name {
+    max-width: 84px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .workspace {
     display: block;
     position: relative;
@@ -30,14 +46,120 @@
     min-height: 100%;
   }
 
+  /* Top HUD: beri ruang lega antara pemilih mode (kiri) dan tombol zoom (kanan) */
+  .mapstage__float--tl {
+    top: var(--s3);
+    left: max(var(--s3), env(safe-area-inset-left, 0px));
+    max-width: calc(100% - 72px);
+    z-index: calc(var(--z-mapctrl) + 2);
+  }
+
+  .mapstage__float--tr {
+    top: var(--s3);
+    right: max(var(--s3), env(safe-area-inset-right, 0px));
+  }
+
+  .maphud-bar {
+    gap: 6px;
+  }
+
+  .mapmode-btn {
+    padding: 6px 9px;
+    min-height: 34px;
+    touch-action: manipulation;
+  }
+
+  .weatherpill {
+    min-height: 34px;
+    padding: 0 10px;
+    touch-action: manipulation;
+  }
+
+  .weatherpop {
+    width: min(272px, calc(100vw - 24px));
+  }
+
+  /* Bottom Layer Dock: satu baris horizontal scrollable di atas peek sheet (bebas overlap) */
+  .mapstage__float--bl {
+    left: max(var(--s3), env(safe-area-inset-left, 0px));
+    right: max(var(--s3), env(safe-area-inset-right, 0px));
+    bottom: calc(98px + env(safe-area-inset-bottom, 0px));
+    max-width: none;
+    transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+  }
+
+  /* Sembunyikan halus saat bottom-sheet terbuka agar tidak menumpuk dua lapisan kaca buram (§12) */
+  .workspace[data-sheet="half"] .mapstage__float--bl,
+  .workspace[data-sheet="expanded"] .mapstage__float--bl {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px);
+  }
+
+  .maplayer-dock {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 4px;
+    padding: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .maplayer-dock::-webkit-scrollbar {
+    display: none;
+  }
+
+  .maplayer-chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-height: 36px;
+    padding: 6px 10px;
+    gap: 5px;
+    scroll-snap-align: start;
+    touch-action: manipulation;
+  }
+
+  /* Sembunyikan legenda desktop & rapikan kredit Cesium agar tidak menabrak dock */
+  .mapstage__float--br { display: none; }
+  .mapcanvas .cesium-viewer-bottom {
+    right: 10px !important;
+    bottom: 4px !important;
+    transform: scale(0.76);
+  }
+
+  /* Kartu CCTV mengambang & Click-to-Pick adaptif untuk layar ponsel */
+  .mapcctv-popup {
+    top: 102px;
+    left: max(var(--s3), env(safe-area-inset-left, 0px));
+    right: max(var(--s3), env(safe-area-inset-right, 0px));
+    width: auto;
+    max-height: calc(100% - 116px - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 14px;
+  }
+
+  .mappick-menu {
+    width: min(320px, calc(100% - 24px));
+  }
+
+  /* Bottom Sheet dengan dynamic viewport height & safe-area */
   .sidepanel {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
     width: 100%;
-    height: 78vh;
-    max-height: 78vh;
+    height: 82vh;
+    height: 82dvh;
+    max-height: 82dvh;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     flex: none;
     border-right: none;
     border-top: 1px solid var(--border);
@@ -59,14 +181,80 @@
 
   .sidepanel__grabber {
     display: flex;
+    height: 32px;
+    flex: 0 0 32px;
+    padding-top: 2px;
+  }
+
+  .sidepanel__body {
+    padding: 2px var(--s4) calc(var(--s6) + env(safe-area-inset-bottom, 0px));
+    scroll-padding-bottom: calc(var(--s8) + env(safe-area-inset-bottom, 0px));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .workspace[data-sheet="peek"] .sidepanel__body {
+    overflow: hidden;
+    cursor: pointer;
   }
 
   .sidepanel__tab { display: none; }
 
-  .topbar { padding: 0 var(--s4); }
-  .logo__tag { display: none; }
+  /* Cegah auto-zoom Safari iOS saat input difokuskan (font-size >= 16px) */
+  .field__input,
+  .inputwrap__input {
+    font-size: 16px;
+  }
 
-  .mapstage__float--br { display: none; }
+  /* Pindahkan toast ke atas pada ponsel agar tidak bertabrakan dengan sheet & dock layer */
+  .toast {
+    top: calc(64px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  .toast.is-on {
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Ergonomi layar sentuh (WCAG 2.5.5 target >= 44px via ukuran / perluasan area sentuh) */
+@media (pointer: coarse) {
+  .topbar__menubtn,
+  .mapctrl .iconbtn {
+    width: 40px;
+    height: 40px;
+    touch-action: manipulation;
+  }
+
+  .maplayer-chip,
+  .mapmode-btn,
+  .weatherpill,
+  .chip,
+  .mappick__btn,
+  .mapcctv__btn {
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+
+  .mappick__close,
+  .mapcctv__close,
+  .jmodal__close {
+    position: relative;
+  }
+
+  .mappick__close::after,
+  .mapcctv__close::after,
+  .jmodal__close::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapstage__float--bl {
+    transition: opacity var(--dur-1) ease;
+    transform: none !important;
+  }
 }
 
 @media (max-width: 420px) {

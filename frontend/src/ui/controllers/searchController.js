@@ -112,9 +112,11 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
     const tempat = findPlaceById(item.dataset.tempat);
     if (!tempat) return;
     kotak.value = tempat.headline || tempat.nama;
+    window.dispatchEvent(new CustomEvent('jaksafe:mobile-half'));
     setState({ [kunciKeadaan]: tempat.id });
     daftar.hidden = true;
     kotak.setAttribute('aria-expanded', 'false');
+    kotak.blur();
   });
 
   // Bila pengguna menekan Enter pada teks kustom, otomatis pilih hasil pertama yang cocok
@@ -126,9 +128,11 @@ function pasangKotakIsian(idInput, idSaran, kunciKeadaan) {
         if (hits.length > 0) {
           registerCustomPlace(hits[0]);
           kotak.value = hits[0].headline || hits[0].nama;
+          window.dispatchEvent(new CustomEvent('jaksafe:mobile-half'));
           setState({ [kunciKeadaan]: hits[0].id });
           daftar.hidden = true;
           kotak.setAttribute('aria-expanded', 'false');
+          kotak.blur();
         }
       }
     }
@@ -187,6 +191,7 @@ function pasangDeteksiGpsAsal() {
           const { latitude, longitude } = pos.coords;
           const place = await reverseGeocodeLive(latitude, longitude);
           inp.value = place.headline || place.nama;
+          window.dispatchEvent(new CustomEvent('jaksafe:mobile-half'));
           setState({ idAsal: place.id });
           tutupSemuaSaran();
           toast(`Origin set to: ${place.headline || place.nama}`);

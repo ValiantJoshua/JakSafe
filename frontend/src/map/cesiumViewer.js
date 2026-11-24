@@ -893,6 +893,67 @@ export function flyToPreset(presetKey = 'jakarta', { duration = 1.3 } = {}) {
 }
 
 /**
+ * Menghitung kompensasi vertikal kamera pada layar ponsel (<= 720px) agar titik pin,
+ * langkah navigasi, maupun garis rute tampil tepat di tengah area peta yang bebas
+ * dari bilah HUD atas dan bottom-sheet bawah.
+ *
+ * @param {number} heightM
+ * @param {{ is3D?: boolean, pitchDeg?: number }} [opts]
+ * @returns {{ latOffsetDeg: number, heightScale: number }}
+ */
+export function getMobileCameraViewportOffset(heightM, { is3D = false } = {}) {
+  if (typeof window === 'undefined' || !window.matchMedia?.('(max-width: 720px)').matches) {
+    return { latOffsetDeg: 0, heightScale: 1 };
+  }
+
+  const stage = document.querySelector('.mapstage');
+  const panel = document.getElementById('sidePanel');
+  const ws = document.getElementById('workspace');
+  const topFloat = document.getElementById('mapModeWrap');
+
+  const stageRect = stage?.getBoundingClientRect();
+  const stageH = stageRect?.height || window.innerHeight || 720;
+  const panelH = panel?.offsetHeight || Math.round(stageH * 0.82);
+  const detent = ws?.getAttribute('data-sheet') || 'half';
+
+  let topInset = 104;
+  if (stageRect && topFloat) {
+    const tlRect = topFloat.getBoundingClientRect();
+    const measuredTop = Math.round(tlRect.bottom - stageRect.top) + 12;
+    if (measuredTop > 40 && measuredTop < stageH * 0.45) {
+      topInset = measuredTop;
+    }
+  }
+
+  let bottomCovered = 0;
+  if (detent === 'peek') {
+    const safeBottom = panel ? (parseFloat(getComputedStyle(panel).paddingBottom) || 0) : 0;
+    // 86px peek sheet + 56px dock layer & celah di atasnya
+    bottomCovered = 86 + safeBottom + 56;
+  } else {
+    // Saat half (atau expanded yang akan diturunkan ke half), sheet menutup ~64% tinggi panel
+    bottomCovered = Math.round(panelH * 0.64);
+  }
+
+  const visibleTop = topInset;
+  const visibleBottom = Math.max(visibleTop + 120, stageH - bottomCovered);
+  const visibleH = visibleBottom - visibleTop;
+  const targetCenterY = (visibleTop + visibleBottom) / 2;
+  const canvasCenterY = stageH / 2;
+
+  // Positif berarti titik target perlu naik ke atas layar -> kamera bergeser ke selatan (kurangi lat)
+  const shiftUpFraction = (canvasCenterY - targetCenterY) / stageH;
+  const fovy = viewerInstance?.camera?.frustum?.fovy || (Math.PI / 3);
+  const groundSpanM = 2 * heightM * Math.tan(fovy / 2);
+  const tiltFactor = is3D ? 1.12 : 1;
+  const latOffsetDeg = (shiftUpFraction * groundSpanM * tiltFactor) / 111320;
+
+  const heightScale = Math.max(1, Math.min(2.1, (stageH * 0.72) / Math.max(160, visibleH)));
+
+  return { latOffsetDeg, heightScale };
+}
+
+/**
  * Mengarahkan kamera ke koordinat tertentu di Jakarta/Indonesia.
  */
 export function flyToCoordinates({
@@ -907,10 +968,11 @@ export function flyToCoordinates({
   const is3D = currentMode === '3d';
   const finalPitch = is3D ? LOCKED_3D_PITCH_DEG : -89.9;
   const finalHeading = is3D ? LOCKED_3D_HEADING_DEG : 0;
-  const latOffset = is3D && finalPitch > -75 ? (height / 111320) * 0.65 : 0;
+  const baseLatOffset = is3D && finalPitch > -75 ? (height / 111320) * 0.65 : 0;
+  const { latOffsetDeg: mobileLatOffset } = getMobileCameraViewportOffset(height, { is3D, pitchDeg: finalPitch });
 
   viewerInstance.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(lon, lat - latOffset, height),
+    destination: Cesium.Cartesian3.fromDegrees(lon, lat - baseLatOffset - mobileLatOffset, height),
     orientation: {
       heading: Cesium.Math.toRadians(finalHeading),
       pitch: Cesium.Math.toRadians(finalPitch),

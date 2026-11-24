@@ -2,7 +2,7 @@
    JakSafe — Layout (Unslopped Civic-Tech Workspace)
 */
 
-.app { display: flex; flex-direction: column; height: 100vh; background: var(--jk-bg); }
+.app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; background: var(--jk-bg); }
 
 /* TOPBAR (Quiet Chrome, 56px height on 4px grid) */
 .topbar {

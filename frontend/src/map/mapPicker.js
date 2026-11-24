@@ -209,9 +209,10 @@ export function posisikanMenuPick(screenPos) {
   const menuW = menu.offsetWidth || 320;
   const menuH = menu.offsetHeight || 170;
 
-  const pad = 16;
-  const topPad = 74;    // jarak aman dari bar mode 3D/2D di kiri atas & tombol zoom di kanan atas
-  const bottomPad = 86; // jarak aman dari bar dock layer di bawah
+  const isMobile = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px)').matches;
+  const pad = isMobile ? 12 : 16;
+  const topPad = isMobile ? 104 : 74;    // jarak aman dari bar mode 3D/2D + weather pill di atas
+  const bottomPad = isMobile ? 156 : 86; // jarak aman dari dock layer + peek bottom-sheet di bawah
 
   // 1. Sumbu X: coba tampil di kanan kursor (+16px)
   let x = screenPos.x + 16;
@@ -248,8 +249,11 @@ async function handleMapClick(screenPos) {
   const { lat, lon } = result;
   currentCoords = { lat, lon };
 
-  // Tutup popup CCTV lain yang mungkin sedang terbuka
+  // Tutup popup CCTV lain yang mungkin sedang terbuka & turunkan bottom-sheet mobile agar kartu terlihat utuh
   bukaPopupKameraPeta(null);
+  if (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 720px)').matches) {
+    toggleSidebar(false);
+  }
 
   // Pasang pin visual di peta (tanpa label teks di atas pin)
   renderPinSementara(lon, lat);
