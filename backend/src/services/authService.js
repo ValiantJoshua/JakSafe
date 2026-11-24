@@ -30,6 +30,195 @@ if (process.env.NODE_ENV === 'production') {
 
 const JWT_EXPIRES_IN = '24h';
 const MAX_PASSWORD_BYTES = 72;
+const GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
+const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
+const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
+const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
+
+let cachedGoogleJwks = { keys: [], expiresAt: 0 };
+
+export function getGoogleClientId() {
+  return String(process.env.GOOGLE_CLIENT_ID || '').trim();
+}
+
+export function resetGoogleJwksCacheForTest() {
+  cachedGoogleJwks = { keys: [], expiresAt: 0 };
+}
+
+async function fetchGoogleJwks({ force = false, fetchImpl = fetch } = {}) {
+  const now = Date.now();
+  if (!force && cachedGoogleJwks.keys.length > 0 && now < cachedGoogleJwks.expiresAt) {
+    return cachedGoogleJwks.keys;
+  }
+
+  const res = await fetchImpl(GOOGLE_JWKS_URL, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    throw new AuthError('Gagal mengambil kunci verifikasi Google. Silakan coba lagi.', 502);
+  }
+
+  const data = await res.json();
+  const keys = Array.isArray(data?.keys) ? data.keys : [];
+  if (keys.length === 0) {
+    throw new AuthError('Kunci verifikasi Google tidak tersedia.', 502);
+  }
+
+  const cc = String(res.headers?.get?.('cache-control') || '');
+  const maxAgeMatch = cc.match(/max-age=(\d+)/i);
+  const ttlSec = maxAgeMatch ? Math.max(300, Math.min(86400, Number(maxAgeMatch[1]))) : 3600;
+  cachedGoogleJwks = { keys, expiresAt: now + ttlSec * 1000 };
+  return keys;
+}
+
+/**
+ * Verifikasi Google ID Token (JWT RS256 dari Google Identity Services)
+ * secara kriptografis menggunakan JWKS resmi Google.
+ */
+export async function verifyGoogleIdToken(idToken, { clientId = getGoogleClientId(), fetchImpl = fetch } = {}) {
+  if (!clientId) {
+    throw new AuthError('Google Sign-In belum dikonfigurasi di server.', 503);
+  }
+  if (!idToken || typeof idToken !== 'string') {
+    throw new AuthError('Token Google wajib disertakan.', 400);
+  }
+
+  const decoded = jwt.decode(idToken, { complete: true });
+  const kid = decoded?.header?.kid;
+  const alg = decoded?.header?.alg;
+  if (!kid || alg !== 'RS256') {
+    throw new AuthError('Format token Google tidak valid.', 401);
+  }
+
+  let keys = await fetchGoogleJwks({ force: false, fetchImpl });
+  let jwk = keys.find((k) => k.kid === kid);
+  if (!jwk) {
+    // Kemungkinan Google baru saja merotasi kunci publik
+    keys = await fetchGoogleJwks({ force: true, fetchImpl });
+    jwk = keys.find((k) => k.kid === kid);
+  }
+  if (!jwk) {
+    throw new AuthError('Kunci penandatangan token Google tidak dikenali.', 401);
+  }
+
+  let payload;
+  try {
+    const publicKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+    payload = jwt.verify(idToken, publicKey, {
+      algorithms: ['RS256'],
+      audience: clientId,
+      issuer: GOOGLE_ISSUERS,
+    });
+  } catch {
+    throw new AuthError('Token Google tidak valid atau telah kedaluwarsa.', 401);
+  }
+
+  const email = String(payload?.email || '').trim().toLowerCase();
+  if (!email || !EMAIL_REGEX.test(email) || !payload?.sub) {
+    throw new AuthError('Informasi akun Google tidak lengkap.', 401);
+  }
+  if (payload.email_verified !== true) {
+    throw new AuthError('Email pada akun Google Anda belum terverifikasi.', 403);
+  }
+
+  return {
+    sub: String(payload.sub),
+    email,
+    name: String(payload.name || email.split('@')[0] || 'JakSafe User').trim(),
+    picture: typeof payload.picture === 'string' ? payload.picture : null,
+  };
+}
+
+/**
+ * Verifikasi Google OAuth2 Access Token (dari Google OAuth2 Popup)
+ * melalui tokeninfo (validasi audience/Client ID) dan userinfo resmi Google.
+ */
+export async function verifyGoogleAccessToken(accessToken, { clientId = getGoogleClientId(), fetchImpl = fetch } = {}) {
+  if (!clientId) {
+    throw new AuthError('Google Sign-In belum dikonfigurasi di server.', 503);
+  }
+  if (!accessToken || typeof accessToken !== 'string') {
+    throw new AuthError('Token akses Google wajib disertakan.', 400);
+  }
+
+  const infoUrl = `${GOOGLE_TOKENINFO_URL}?access_token=${encodeURIComponent(accessToken)}`;
+  const infoRes = await fetchImpl(infoUrl, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!infoRes.ok) {
+    throw new AuthError('Token Google tidak valid atau telah kedaluwarsa.', 401);
+  }
+
+  const info = await infoRes.json();
+  if (info?.aud !== clientId && info?.azp !== clientId) {
+    throw new AuthError('Token Google tidak diterbitkan untuk aplikasi ini.', 401);
+  }
+
+  const userRes = await fetchImpl(GOOGLE_USERINFO_URL, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!userRes.ok) {
+    throw new AuthError('Gagal mengambil profil akun Google.', 502);
+  }
+
+  const profile = await userRes.json();
+  const email = String(profile?.email || info?.email || '').trim().toLowerCase();
+  if (!email || !EMAIL_REGEX.test(email) || !profile?.sub) {
+    throw new AuthError('Informasi akun Google tidak lengkap.', 401);
+  }
+  if (profile.email_verified !== true && profile.email_verified !== 'true') {
+    throw new AuthError('Email pada akun Google Anda belum terverifikasi.', 403);
+  }
+
+  return {
+    sub: String(profile.sub),
+    email,
+    name: String(profile.name || email.split('@')[0] || 'JakSafe User').trim(),
+    picture: typeof profile.picture === 'string' ? profile.picture : null,
+  };
+}
+
+/**
+ * Masuk atau daftar otomatis menggunakan Google ID Token maupun OAuth2 Access Token.
+ */
+export async function loginWithGoogle({ credential, accessToken, isHealthSensitive = false }, opts = {}) {
+  const googleProfile = accessToken
+    ? await verifyGoogleAccessToken(accessToken, opts)
+    : await verifyGoogleIdToken(credential, opts);
+  const existing = await findUserByEmail(googleProfile.email);
+
+  if (existing) {
+    const safeUser = {
+      ...existing,
+      id: String(existing.id || existing._id),
+      role: existing.role === 'admin' ? 'admin' : 'user',
+      tokenVersion: Number(existing.tokenVersion) || 0,
+    };
+    const token = generateToken(safeUser);
+    return { user: safeUser, token, isNewUser: false };
+  }
+
+  // Buat password acak kriptografis agar skema User tetap aman & akun Google tidak bisa dibobol lewat password biasa
+  const randomPasswordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+  const newUser = await createUser({
+    name: googleProfile.name,
+    email: googleProfile.email,
+    password: randomPasswordHash,
+    role: 'user',
+    googleId: googleProfile.sub,
+    avatarUrl: googleProfile.picture,
+    healthProfile: {
+      isSensitive: Boolean(isHealthSensitive),
+      conditions: [],
+    },
+  });
+
+  const token = generateToken(newUser);
+  return { user: newUser, token, isNewUser: true };
+}
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

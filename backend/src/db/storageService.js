@@ -91,10 +91,21 @@ export async function findUserById(id) {
   return sanitizeUser(found);
 }
 
-export async function createUser({ name, email, password, role = 'user', healthProfile = {}, alertPreferences = {} }) {
+export async function createUser({
+  name,
+  email,
+  password,
+  role = 'user',
+  googleId = null,
+  avatarUrl = null,
+  healthProfile = {},
+  alertPreferences = {},
+}) {
   const normEmail = String(email || '').trim().toLowerCase();
   const safeName = String(name || '').trim();
   const safeRole = role === 'admin' ? 'admin' : 'user';
+  const safeGoogleId = googleId ? String(googleId).trim() : null;
+  const safeAvatarUrl = avatarUrl ? String(avatarUrl).trim() : null;
 
   const profile = {
     isSensitive: Boolean(healthProfile?.isSensitive),
@@ -113,6 +124,8 @@ export async function createUser({ name, email, password, role = 'user', healthP
       name: safeName,
       email: normEmail,
       password,
+      googleId: safeGoogleId,
+      avatarUrl: safeAvatarUrl,
       role: safeRole,
       tokenVersion: 0,
       healthProfile: profile,
@@ -136,6 +149,8 @@ export async function createUser({ name, email, password, role = 'user', healthP
     name: safeName,
     email: normEmail,
     password,
+    googleId: safeGoogleId,
+    avatarUrl: safeAvatarUrl,
     role: safeRole,
     tokenVersion: 0,
     healthProfile: profile,

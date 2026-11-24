@@ -27,6 +27,24 @@ export async function daftarPengguna(data) {
 }
 
 /**
+ * Mengambil konfigurasi publik Google Sign-In (enabled + clientId) dari backend.
+ */
+export async function ambilKonfigurasiGoogle() {
+  return await minta('/auth/google/config');
+}
+
+/**
+ * Masuk atau daftar akun menggunakan Google ID Token atau OAuth2 Access Token.
+ * @param {{ credential?: string, accessToken?: string, isHealthSensitive?: boolean }} payload
+ */
+export async function masukDenganGoogle({ credential, accessToken, isHealthSensitive = false }) {
+  return await minta('/auth/google', {
+    metode: 'POST',
+    badan: { credential, accessToken, isHealthSensitive },
+  });
+}
+
+/**
  * Mengambil profil pengguna saat ini berdasarkan token JWT.
  * @param {string} token
  */

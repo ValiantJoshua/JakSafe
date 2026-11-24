@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   register,
   login,
+  loginWithGoogle,
+  getGoogleClientId,
   logout,
   updateProfile,
   AuthError,
@@ -46,6 +48,37 @@ router.post('/login', async (req, res) => {
     res.status(status).json({
       ok: false,
       error: err.message || 'Gagal masuk',
+    });
+  }
+});
+
+// GET /api/auth/google/config -> memberi tahu frontend apakah Google Sign-In aktif beserta Client ID publiknya
+router.get('/google/config', (_req, res) => {
+  const clientId = getGoogleClientId();
+  res.json({
+    ok: true,
+    enabled: Boolean(clientId),
+    clientId: clientId || null,
+  });
+});
+
+// POST /api/auth/google -> verifikasi Google ID Token / Access Token & terbitkan JWT JakSafe
+router.post('/google', async (req, res) => {
+  const { credential, accessToken, isHealthSensitive } = req.body || {};
+  try {
+    const result = await loginWithGoogle({ credential, accessToken, isHealthSensitive });
+    res.status(result.isNewUser ? 201 : 200).json({
+      ok: true,
+      message: result.isNewUser ? 'Akun Google berhasil dibuat' : 'Berhasil masuk dengan Google',
+      isNewUser: result.isNewUser,
+      token: result.token,
+      user: result.user,
+    });
+  } catch (err) {
+    const status = err instanceof AuthError ? err.status : 500;
+    res.status(status).json({
+      ok: false,
+      error: err.message || 'Gagal masuk dengan Google',
     });
   }
 });

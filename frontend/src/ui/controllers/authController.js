@@ -12,6 +12,8 @@ import { getState, setState, subscribe } from '../../state/appState.js';
 import {
   masukPengguna,
   daftarPengguna,
+  ambilKonfigurasiGoogle,
+  masukDenganGoogle,
   ambilProfilSaya,
   keluarPengguna,
   perbaruiProfil,
@@ -30,6 +32,159 @@ import { ikon } from '../icons.js';
 let modeAutentikasi = 'login';
 let wilayahFilterAktif = 'semua';
 let daftarPeringatanAktif = [];
+let googleClientIdCache = null;
+let googleGsiScriptPromise = null;
+let googleTokenClient = null;
+let googleTokenClientId = '';
+
+/** Menyelesaikan sesi masuk (Email/Password maupun Google) dan memuat data akun pengguna. */
+async function selesaikanSesiMasuk({ token, user, sensitifFallback = false, isNewUser = false }) {
+  localStorage.setItem('jaksafe_token', token);
+  localStorage.setItem('jaksafe_user', JSON.stringify(user));
+
+  setState({
+    masuk: true,
+    token,
+    pengguna: user,
+    sensitifKesehatan: Boolean(user?.healthProfile?.isSensitive ?? sensitifFallback),
+  });
+
+  bukaModal(false);
+  toast(isNewUser ? `Account created. Welcome, ${user.name}!` : `Welcome, ${user.name}!`);
+
+  try {
+    const [routes, history] = await Promise.all([
+      ambilSemuaRuteTersimpan(token),
+      ambilRiwayatPerjalanan(token),
+    ]);
+    setState({ ruteTersimpan: routes, riwayatPerjalanan: history });
+  } catch (loadErr) {
+    console.warn('[auth] Failed to load account data:', loadErr);
+  }
+}
+
+/** Memuat skrip resmi Google Identity Services secara dinamis saat dibutuhkan. */
+function muatSkripGoogleGsi() {
+  if (typeof window === 'undefined') return Promise.resolve(false);
+  if (window.google?.accounts?.oauth2) return Promise.resolve(true);
+  if (googleGsiScriptPromise) return googleGsiScriptPromise;
+
+  googleGsiScriptPromise = new Promise((resolve) => {
+    const existing = document.querySelector('script[data-jaksafe-gsi="1"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(Boolean(window.google?.accounts?.oauth2)), { once: true });
+      existing.addEventListener('error', () => resolve(false), { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.dataset.jaksafeGsi = '1';
+    script.onload = () => resolve(Boolean(window.google?.accounts?.oauth2));
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+
+  return googleGsiScriptPromise;
+}
+
+/** Mengambil Google Client ID dari env Vite atau endpoint backend /api/auth/google/config. */
+async function ambilGoogleClientId() {
+  if (googleClientIdCache !== null) return googleClientIdCache;
+  const fromEnv = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
+  if (fromEnv) {
+    googleClientIdCache = fromEnv;
+    return fromEnv;
+  }
+  try {
+    const cfg = await ambilKonfigurasiGoogle();
+    googleClientIdCache = cfg?.enabled && cfg?.clientId ? String(cfg.clientId).trim() : '';
+  } catch {
+    googleClientIdCache = '';
+  }
+  return googleClientIdCache;
+}
+
+function perbaruiLabelTombolGoogle(busy = false) {
+  const btn = $('#btnGoogleAuth');
+  const lbl = $('#lblGoogleAuth');
+  if (btn) btn.disabled = busy;
+  if (lbl) {
+    lbl.textContent = busy
+      ? 'Connecting to Google...'
+      : (modeAutentikasi === 'register' ? 'Sign up with Google' : 'Continue with Google');
+  }
+}
+
+/** Menyiapkan tombol "Continue with Google" yang selaras dengan tema JakSafe (terang/gelap). */
+async function siapkanTombolGoogle() {
+  const wrap = $('#googleAuthWrap');
+  const btn = $('#btnGoogleAuth');
+  if (!wrap || !btn) return;
+
+  const clientId = await ambilGoogleClientId();
+  if (!clientId) {
+    wrap.hidden = true;
+    return;
+  }
+
+  wrap.hidden = false;
+  perbaruiLabelTombolGoogle(false);
+
+  const loaded = await muatSkripGoogleGsi();
+  if (!loaded || !window.google?.accounts?.oauth2) {
+    wrap.hidden = true;
+    return;
+  }
+
+  if (!googleTokenClient || googleTokenClientId !== clientId) {
+    googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'openid email profile',
+      callback: async (response) => {
+        if (response?.error || !response?.access_token) {
+          perbaruiLabelTombolGoogle(false);
+          tampilkanErrorAuth(response?.error_description || 'Google sign-in was cancelled or denied.');
+          return;
+        }
+        bersihkanErrorAuth();
+        try {
+          const sensitif = modeAutentikasi === 'register' ? ($('#chkSensitif')?.checked ?? false) : false;
+          const res = await masukDenganGoogle({
+            accessToken: response.access_token,
+            isHealthSensitive: sensitif,
+          });
+          await selesaikanSesiMasuk({
+            token: res.token,
+            user: res.user,
+            sensitifFallback: sensitif,
+            isNewUser: Boolean(res.isNewUser),
+          });
+        } catch (err) {
+          console.error('[auth] Google sign-in error:', err);
+          tampilkanErrorAuth(err?.message || 'Unable to sign in with Google. Please try again.');
+        } finally {
+          perbaruiLabelTombolGoogle(false);
+        }
+      },
+      error_callback: () => {
+        perbaruiLabelTombolGoogle(false);
+      },
+    });
+    googleTokenClientId = clientId;
+  }
+
+  if (!btn.dataset.googleWired) {
+    btn.dataset.googleWired = '1';
+    btn.addEventListener('click', () => {
+      if (!googleTokenClient) return;
+      bersihkanErrorAuth();
+      perbaruiLabelTombolGoogle(true);
+      googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+    });
+  }
+}
 
 /** Mengembalikan input kata sandi ke kondisi tersembunyi. */
 function resetTampilanPassword() {
@@ -110,6 +265,9 @@ function aturModeAuth(mode, { focusField = false } = {}) {
   if (submitBtn && !submitBtn.disabled) {
     submitBtn.innerHTML = `${isRegister ? 'Create Account' : 'Sign In'} <span class="btn__dot">${ikon('i-arrow-r', 16)}</span>`;
   }
+  if (!$('#btnGoogleAuth')?.disabled) {
+    perbaruiLabelTombolGoogle(false);
+  }
 
   bersihkanErrorAuth();
   if (focusField) {
@@ -125,6 +283,7 @@ function bukaModal(buka) {
   resetTampilanPassword();
   if (buka) {
     aturModeAuth('login');
+    void siapkanTombolGoogle();
     setTimeout(() => $('#loginEmail')?.focus(), 60);
   } else {
     bersihkanErrorAuth();
@@ -545,29 +704,12 @@ export async function pasangPengendaliAuth() {
       }
 
       const { token, user } = res;
-      localStorage.setItem('jaksafe_token', token);
-      localStorage.setItem('jaksafe_user', JSON.stringify(user));
-
-      setState({
-        masuk: true,
+      await selesaikanSesiMasuk({
         token,
-        pengguna: user,
-        sensitifKesehatan: Boolean(user?.healthProfile?.isSensitive ?? (isRegister ? sensitif : false)),
+        user,
+        sensitifFallback: isRegister ? sensitif : false,
+        isNewUser: isRegister,
       });
-
-      bukaModal(false);
-      toast(`Welcome, ${user.name}!`);
-
-      // Muat rute tersimpan & riwayat perjalanan dari backend
-      try {
-        const [routes, history] = await Promise.all([
-          ambilSemuaRuteTersimpan(token),
-          ambilRiwayatPerjalanan(token),
-        ]);
-        setState({ ruteTersimpan: routes, riwayatPerjalanan: history });
-      } catch (loadErr) {
-        console.warn('[auth] Failed to load account data:', loadErr);
-      }
     } catch (err) {
       console.error('[auth] Auth error:', err);
       if (!isRegister && err.status === 404) {

@@ -50,6 +50,7 @@ export function createApp(options = {}) {
       || req.path.startsWith('/tomtom/flow')
       || req.path === '/auth/login'
       || req.path === '/auth/register'
+      || req.path === '/auth/google'
     ),
   });
 
@@ -112,6 +113,7 @@ export function createApp(options = {}) {
 
   app.use('/api/auth/login', authLimiter);
   app.use('/api/auth/register', authLimiter);
+  app.use('/api/auth/google', authLimiter);
   app.use('/api/navigate', heavyLimiter);
   app.use('/api/cctv/analyze', heavyLimiter);
   app.use('/api/tomtom/flow', tileLimiter);
